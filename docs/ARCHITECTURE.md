@@ -55,9 +55,9 @@ So the honest description is "raw, typed, statements, canonical." The names are 
 | Web app and API | SvelteKit (Svelte 5) on `@sveltejs/adapter-cloudflare`, TypeScript, Tailwind 4 | Next.js, Astro, Rails | Server-rendered by default with progressive enhancement, a small client bundle, and first-class Workers bindings via `platform.env`. |
 | Serving database | D1 (SQLite) with FTS5 | Postgres via Hyperdrive (Neon/Supabase), Turso, DuckDB-Wasm over R2 | Read-heavy, single-writer, regenerated in bulk: SQLite's sweet spot. FTS5 is supported. 10 GB limit is two orders of magnitude above Phase 0 (~100 MB). Postgres would add a second vendor and a connection pool for no query Atlas needs. |
 | Object storage | R2 | S3 | Zero egress, same account, native Worker binding, serves downloads directly. |
-| Pipeline runtime | Python 3.13 in a Cloudflare Container, one image, triggered from a Worker `scheduled` handler | Python Workers (Pyodide), rewriting adapters in TypeScript, GitHub Actions cron | The Uganda adapters exist in Python and use `pdfplumber`, `pyarrow`, DuckDB and Splink; none of those run under Pyodide today. A container runs them unchanged. TypeScript adapters are allowed by the contract (section 6) but are not the Phase 0 path. |
-| Scheduling | Cron Triggers (one per cadence class) | External scheduler | Native; the trigger fans out to per-source runs through Queues in Phase 1, sequentially in Phase 0. |
-| Rendered sources | Browser Rendering binding | Headless Chrome in the container | Managed, metered, and only for sources that need a browser and whose terms allow it. |
+| Pipeline runtime | Python 3.13 run by a GitHub Actions scheduled workflow (one job per cadence class) that executes the adapters, resolution and scoring and loads the serving database through the D1 import API; a local run is the fallback | Cloudflare Containers (paid plan only, Phase 1), Python Workers (Pyodide), rewriting adapters in TypeScript | The adapters use `pdfplumber`, `pyarrow`, DuckDB and Splink, none of which run under Pyodide; a scheduled workflow runs them unchanged on a free tier. Containers become the runtime in Phase 1 when the paid plan is justified. |
+| Scheduling | GitHub Actions cron (one workflow per cadence class); the Cloudflare API token is a repository secret scoped to D1, R2 and Workers | Cloudflare Cron Triggers plus Containers (paid) | Free, observable per run, and the pipeline needs no Worker to start it. Cron Triggers return with Containers in Phase 1. |
+| Rendered sources | Browser Rendering binding, free tier (ten minutes per day), only for sources that need a browser and whose terms allow it; never for KCCA, URA, PPDA or UNBS | Headless Chrome in the pipeline runner | Managed and metered; the Phase 0 registers are plain HTML, PDF and JSON. |
 | Entity resolution | Splink (DuckDB backend) in the container | dedupe, hand-written blocking + Jaro-Winkler | Proven on this data; expert-set weights, no EM on name-only features; outputs candidates with a comparison vector. |
 | Canonical build | DuckDB SQL in the container, Parquet out | dbt-duckdb, Polars | Same engine as the linkage step; SQL is reviewable by contributors; dbt adds a toolchain for a dozen models. Revisit if models exceed ~20. |
 | Load to D1 | D1 import API (init, upload SQL to R2, ingest, poll), one SQL file per regeneration | Row-by-row inserts from a Worker | Bulk import is built for this; the Worker never writes canonical tables. |
@@ -88,18 +88,19 @@ Decision: keep Python for the pipeline in Phase 0 and make the **adapter contrac
 ```
                      +---------------------------- Cloudflare account ----------------------------+
                      |                                                                             |
-  Cron Triggers  --> |  Worker: atlas (SvelteKit)                                                  |
+  GitHub Actions   |                                                                             |
+  (cron per        |  Worker: atlas (SvelteKit)                                                  |
+   cadence class)  |                                                                             |
    (per cadence)     |   /            site (SSR + islands)     reads D1                            |
                      |   /api/v1/*    JSON API                  reads D1, R2 (downloads)           |
                      |   /mcp         remote MCP (createMcpHandler) same handlers as /api          |
                      |   /ops/*       maintainer UI (Access)    writes claims/labels/statements    |
                      |   /ops/mcp     ops MCP (createMcpHandler, Access) same ops library          |
-                     |   scheduled()  starts pipeline container with {pack, source} or {regen}     |
                      |                                                                             |
-                     |  Container: pipeline (Python 3.13)                                          |
+                     |  Pipeline runner: GitHub Actions job (Python 3.13), Phase 1: Container      |
                      |   adapters -> raw (R2) -> typed + statements (R2)                           |
                      |   resolve  -> canonical parquet (R2) -> SQL -> D1 import API                |
-                     |   uses Browser Rendering binding for rendered sources                       |
+                     |   Browser Rendering (free tier) only for sources that need it              |
                      |                                                                             |
                      |  D1: atlas        canonical tables + FTS + claims/sessions/labels           |
                      |  R2: atlas-data   raw/, sources/, canonical/, bundles/, regen/<id>.sql      |
@@ -149,7 +150,7 @@ Tables in D1, all regenerated wholesale except the last group.
 | `businesses_fts` | FTS5 virtual table | name, trade names, identifier values |
 | `claims`, `claim_events`, `sessions`, `operator_statements`, `labels`, `issues` | append-only, not regenerated | maintained by the ops library; exported to R2 on every regeneration so they are inputs, never state trapped in the serving store |
 
-Regeneration is a transactional swap: new tables are loaded under a suffixed name via the import API, then a single transaction renames them into place and updates `meta.live_regeneration`. A failed import never touches the live tables. Two D1 limits shape the SQL writer: a single SQL statement may not exceed 100,000 bytes, so multi-row `INSERT`s are split into batches well under that size; and an import blocks the database for its duration, so the writer always stages under suffixed table names and never imports into a live table.
+Regeneration is a transactional swap: new tables are loaded under a suffixed name via the import API, then a single transaction renames them into place and updates `meta.live_regeneration`. A failed import never touches the live tables. Two D1 limits shape the SQL writer: a single SQL statement may not exceed 100,000 bytes, so multi-row `INSERT`s are split into batches well under that size; and an import blocks the database for its duration, so the writer always stages under suffixed table names and never imports into a live table. Phase 0 runs on the free plan, so each database stays under 500 MB: the remote size is reported after every import, and at 400 MB the statements table is normalised (sources by id, shorter statement ids, repeated source references in a refs table) or split into a second database; the full statements always remain in the Parquet bundles.
 
 ## 8. Resolution and scoring
 
@@ -179,7 +180,7 @@ Regeneration is a transactional swap: new tables are loaded under a suffixed nam
 | Downloads | R2 objects with `datapackage.json` | R2 direct |
 | WebMCP and MCP tools | the same handlers as `/api/v1` | as above |
 
-All reads carry `ETag` derived from the live regeneration id so agents and browsers revalidate cheaply.
+All reads carry `ETag` derived from the live regeneration id so agents and browsers revalidate cheaply. On the free plan a request has 10 ms of CPU and 50 database queries: explore aggregates (counts by category, division and register presence) are precomputed into a table at regeneration, and the business page stays under ten queries.
 
 ## 10. Security model
 
