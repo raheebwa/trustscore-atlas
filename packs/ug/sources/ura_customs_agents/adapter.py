@@ -147,3 +147,17 @@ def run(ctx) -> None:
         )
         ctx.raw.put(f"page-{page}.html", body)
         _emit_page(ctx, body, page_url)
+
+
+SNAPSHOT_DATE_COLUMNS = [
+    "license_issue_date",
+    "license_expiry_date",
+    "date_of_approval",
+    "date_of_application",
+    "date_of_deactivation",
+]
+
+
+def from_snapshot_row(row: dict) -> dict:
+    """Normalise a row from a dated typed table received earlier (snapshot runs)."""
+    return row | {c: _iso_date(row[c]) if row.get(c) else "" for c in SNAPSHOT_DATE_COLUMNS}

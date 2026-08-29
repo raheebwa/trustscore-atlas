@@ -117,6 +117,19 @@ def replay_fetcher(manifest_path: Path) -> Fetcher:
     return fetch
 
 
+def _load_snapshot(spec: AdapterSpec, ctx: Context, snapshot: Path, source_ref: str) -> None:
+    """Feed a dated typed table through the adapter contract when the register itself no longer
+    serves. The table as received is the raw object; the adapter may normalise each row via an
+    optional from_snapshot_row(row) hook (date formats and the like)."""
+    data = snapshot.read_bytes()
+    ctx.raw.last_url = None
+    ctx.raw.put(snapshot.name, data)
+    normalise = getattr(spec.module, "from_snapshot_row", lambda row: row)
+    for row in pq.read_table(snapshot).to_pylist():
+        record = normalise({k: ("" if v is None else str(v)) for k, v in row.items()})
+        ctx.emit_record(record | {"source_ref": source_ref})
+
+
 def _typed_records(spec: AdapterSpec, rows: list[dict], salt: str) -> list[dict]:
     pii = spec.source["pii"]
     columns = [f["name"] for f in spec.schema["fields"]]
@@ -160,12 +173,21 @@ def run_adapter(
     params: dict | None = None,
     previous_manifest: dict | None = None,
     replay_from: Path | None = None,
+    snapshot: Path | None = None,
+    snapshot_at: datetime | None = None,
+    snapshot_ref: str | None = None,
 ) -> RunResult:
     if replay_from is not None and started_at is None:
         # A replay re-derives records from the original observation; the assertion time is the
         # original pull time, so outputs stay byte-identical without a re-crawl.
         original = json.loads(Path(replay_from).read_text())
         started_at = datetime.fromisoformat(original["started_at"].replace("Z", "+00:00"))
+    if snapshot is not None:
+        if snapshot_at is None or not snapshot_ref:
+            raise ValueError(
+                "a snapshot run needs snapshot_at (original pull time) and snapshot_ref"
+            )
+        started_at = snapshot_at
     started_at = started_at or datetime.now(UTC)
     run_id = run_id or datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     salt = salt or os.environ.get("ATLAS_LINKAGE_SALT")
@@ -185,7 +207,10 @@ def run_adapter(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     ctx = Context(fetcher=fetcher, raw=RawStore(raw_dir), params=params or {})
-    spec.module.run(ctx)
+    if snapshot is not None:
+        _load_snapshot(spec, ctx, Path(snapshot), snapshot_ref)
+    else:
+        spec.module.run(ctx)
 
     records = _typed_records(spec, ctx.records, salt)
     statements = build_statements(records, spec.mapping, spec.source, started_at)
@@ -222,6 +247,11 @@ def run_adapter(
         "checksums": {"records_parquet": records_sha, "statements_parquet": statements_sha},
         "flags": flags,
     }
+    if snapshot is not None:
+        manifest["snapshot"] = {
+            "file": Path(snapshot).name,
+            "observed_at": started_at.isoformat().replace("+00:00", "Z"),
+        }
     Draft202012Validator(_schema("manifest")).validate(manifest)
     (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     if not flags:

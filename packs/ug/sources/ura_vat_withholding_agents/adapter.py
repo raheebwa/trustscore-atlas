@@ -122,3 +122,11 @@ def run(ctx) -> None:
         )
         ctx.raw.put(f"page-{page}.html", body)
         _emit_page(ctx, body, page_url)
+
+
+SNAPSHOT_DATE_COLUMNS = ["designation_effective_date"]
+
+
+def from_snapshot_row(row: dict) -> dict:
+    """Normalise a row from a dated typed table received earlier (snapshot runs)."""
+    return row | {c: _iso_date(row[c]) if row.get(c) else "" for c in SNAPSHOT_DATE_COLUMNS}
