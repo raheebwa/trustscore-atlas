@@ -24,6 +24,7 @@ PHASE0_RUBRICS = ("formality", "activity", "compliance_signals", "procurement_re
 PRELUDE_DROPS = {
     "DB": ("scores", "businesses_fts", "statements", "refs"),
     "DB_STATEMENTS": ("statements",),
+    "DB_SCORES": ("scores",),
 }
 
 
@@ -299,7 +300,15 @@ def regenerate(
     # loader first drops the largest live table. The previous regeneration's stage.sql and
     # swap.sql stay on disk as the rollback path; trace reads fail closed during the load.
     load_order: dict[str, list[str]] = {}
-    for database, prefix in (("DB", ""), ("DB_STATEMENTS", "statements-")):
+    pack_meta = {
+        "coverage_applicable": _json(resolution.businesses[0]["coverage"]["applicable"]),
+        "coverage_checked": _json(resolution.businesses[0]["coverage"]["checked"]),
+    }
+    for database, prefix in (
+        ("DB", ""),
+        ("DB_STATEMENTS", "statements-"),
+        ("DB_SCORES", "scores-"),
+    ):
         sql = regeneration_sql(
             schema_path,
             regeneration,
@@ -316,7 +325,15 @@ def regenerate(
         )
         (out / f"{prefix}stage.sql").write_text("\n".join(sql) + "\n")
         (out / f"{prefix}swap.sql").write_text(
-            "\n".join(swap_sql(schema_path, regeneration, database=database)) + "\n"
+            "\n".join(
+                swap_sql(
+                    schema_path,
+                    regeneration,
+                    database=database,
+                    meta=pack_meta if database == "DB" else None,
+                )
+            )
+            + "\n"
         )
         load_order[database] = [f"{prefix}prelude.sql", f"{prefix}stage.sql", f"{prefix}swap.sql"]
     summary = regeneration | {

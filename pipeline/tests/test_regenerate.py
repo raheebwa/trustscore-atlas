@@ -135,14 +135,12 @@ def test_regenerate_splits_statements_into_a_second_database(tmp_path: Path):
         schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
     )
     order = json.loads((out.directory / "regeneration.json").read_text())["load_order"]
-    assert order == {
-        "DB": ["prelude.sql", "stage.sql", "swap.sql"],
-        "DB_STATEMENTS": [
-            "statements-prelude.sql",
-            "statements-stage.sql",
-            "statements-swap.sql",
-        ],
-    }
+    assert order["DB"] == ["prelude.sql", "stage.sql", "swap.sql"]
+    assert order["DB_STATEMENTS"] == [
+        "statements-prelude.sql",
+        "statements-stage.sql",
+        "statements-swap.sql",
+    ]
     main = sqlite3.connect(":memory:")
     for name in ("prelude.sql", "stage.sql", "swap.sql"):
         apply_batch(main, (out.directory / name).read_text())
@@ -258,3 +256,56 @@ def test_regenerate_scores_all_four_rubrics_with_formality_first(tmp_path: Path)
     businesses = pq.read_table(out.directory / "businesses.parquet").to_pylist()
     assert out.summary["counts"]["scores"] == EXPECTED["entities"] * 4
     assert businesses
+
+
+def test_regenerate_puts_scores_in_a_third_database_and_shares_pack_coverage_once(tmp_path: Path):
+    """Scores (four rubrics with evidence) are the largest table, so they load into DB_SCORES.
+    The applicable and checked register lists are the same for every business in a
+    regeneration, so they are stored once in meta and each business keeps only found_in."""
+    import sqlite3
+
+    from atlas_pipeline.d1 import apply_batch
+
+    spec = load_adapter(ADAPTER)
+    pages = {
+        spec.module.query_url(n): (ADAPTER / "fixtures" / "raw" / f"{_slug(n)}.html").read_bytes()
+        for n in EXPECTED["natures"]
+    }
+    run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=lambda url, **_: pages[url],
+        salt=SALT,
+        params={"natures": EXPECTED["natures"]},
+    )
+    out = regenerate(
+        pack_dir=PACKS / "ug",
+        data_root=tmp_path,
+        regeneration_id="20260829T210000Z",
+        computed_at="2026-08-29T21:00:00Z",
+        rubrics_dir=PACKS.parent / "rubrics",
+        schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
+    )
+    order = json.loads((out.directory / "regeneration.json").read_text())["load_order"]
+    assert order["DB_SCORES"] == ["scores-prelude.sql", "scores-stage.sql", "scores-swap.sql"]
+    main = sqlite3.connect(":memory:")
+    for name in order["DB"]:
+        apply_batch(main, (out.directory / name).read_text())
+    assert main.execute("SELECT count(*) FROM sqlite_master WHERE name='scores'").fetchone() == (0,)
+    coverage = json.loads(main.execute("SELECT coverage FROM businesses LIMIT 1").fetchone()[0])
+    assert set(coverage) == {"found_in"}
+    meta = dict(main.execute("SELECT key, value FROM meta").fetchall())
+    assert json.loads(meta["coverage_applicable"])[0] == "kcca.businesses"
+    assert json.loads(meta["coverage_checked"]) == ["kcca.businesses"]
+    assert meta["live_regeneration"] == "20260829T210000Z"
+    scores_db = sqlite3.connect(":memory:")
+    for name in order["DB_SCORES"]:
+        apply_batch(scores_db, (out.directory / name).read_text())
+    assert scores_db.execute("SELECT count(*) FROM scores").fetchone() == (
+        EXPECTED["entities"] * 4,
+    )
+    assert scores_db.execute("SELECT value FROM meta WHERE key='live_regeneration'").fetchone() == (
+        "20260829T210000Z",
+    )

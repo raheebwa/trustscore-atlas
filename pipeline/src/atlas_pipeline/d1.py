@@ -22,13 +22,13 @@ DATABASES = {
         "identifiers",
         "aliases",
         "linkage_candidates",
-        "scores",
         "sources",
         "businesses_fts",
     ),
     "DB_STATEMENTS": ("statements", "refs"),
+    "DB_SCORES": ("scores",),
 }
-STAGED_TABLES = DATABASES["DB"] + DATABASES["DB_STATEMENTS"]
+STAGED_TABLES = DATABASES["DB"] + DATABASES["DB_STATEMENTS"] + DATABASES["DB_SCORES"]
 PERSISTENT_TABLES = ("regenerations", "meta")
 
 BUSINESS_COLUMNS = [
@@ -189,7 +189,7 @@ def business_rows(businesses: list[dict], scores: list[dict]) -> list[dict]:
                 "division": location.get("division_or_subcounty"),
                 "first_seen": b["first_seen"],
                 "last_seen": b["last_seen"],
-                "coverage": _json(b["coverage"]),
+                "coverage": _json({"found_in": b["coverage"]["found_in"]}),
                 "scores": _json(summary.get(b["atlas_id"], {})),
             }
         )
@@ -231,6 +231,22 @@ def regeneration_sql(
         )
         out += _regeneration_row(regeneration)
         return out
+    if database == "DB_SCORES":
+        out += insert_statements(
+            f"scores__{rid}",
+            SCORE_COLUMNS,
+            [
+                {
+                    **s,
+                    "regeneration_id": rid,
+                    "coverage": _json(s["coverage"]),
+                    "evidence": _json(s["evidence"]),
+                }
+                for s in scores
+            ],
+        )
+        out += _regeneration_row(regeneration)
+        return out
     out += insert_statements(
         f"businesses__{rid}", BUSINESS_COLUMNS, business_rows(businesses, scores)
     )
@@ -254,19 +270,6 @@ def regeneration_sql(
             "model_version",
         ],
         [{**c, "comparison": _json(c["comparison"])} for c in (candidates or [])],
-    )
-    out += insert_statements(
-        f"scores__{rid}",
-        SCORE_COLUMNS,
-        [
-            {
-                **s,
-                "regeneration_id": rid,
-                "coverage": _json(s["coverage"]),
-                "evidence": _json(s["evidence"]),
-            }
-            for s in scores
-        ],
     )
     out += insert_statements(f"sources__{rid}", SOURCE_COLUMNS, sources)
     out += insert_statements(
@@ -294,7 +297,14 @@ def _regeneration_row(regeneration: dict) -> list[str]:
     )
 
 
-def swap_sql(schema_path: Path, regeneration: dict, database: str = "DB") -> list[str]:
+def swap_sql(
+    schema_path: Path,
+    regeneration: dict,
+    database: str = "DB",
+    meta: dict[str, str] | None = None,
+) -> list[str]:
+    """Rename staged tables into place and move the live pointer; extra meta rows (for
+    example the pack-wide coverage lists) are written in the same batch."""
     rid = _check_regeneration_id(regeneration["id"])
     tables = DATABASES[database]
     out: list[str] = []
@@ -304,6 +314,10 @@ def swap_sql(schema_path: Path, regeneration: dict, database: str = "DB") -> lis
     for stmt in _schema_statements(schema_path):
         if stmt.startswith("CREATE INDEX") and _index_table(stmt) in tables:
             out.append(stmt)
+    for key, value in sorted((meta or {}).items()):
+        out.append(
+            f"INSERT OR REPLACE INTO meta (key, value) VALUES ({quote(key)}, {quote(value)});"
+        )
     out.append(
         f"INSERT OR REPLACE INTO meta (key, value) VALUES ('live_regeneration', {quote(rid)});"
     )
