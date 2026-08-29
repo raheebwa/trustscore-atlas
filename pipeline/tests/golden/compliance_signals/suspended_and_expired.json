@@ -1,0 +1,127 @@
+{
+  "business": {
+    "atlas_id": "atl_0000000000000009",
+    "identifiers": [],
+    "coverage": {
+      "applicable": [
+        "kcca.businesses",
+        "kcca.property_rates",
+        "ura.vat_withholding_agents",
+        "ura.customs_agents",
+        "ura.wht_exemptions",
+        "ppda.ocds",
+        "unbs.certified_products",
+        "bou.supervised_institutions",
+        "cma.licensed_firms",
+        "urbra.licensed_schemes",
+        "ucc.broadcasters",
+        "nlgrb.gaming_operators"
+      ],
+      "checked": [
+        "kcca.businesses",
+        "ura.vat_withholding_agents",
+        "ura.customs_agents",
+        "ura.wht_exemptions",
+        "ppda.ocds",
+        "unbs.certified_products"
+      ],
+      "found_in": [
+        "unbs.certified_products",
+        "ura.customs_agents"
+      ],
+      "not_yet_checked": [
+        "kcca.property_rates",
+        "bou.supervised_institutions",
+        "cma.licensed_firms",
+        "urbra.licensed_schemes",
+        "ucc.broadcasters",
+        "nlgrb.gaming_operators"
+      ]
+    }
+  },
+  "statements": [
+    {
+      "statement_id": "d1",
+      "field": "certification.status",
+      "value": "Expired",
+      "source": "unbs.certified_products",
+      "asserted_at": "2026-08-29T22:25:03Z",
+      "precedence": 3
+    },
+    {
+      "statement_id": "d2",
+      "field": "certification.status",
+      "value": "Valid",
+      "source": "unbs.certified_products",
+      "asserted_at": "2026-08-29T22:25:03Z",
+      "precedence": 3
+    },
+    {
+      "statement_id": "d3",
+      "field": "certification.status",
+      "value": "Withdrawn",
+      "source": "unbs.certified_products",
+      "asserted_at": "2026-08-29T22:25:03Z",
+      "precedence": 3
+    },
+    {
+      "statement_id": "d4",
+      "field": "status.ura_customs_agent",
+      "value": "Suspended",
+      "source": "ura.customs_agents",
+      "asserted_at": "2026-05-12T00:00:00Z",
+      "precedence": 2
+    }
+  ],
+  "expected": {
+    "rubric": "compliance_signals",
+    "version": 1,
+    "value": 0,
+    "max": 100,
+    "checkable": 70,
+    "unknown": 30,
+    "unknown_predicates": [
+      "property_rates_compliant",
+      "regulator_licence_current"
+    ],
+    "coverage": {
+      "applicable": 12,
+      "checked": 6,
+      "found_in": 2,
+      "not_yet_checked": 6
+    },
+    "evidence": [
+      {
+        "predicate": "no_adverse_status",
+        "points": 0,
+        "reason": "adverse status in a register",
+        "statement_ids": [
+          "d4"
+        ],
+        "as_of": "2026-05-12"
+      },
+      {
+        "predicate": "certification_permits_current",
+        "points": 0,
+        "reason": "most permits not current",
+        "statement_ids": [
+          "d1",
+          "d2",
+          "d3"
+        ],
+        "as_of": "2026-08-29"
+      },
+      {
+        "predicate": "property_rates_compliant",
+        "points": 0,
+        "reason": "not checked (registers not yet loaded)"
+      },
+      {
+        "predicate": "regulator_licence_current",
+        "points": 0,
+        "reason": "not checked (registers not yet loaded)"
+      }
+    ],
+    "evaluation_as_of": "2026-08-29T21:00:00Z"
+  }
+}

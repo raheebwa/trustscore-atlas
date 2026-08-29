@@ -1,0 +1,118 @@
+{
+  "business": {
+    "atlas_id": "atl_0000000000000009",
+    "identifiers": [],
+    "coverage": {
+      "applicable": [
+        "kcca.businesses",
+        "kcca.property_rates",
+        "ura.vat_withholding_agents",
+        "ura.customs_agents",
+        "ura.wht_exemptions",
+        "ppda.ocds",
+        "unbs.certified_products",
+        "bou.supervised_institutions",
+        "cma.licensed_firms",
+        "urbra.licensed_schemes",
+        "ucc.broadcasters",
+        "nlgrb.gaming_operators"
+      ],
+      "checked": [
+        "kcca.businesses",
+        "ura.vat_withholding_agents",
+        "ura.customs_agents",
+        "ura.wht_exemptions",
+        "ppda.ocds",
+        "unbs.certified_products"
+      ],
+      "found_in": [
+        "kcca.businesses",
+        "ura.customs_agents"
+      ],
+      "not_yet_checked": [
+        "kcca.property_rates",
+        "bou.supervised_institutions",
+        "cma.licensed_firms",
+        "urbra.licensed_schemes",
+        "ucc.broadcasters",
+        "nlgrb.gaming_operators"
+      ]
+    }
+  },
+  "statements": [
+    {
+      "statement_id": "a1",
+      "field": "identifiers",
+      "value": "{\"scheme\":\"ug:kcca_licence\",\"value\":\"0123456789abcdef\"}",
+      "source": "kcca.businesses",
+      "asserted_at": "2026-08-29T20:43:23Z",
+      "precedence": 3
+    },
+    {
+      "statement_id": "a2",
+      "field": "licence.expiry_date",
+      "value": "2027-03-31",
+      "source": "ura.customs_agents",
+      "asserted_at": "2026-05-12T00:00:00Z",
+      "precedence": 2
+    },
+    {
+      "statement_id": "a3",
+      "field": "identifiers",
+      "value": "{\"scheme\":\"ug:tin\",\"value\":\"1000000009\"}",
+      "source": "ura.customs_agents",
+      "asserted_at": "2026-05-12T00:00:00Z",
+      "precedence": 2
+    }
+  ],
+  "expected": {
+    "rubric": "activity",
+    "version": 1,
+    "value": 80,
+    "max": 100,
+    "checkable": 100,
+    "unknown": 0,
+    "unknown_predicates": [],
+    "coverage": {
+      "applicable": 12,
+      "checked": 6,
+      "found_in": 2,
+      "not_yet_checked": 6
+    },
+    "evidence": [
+      {
+        "predicate": "recent_statement",
+        "points": 40,
+        "statement_ids": [
+          "a1",
+          "a2",
+          "a3"
+        ],
+        "as_of": "2026-08-29"
+      },
+      {
+        "predicate": "valid_licence_or_permit",
+        "points": 30,
+        "statement_ids": [
+          "a2"
+        ],
+        "as_of": "2026-05-12"
+      },
+      {
+        "predicate": "public_contract_awarded",
+        "points": 0,
+        "reason": "no evidence in checked registers"
+      },
+      {
+        "predicate": "seen_in_multiple_registers",
+        "points": 10,
+        "statement_ids": [
+          "a1",
+          "a3"
+        ],
+        "as_of": "2026-08-29"
+      }
+    ],
+    "evaluation_as_of": "2026-08-29T21:00:00Z"
+  }
+}

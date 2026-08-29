@@ -1,0 +1,101 @@
+{
+  "business": {
+    "atlas_id": "atl_0000000000000009",
+    "identifiers": [],
+    "coverage": {
+      "applicable": [
+        "kcca.businesses",
+        "kcca.property_rates",
+        "ura.vat_withholding_agents",
+        "ura.customs_agents",
+        "ura.wht_exemptions",
+        "ppda.ocds",
+        "unbs.certified_products",
+        "bou.supervised_institutions",
+        "cma.licensed_firms",
+        "urbra.licensed_schemes",
+        "ucc.broadcasters",
+        "nlgrb.gaming_operators"
+      ],
+      "checked": [
+        "kcca.businesses",
+        "ura.vat_withholding_agents",
+        "ura.customs_agents",
+        "ura.wht_exemptions",
+        "ppda.ocds",
+        "unbs.certified_products"
+      ],
+      "found_in": [
+        "ura.customs_agents"
+      ],
+      "not_yet_checked": [
+        "kcca.property_rates",
+        "bou.supervised_institutions",
+        "cma.licensed_firms",
+        "urbra.licensed_schemes",
+        "ucc.broadcasters",
+        "nlgrb.gaming_operators"
+      ]
+    }
+  },
+  "statements": [
+    {
+      "statement_id": "b1",
+      "field": "licence.expiry_date",
+      "value": "2024-12-31",
+      "source": "ura.customs_agents",
+      "asserted_at": "2025-01-15T00:00:00Z",
+      "precedence": 2
+    },
+    {
+      "statement_id": "b2",
+      "field": "identifiers",
+      "value": "{\"scheme\":\"ug:tin\",\"value\":\"1000000010\"}",
+      "source": "ura.customs_agents",
+      "asserted_at": "2025-01-15T00:00:00Z",
+      "precedence": 2
+    }
+  ],
+  "expected": {
+    "rubric": "activity",
+    "version": 1,
+    "value": 0,
+    "max": 100,
+    "checkable": 100,
+    "unknown": 0,
+    "unknown_predicates": [],
+    "coverage": {
+      "applicable": 12,
+      "checked": 6,
+      "found_in": 1,
+      "not_yet_checked": 6
+    },
+    "evidence": [
+      {
+        "predicate": "recent_statement",
+        "points": 0,
+        "reason": "no evidence in checked registers"
+      },
+      {
+        "predicate": "valid_licence_or_permit",
+        "points": 0,
+        "reason": "licence or permit expired",
+        "statement_ids": [
+          "b1"
+        ],
+        "as_of": "2025-01-15"
+      },
+      {
+        "predicate": "public_contract_awarded",
+        "points": 0,
+        "reason": "no evidence in checked registers"
+      },
+      {
+        "predicate": "seen_in_multiple_registers",
+        "points": 0,
+        "reason": "no evidence in checked registers"
+      }
+    ],
+    "evaluation_as_of": "2026-08-29T21:00:00Z"
+  }
+}

@@ -12,31 +12,34 @@ formality:
     sources: [bou.supervised_institutions, cma.licensed_firms, urbra.licensed_schemes, ucc.broadcasters, nlgrb.gaming_operators, unbs.certified_products]
 activity:
   recent_statement:
-    sources: [kcca.businesses, ura.customs_agents, ura.vat_withholding_agents, unbs.certified_products, ucc.broadcasters, ppda.parties]
+    sources: [kcca.businesses, ura.customs_agents, ura.vat_withholding_agents, ura.wht_exemptions, unbs.certified_products, ucc.broadcasters, ppda.ocds]
   valid_licence_or_permit:
-    expiry_fields: [ura.customs_agents.licence_expiry, unbs.certified_products.expiry, ucc.broadcasters.licence_expiry]
+    expiry_fields: [ura.customs_agents.licence.expiry_date, unbs.certified_products.certification.expiry_date, ucc.broadcasters.licence.expiry_date]
   public_contract_awarded:
-    sources: [ppda.awards]
+    date_fields: [ppda.ocds.procurement.last_award_date]
   seen_in_multiple_registers:
     minimum: 2
 compliance_signals:
   no_adverse_status:
-    status_fields: [ura.customs_agents.registration_status, ucc.broadcasters.status]
+    status_fields: [ura.customs_agents.status.ura_customs_agent, ucc.broadcasters.status.ucc_licence]
   certification_permits_current:
-    sources: [unbs.certified_products]
+    status_fields: [unbs.certified_products.certification.status]
+    current_values: [Valid]
   property_rates_compliant:
     sources: [kcca.property_rates]
   regulator_licence_current:
     sources: [bou.supervised_institutions, cma.licensed_firms, urbra.licensed_schemes, nlgrb.gaming_operators]
 procurement_readiness:
   registered_party:
-    sources: [ppda.parties]
+    role_fields: [ppda.ocds.procurement.roles]
+    roles: [supplier, tenderer]
   any_award:
-    sources: [ppda.awards]
+    count_fields: [ppda.ocds.procurement.awards_count]
   awards_across_buyers:
-    sources: [ppda.awards]
+    count_fields: [ppda.ocds.procurement.awards_count]
+    buyer_fields: [ppda.ocds.procurement.distinct_buyers]
   contract_signed_recently:
-    sources: [ppda.contracts]
+    date_fields: [ppda.ocds.procurement.last_contract_date]
   formality_threshold:
     rubric: formality
     minimum: 55

@@ -1,0 +1,140 @@
+{
+  "business": {
+    "atlas_id": "atl_0000000000000009",
+    "identifiers": [],
+    "coverage": {
+      "applicable": [
+        "kcca.businesses",
+        "kcca.property_rates",
+        "ura.vat_withholding_agents",
+        "ura.customs_agents",
+        "ura.wht_exemptions",
+        "ppda.ocds",
+        "unbs.certified_products",
+        "bou.supervised_institutions",
+        "cma.licensed_firms",
+        "urbra.licensed_schemes",
+        "ucc.broadcasters",
+        "nlgrb.gaming_operators"
+      ],
+      "checked": [
+        "kcca.businesses",
+        "ura.vat_withholding_agents",
+        "ura.customs_agents",
+        "ura.wht_exemptions",
+        "ppda.ocds",
+        "unbs.certified_products"
+      ],
+      "found_in": [
+        "ppda.ocds",
+        "kcca.businesses"
+      ],
+      "not_yet_checked": [
+        "kcca.property_rates",
+        "bou.supervised_institutions",
+        "cma.licensed_firms",
+        "urbra.licensed_schemes",
+        "ucc.broadcasters",
+        "nlgrb.gaming_operators"
+      ]
+    },
+    "scores": {
+      "formality": {
+        "value": 25
+      }
+    }
+  },
+  "statements": [
+    {
+      "statement_id": "f1",
+      "field": "procurement.roles",
+      "value": "tenderer",
+      "source": "ppda.ocds",
+      "asserted_at": "2026-08-16T00:00:00Z",
+      "precedence": 3
+    },
+    {
+      "statement_id": "f2",
+      "field": "procurement.awards_count",
+      "value": "0",
+      "source": "ppda.ocds",
+      "asserted_at": "2026-08-16T00:00:00Z",
+      "precedence": 3
+    },
+    {
+      "statement_id": "f3",
+      "field": "procurement.distinct_buyers",
+      "value": "0",
+      "source": "ppda.ocds",
+      "asserted_at": "2026-08-16T00:00:00Z",
+      "precedence": 3
+    },
+    {
+      "statement_id": "f4",
+      "field": "procurement.last_contract_date",
+      "value": "2023-01-10",
+      "source": "ppda.ocds",
+      "asserted_at": "2026-08-16T00:00:00Z",
+      "precedence": 3
+    }
+  ],
+  "expected": {
+    "rubric": "procurement_readiness",
+    "version": 1,
+    "value": 20,
+    "max": 100,
+    "checkable": 100,
+    "unknown": 0,
+    "unknown_predicates": [],
+    "coverage": {
+      "applicable": 12,
+      "checked": 6,
+      "found_in": 2,
+      "not_yet_checked": 6
+    },
+    "evidence": [
+      {
+        "predicate": "registered_party",
+        "points": 20,
+        "statement_ids": [
+          "f1"
+        ],
+        "as_of": "2026-08-16"
+      },
+      {
+        "predicate": "any_award",
+        "points": 0,
+        "reason": "no award recorded",
+        "statement_ids": [
+          "f2"
+        ],
+        "as_of": "2026-08-16"
+      },
+      {
+        "predicate": "awards_across_buyers",
+        "points": 0,
+        "reason": "fewer than three awards across two buyers",
+        "statement_ids": [
+          "f2",
+          "f3"
+        ],
+        "as_of": "2026-08-16"
+      },
+      {
+        "predicate": "contract_signed_recently",
+        "points": 0,
+        "reason": "last contract older than 24 months",
+        "statement_ids": [
+          "f4"
+        ],
+        "as_of": "2026-08-16"
+      },
+      {
+        "predicate": "formality_threshold",
+        "points": 0,
+        "reason": "formality 25 of 100 below 55"
+      }
+    ],
+    "evaluation_as_of": "2026-08-29T21:00:00Z"
+  }
+}
