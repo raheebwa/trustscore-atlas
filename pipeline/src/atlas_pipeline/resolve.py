@@ -76,6 +76,88 @@ class Resolution:
     statements: list[dict] = field(default_factory=list)
     crosswalk: dict[str, str] = field(default_factory=dict)
     new_entities: list[str] = field(default_factory=list)
+    groups: dict[str, list[str]] = field(default_factory=dict)
+    aliases: list[dict] = field(default_factory=list)
+
+
+def _issuer_unique_schemes(pack: dict) -> set[str]:
+    schemes = pack.get("identifier_schemes") or {}
+    return {name for name, spec in schemes.items() if (spec or {}).get("issuer_unique")}
+
+
+class _Groups:
+    """Union-find over entity ids."""
+
+    def __init__(self) -> None:
+        self.parent: dict[str, str] = {}
+
+    def add(self, item: str) -> None:
+        self.parent.setdefault(item, item)
+
+    def find(self, item: str) -> str:
+        while self.parent[item] != item:
+            self.parent[item] = self.parent[self.parent[item]]
+            item = self.parent[item]
+        return item
+
+    def union(self, a: str, b: str) -> None:
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            # deterministic: the lexically smaller root survives
+            if rb < ra:
+                ra, rb = rb, ra
+            self.parent[rb] = ra
+
+    def members(self) -> dict[str, list[str]]:
+        out: dict[str, list[str]] = defaultdict(list)
+        for item in self.parent:
+            out[self.find(item)].append(item)
+        return {root: sorted(items) for root, items in out.items()}
+
+
+def _group_entities(
+    by_entity: dict[str, list[dict]], unique_schemes: set[str]
+) -> dict[str, list[str]]:
+    """Entities sharing an issuer-unique identifier value are one business (DEC-ATLAS-011 B8).
+    Every other similarity is a candidate produced elsewhere, never a merge here."""
+    groups = _Groups()
+    holders: dict[tuple[str, str], str] = {}
+    for entity_id in sorted(by_entity):
+        groups.add(entity_id)
+        for s in by_entity[entity_id]:
+            if s["field"] != "identifiers":
+                continue
+            ident = json.loads(s["value"])
+            key = (ident.get("scheme"), ident.get("value"))
+            if key[0] not in unique_schemes or not key[1]:
+                continue
+            if key in holders:
+                groups.union(holders[key], entity_id)
+            else:
+                holders[key] = entity_id
+    return groups.members()
+
+
+def _known(crosswalk: dict, entity_id: str) -> tuple[str, str] | None:
+    entry = crosswalk.get(entity_id)
+    if entry is None:
+        return None
+    if isinstance(entry, str):
+        return entry, ""
+    return entry["atlas_id"], entry.get("first_regeneration_id", "")
+
+
+def _choose_atlas_id(members: list[str], crosswalk: dict) -> tuple[str, list[str]]:
+    """The oldest known id survives; other known ids become aliases; unknown groups get a new id
+    derived from their lexically first entity id."""
+    known = sorted(
+        {k for k in (_known(crosswalk, m) for m in members) if k},
+        key=lambda k: (k[1], k[0]),
+    )
+    if not known:
+        return new_atlas_id(members[0]), []
+    survivor = known[0][0]
+    return survivor, [k[0] for k in known[1:] if k[0] != survivor]
 
 
 def resolve(
@@ -83,7 +165,7 @@ def resolve(
     *,
     pack: dict,
     checked_sources: list[str],
-    crosswalk: dict[str, str] | None = None,
+    crosswalk: dict | None = None,
 ) -> Resolution:
     by_entity: dict[str, list[dict]] = defaultdict(list)
     for s in statements:
@@ -95,23 +177,32 @@ def resolve(
     checked = [s for s in applicable if s in loaded and s in checked_sources]
     not_yet_checked = [s for s in applicable if s not in checked]
     crosswalk = dict(crosswalk or {})
-    result = Resolution(crosswalk=crosswalk)
-    for entity_id in sorted(by_entity):
-        rows = by_entity[entity_id]
+    unique_schemes = _issuer_unique_schemes(pack)
+    result = Resolution(crosswalk={k: (_known(crosswalk, k) or ("", ""))[0] for k in crosswalk})
+
+    for members in _group_entities(by_entity, unique_schemes).values():
+        rows = [s for m in members for s in by_entity[m]]
         by_field: dict[str, list[dict]] = defaultdict(list)
         for s in rows:
             by_field[s["field"]].append(s)
+
+        atlas_id, aliased = _choose_atlas_id(members, crosswalk)
+        joined_by = sorted(unique_schemes) if len(members) > 1 else []
+        for old in aliased:
+            result.aliases.append(
+                {"atlas_id": old, "canonical_atlas_id": atlas_id, "reason": ",".join(joined_by)}
+            )
+        for m in members:
+            if _known(crosswalk, m) is None:
+                result.crosswalk[m] = atlas_id
+                result.new_entities.append(m)
+        result.groups[atlas_id] = members
 
         ident_rows = [
             {**json.loads(s["value"]), "source": s["source"], "asserted_at": _dt(s["asserted_at"])}
             for s in by_field.get("identifiers", [])
         ]
         identifiers = sorted({(i["scheme"], i["value"], i["source"]) for i in ident_rows})
-        atlas_id = crosswalk.get(entity_id)
-        if atlas_id is None:
-            atlas_id = new_atlas_id(entity_id)
-            crosswalk[entity_id] = atlas_id
-            result.new_entities.append(entity_id)
         name, variants = choose_name(by_field["canonical_name"])
         seen = [_dt(s["asserted_at"]) for s in rows]
         business = {
@@ -136,12 +227,14 @@ def resolve(
         }
         for group, prefix in FIELD_GROUPS.items():
             values = {
-                f.removeprefix(prefix): rank_values(v)[0]
+                f.removeprefix(prefix): rank_values(v)
                 for f, v in by_field.items()
                 if f.startswith(prefix)
             }
             if values:
-                business[group] = values
+                business[group] = {k: v[0] for k, v in values.items()}
         result.businesses.append(business)
         result.statements.extend({**s, "atlas_id": atlas_id} for s in rows)
+    result.businesses.sort(key=lambda b: b["atlas_id"])
+    result.statements.sort(key=lambda s: (s["atlas_id"], s["statement_id"]))
     return result
