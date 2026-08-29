@@ -34,7 +34,7 @@ def _fixture_fetcher(spec):
         spec.module.query_url(n): (ADAPTER / "fixtures" / "raw" / f"{_slug(n)}.html").read_bytes()
         for n in EXPECTED["natures"]
     }
-    return lambda url: pages[url]
+    return lambda url, **_request: pages[url]
 
 
 def _run(spec, root, **kw):

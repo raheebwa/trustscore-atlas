@@ -4,6 +4,9 @@ import httpx
 import pytest
 
 from atlas_pipeline import http
+from atlas_pipeline.adapters import load_adapter, run_adapter
+
+from .conftest import PACKS, RUN_ID, SALT, STARTED_AT
 
 
 def _fetcher_with(handler, monkeypatch, **kwargs):
@@ -53,3 +56,73 @@ def test_fetch_raises_after_last_retry(monkeypatch):
     with pytest.raises(httpx.HTTPStatusError):
         fetch("https://example.com/")
     assert len(sleeps) == 1
+
+
+def test_fetch_forwards_method_data_and_headers_and_keeps_cookies(monkeypatch):
+    requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if len(requests) == 1:
+            return httpx.Response(200, headers={"Set-Cookie": "JSESSIONID=fixture; Path=/"})
+        assert request.headers["cookie"] == "JSESSIONID=fixture"
+        return httpx.Response(200, content=b"results")
+
+    fetch, _ = _fetcher_with(handler, monkeypatch, pause=0)
+    fetch("https://example.com/parameter")
+    body = fetch(
+        "https://example.com/results",
+        method="POST",
+        data={"reportCode": "7"},
+        headers={"X-CSRF-TOKEN": "fixture-token"},
+    )
+
+    assert body == b"results"
+    assert requests[1].method == "POST"
+    assert requests[1].content == b"reportCode=7"
+    assert requests[1].headers["x-csrf-token"] == "fixture-token"
+
+
+def test_make_fetcher_passes_a_certificate_bundle_path(monkeypatch):
+    options = {}
+
+    class Client:
+        def __init__(self, **kwargs):
+            options.update(kwargs)
+
+        def request(self, method, url, *, data=None, headers=None):
+            request = httpx.Request(method, url, content=data, headers=headers)
+            return httpx.Response(200, content=b"ok", request=request)
+
+    monkeypatch.setattr(http.httpx, "Client", Client)
+    fetch = http.make_fetcher(verify="/tmp/fixture-ca.pem", pause=0)
+
+    assert fetch("https://example.com/") == b"ok"
+    assert options["verify"] == "/tmp/fixture-ca.pem"
+
+
+def test_run_adapter_uses_the_certificate_bundle_declared_by_the_adapter(monkeypatch, tmp_path):
+    adapter = PACKS / "ug" / "sources" / "unbs_certified_products"
+    spec = load_adapter(adapter)
+    page = (adapter / "fixtures" / "raw" / "certified-products.html").read_bytes()
+    options = {}
+
+    def make_fetcher(**kwargs):
+        options.update(kwargs)
+
+        def fetch(url, **_request):
+            assert url == spec.module.ENDPOINT
+            return page
+
+        return fetch
+
+    monkeypatch.setattr(http, "make_fetcher", make_fetcher)
+    run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        salt=SALT,
+    )
+
+    assert options["verify"] == spec.module.TLS_VERIFY

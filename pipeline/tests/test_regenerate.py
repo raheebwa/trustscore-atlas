@@ -29,7 +29,7 @@ def test_regenerate_from_one_source(tmp_path: Path):
         data_root=tmp_path,
         run_id=RUN_ID,
         started_at=STARTED_AT,
-        fetcher=lambda url: pages[url],
+        fetcher=lambda url, **_request: pages[url],
         salt=SALT,
         params={"natures": EXPECTED["natures"]},
     )
