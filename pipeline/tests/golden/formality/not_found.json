@@ -1,0 +1,80 @@
+{
+  "business": {
+    "atlas_id": "atl_0000000000000003",
+    "identifiers": [
+      {
+        "scheme": "ug:tin",
+        "value": "1000000001",
+        "source": "ura.vat_withholding_agents"
+      }
+    ],
+    "coverage": {
+      "applicable": [
+        "kcca.businesses",
+        "ura.vat_withholding_agents"
+      ],
+      "checked": [
+        "kcca.businesses",
+        "ura.vat_withholding_agents"
+      ],
+      "found_in": [
+        "ura.vat_withholding_agents"
+      ],
+      "not_yet_checked": []
+    }
+  },
+  "statements": [
+    {
+      "statement_id": "s5",
+      "field": "identifiers",
+      "value": "{\"scheme\":\"ug:tin\",\"value\":\"1000000001\"}",
+      "source": "ura.vat_withholding_agents",
+      "asserted_at": "2026-08-12T00:00:00Z",
+      "precedence": 2
+    }
+  ],
+  "expected": {
+    "rubric": "formality",
+    "version": 1,
+    "value": 30,
+    "max": 100,
+    "checkable": 55,
+    "unknown": 45,
+    "unknown_predicates": [
+      "legal_register_presence",
+      "sector_regulator_licence"
+    ],
+    "coverage": {
+      "applicable": 2,
+      "checked": 2,
+      "found_in": 1,
+      "not_yet_checked": 0
+    },
+    "evidence": [
+      {
+        "predicate": "legal_register_presence",
+        "points": 0,
+        "reason": "not checked (no register bound in this pack)"
+      },
+      {
+        "predicate": "tax_identity_present",
+        "points": 30,
+        "statement_ids": [
+          "s5"
+        ],
+        "as_of": "2026-08-12"
+      },
+      {
+        "predicate": "local_trading_licence",
+        "points": 0,
+        "reason": "no evidence in checked registers"
+      },
+      {
+        "predicate": "sector_regulator_licence",
+        "points": 0,
+        "reason": "not checked (registers not yet loaded)"
+      }
+    ],
+    "evaluation_as_of": "2026-08-29T10:00:00Z"
+  }
+}

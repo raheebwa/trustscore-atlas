@@ -1,0 +1,3 @@
+"""Ingestion, resolution, scoring and loading framework for TrustScore Atlas."""
+
+__version__ = "0.1.0"

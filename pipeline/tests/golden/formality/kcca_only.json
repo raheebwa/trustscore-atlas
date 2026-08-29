@@ -1,0 +1,90 @@
+{
+  "business": {
+    "atlas_id": "atl_0000000000000001",
+    "identifiers": [
+      {
+        "scheme": "ug:kcca_licence",
+        "value": "aaaa",
+        "source": "kcca.businesses"
+      }
+    ],
+    "coverage": {
+      "applicable": [
+        "kcca.businesses",
+        "ura.vat_withholding_agents"
+      ],
+      "checked": [
+        "kcca.businesses"
+      ],
+      "found_in": [
+        "kcca.businesses"
+      ],
+      "not_yet_checked": [
+        "ura.vat_withholding_agents"
+      ]
+    }
+  },
+  "statements": [
+    {
+      "statement_id": "s1",
+      "field": "identifiers",
+      "value": "{\"scheme\":\"ug:kcca_licence\",\"value\":\"aaaa\"}",
+      "source": "kcca.businesses",
+      "asserted_at": "2026-08-29T20:31:50Z",
+      "precedence": 3
+    },
+    {
+      "statement_id": "s2",
+      "field": "canonical_name",
+      "value": "EXAMPLE BAKERY LTD",
+      "source": "kcca.businesses",
+      "asserted_at": "2026-08-29T20:31:50Z",
+      "precedence": 3
+    }
+  ],
+  "expected": {
+    "rubric": "formality",
+    "version": 1,
+    "value": 25,
+    "max": 100,
+    "checkable": 25,
+    "unknown": 75,
+    "unknown_predicates": [
+      "legal_register_presence",
+      "tax_identity_present",
+      "sector_regulator_licence"
+    ],
+    "coverage": {
+      "applicable": 2,
+      "checked": 1,
+      "found_in": 1,
+      "not_yet_checked": 1
+    },
+    "evidence": [
+      {
+        "predicate": "legal_register_presence",
+        "points": 0,
+        "reason": "not checked (no register bound in this pack)"
+      },
+      {
+        "predicate": "tax_identity_present",
+        "points": 0,
+        "reason": "not checked (registers not yet loaded)"
+      },
+      {
+        "predicate": "local_trading_licence",
+        "points": 25,
+        "statement_ids": [
+          "s1"
+        ],
+        "as_of": "2026-08-29"
+      },
+      {
+        "predicate": "sector_regulator_licence",
+        "points": 0,
+        "reason": "not checked (registers not yet loaded)"
+      }
+    ],
+    "evaluation_as_of": "2026-08-29T10:00:00Z"
+  }
+}
