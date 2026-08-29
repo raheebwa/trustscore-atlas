@@ -40,17 +40,21 @@ def build_statements(
         entity_id = f"{slug}:{record['_entity_key']}"
         for spec in mapping["statements"]:
             if "value" in spec:
-                value = spec["value"]
+                raw_value = spec["value"]
             elif spec.get("from") == "entity_key":
+                raw_value = record["_entity_key"]
+            else:
+                raw_value = record.get(spec["from"])
+            if raw_value is None or raw_value == "":
+                continue
+            if "identifier" in spec:
                 value = json.dumps(
-                    {"scheme": spec["identifier"], "value": record["_entity_key"]},
+                    {"scheme": spec["identifier"], "value": raw_value},
                     sort_keys=True,
                     separators=(",", ":"),
                 )
             else:
-                value = record.get(spec["from"])
-            if value is None or value == "":
-                continue
+                value = raw_value
             sid = statement_id(entity_id, spec["field"], value, slug, record["record_id"])
             out[sid] = {
                 "statement_id": sid,

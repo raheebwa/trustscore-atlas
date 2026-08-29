@@ -20,6 +20,12 @@ identifier_schemes:
     pattern: "^[0-9a-f]{16}$"
     org_id_guide: null
     note: KCCA publishes no licence number; the key is a deterministic hash of the published row.
+  ug:customs_licence:
+    title: Uganda Revenue Authority customs agent licence number
+    issuer: Uganda Revenue Authority
+    pattern: "^[A-Za-z0-9][A-Za-z0-9./-]*$"
+    org_id_guide: null
+    note: The issuing tax office determines the format; observed values use letters, digits, slashes, dots and hyphens.
   ug:ppda_party_id:
     title: PPDA OCDS party identifier
     issuer: Public Procurement and Disposal of Public Assets Authority

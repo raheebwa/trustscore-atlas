@@ -35,7 +35,7 @@ def fetcher(spec):
         spec.module.query_url(n): (ADAPTER / "fixtures" / "raw" / f"{_slug(n)}.html").read_bytes()
         for n in EXPECTED["natures"]
     }
-    return lambda url: pages[url]
+    return lambda url, **_request: pages[url]
 
 
 def _run(spec, fetcher, root: Path, previous_manifest=None):
@@ -150,7 +150,7 @@ def test_records_and_statements_match_the_expected_fixture(run):
 def test_replay_from_previous_raw_reproduces_outputs_without_fetching(spec, fetcher, run, tmp_path):
     from atlas_pipeline.adapters import replay_fetcher
 
-    def refuse(url):
+    def refuse(url, **_request):
         raise AssertionError(f"network fetch attempted during replay: {url}")
 
     replay = run_adapter(

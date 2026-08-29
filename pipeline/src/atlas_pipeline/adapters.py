@@ -109,7 +109,7 @@ def replay_fetcher(manifest_path: Path) -> Fetcher:
     raw_dir = raw_dir_for(manifest_path, manifest["run_id"])
     by_url = {o["url"]: raw_dir / o["name"] for o in manifest["raw_objects"] if "url" in o}
 
-    def fetch(url: str) -> bytes:
+    def fetch(url: str, **_request) -> bytes:
         if url not in by_url:
             raise KeyError(f"no raw object recorded for {url} in run {manifest['run_id']}")
         return by_url[url].read_bytes()
@@ -176,7 +176,7 @@ def run_adapter(
     elif fetcher is None:
         from .http import make_fetcher
 
-        fetcher = make_fetcher()
+        fetcher = make_fetcher(verify=getattr(spec.module, "TLS_VERIFY", None))
 
     data_root = Path(data_root)
     raw_dir = data_root / "raw" / spec.iso2 / spec.slug_dir / run_id

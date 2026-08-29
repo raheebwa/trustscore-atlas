@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "certifi",
     "duckdb>=1.5.5",
     "httpx>=0.28.1",
     "jsonschema>=4.26.0",
