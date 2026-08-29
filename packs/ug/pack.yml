@@ -37,6 +37,16 @@ identifier_schemes:
     issuer: Uganda National Bureau of Standards
     pattern: "^[A-Za-z0-9/-]+$"
     org_id_guide: null
+  ug:bou_code:
+    title: Bank of Uganda supervised institution code
+    issuer: Bank of Uganda
+    pattern: "^(?:[A-Z]{4}UG[A-Z0-9]{2}(?:[A-Z0-9]{3})?|FXB [0-9]{3}|MR [0-9]{3}|CRB[0-9]{3})$"
+    org_id_guide: null
+  ug:nlgrb_licence:
+    title: NLGRB gaming operator licence number
+    issuer: National Lotteries and Gaming Regulatory Board
+    pattern: "^NLGRB-[A-Z]{2,4}-[0-9]{2}-[0-9]{4}$"
+    org_id_guide: null
   ug:ursb_reg_no:
     title: URSB registration number
     issuer: Uganda Registration Services Bureau

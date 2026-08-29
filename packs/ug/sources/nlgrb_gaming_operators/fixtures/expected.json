@@ -1,0 +1,36 @@
+{
+  "rows": 3,
+  "rows_dropped": 1,
+  "entities": 2,
+  "identifier_statements": 3,
+  "year": "2026",
+  "company": "Sample Betting Company Ltd",
+  "company_records": [
+    {
+      "trade_name": "Sample Bet",
+      "licence_type": "General Betting Operating Licence",
+      "website": "samplebet.example",
+      "mode_of_operation": "Online",
+      "licence_number": "NLGRB-GB-26-0000"
+    },
+    {
+      "trade_name": "Sample Games",
+      "licence_type": "Gambling Software Operating Licence",
+      "website": "samplebet.example",
+      "mode_of_operation": "Online",
+      "licence_number": "NLGRB-GS-26-0000"
+    }
+  ],
+  "statements_for_company": {
+    "canonical_name": ["Sample Betting Company Ltd"],
+    "name_variants": ["Sample Bet", "Sample Games"],
+    "licence.type": [
+      "Gambling Software Operating Licence",
+      "General Betting Operating Licence"
+    ],
+    "licence.year": ["2026"],
+    "status.nlgrb_licensed": ["licensed"],
+    "website": ["samplebet.example"]
+  },
+  "raw_files": ["licensed-companies-2026.pdf", "wpdm-search.json"]
+}

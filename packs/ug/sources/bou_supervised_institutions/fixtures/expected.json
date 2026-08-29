@@ -1,0 +1,19 @@
+{
+  "rows": 3,
+  "rows_dropped": 1,
+  "entities": 3,
+  "identifier_statements": 2,
+  "institution": "Example Commercial Bank Ltd",
+  "institution_record": {
+    "category": "Tier I Commercial Banks",
+    "code": "EXAMUGKA",
+    "source_ref": "https://bou.or.ug/api/supervision?populate[supervisedInstitutions][populate][category][populate]=*"
+  },
+  "statements_for_institution": {
+    "canonical_name": ["Example Commercial Bank Ltd"],
+    "sector.source_category": ["Tier I Commercial Banks"],
+    "status.bou_supervised": ["supervised"],
+    "identifiers": ["{\"scheme\":\"ug:bou_code\",\"value\":\"EXAMUGKA\"}"]
+  },
+  "raw_files": ["supervision.json"]
+}

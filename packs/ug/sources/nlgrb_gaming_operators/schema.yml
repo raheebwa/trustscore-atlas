@@ -1,0 +1,34 @@
+# Table Schema for records.parquet.
+fields:
+  - name: record_id
+    type: string
+    description: Deterministic key of the company, licence number and licence year.
+    constraints: { required: true, pattern: "^[0-9a-f]{16}$" }
+  - name: company_name
+    type: string
+    description: Licensed company's registered name.
+    constraints: { required: true }
+  - name: trade_name
+    type: string
+    description: Published consumer-facing trade name.
+  - name: licence_type
+    type: string
+    description: Licence class published by NLGRB.
+  - name: website
+    type: string
+    description: Operator website published by NLGRB, when present.
+  - name: mode_of_operation
+    type: string
+    description: Published operating mode, such as online or land based.
+  - name: licence_number
+    type: string
+    description: NLGRB-issued licence number.
+    constraints: { required: true }
+  - name: year
+    type: string
+    description: Calendar year parsed from the selected package title.
+    constraints: { required: true, pattern: "^[0-9]{4}$" }
+  - name: source_ref
+    type: string
+    description: Download URL of the selected annual licensed-companies PDF.
+    constraints: { required: true }

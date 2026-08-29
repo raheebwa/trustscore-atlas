@@ -1,0 +1,112 @@
+%PDF-1.4
+%fixture
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 792 612] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 1227 >>
+stream
+0.5 w
+16 468 m 16 570 l S
+44 468 m 44 570 l S
+194 468 m 194 570 l S
+284 468 m 284 570 l S
+434 468 m 434 570 l S
+524 468 m 524 570 l S
+619 468 m 619 570 l S
+776 468 m 776 570 l S
+16 570 m 776 570 l S
+16 536 m 776 536 l S
+16 502 m 776 502 l S
+16 468 m 776 468 l S
+BT /F1 6 Tf 19 549 Td (No.) Tj ET
+BT /F1 6 Tf 47 549 Td (Company Name) Tj ET
+BT /F1 6 Tf 197 549 Td (Trade Name) Tj ET
+BT /F1 6 Tf 287 549 Td (Licence Type) Tj ET
+BT /F1 6 Tf 437 549 Td (Website) Tj ET
+BT /F1 6 Tf 527 549 Td (Mode of Operation) Tj ET
+BT /F1 6 Tf 622 549 Td (Licence Number) Tj ET
+BT /F1 6 Tf 19 515 Td (1.) Tj ET
+BT /F1 6 Tf 47 515 Td (Sample Betting Company Ltd) Tj ET
+BT /F1 6 Tf 197 515 Td (Sample Bet) Tj ET
+BT /F1 6 Tf 287 515 Td (General Betting Operating Licence) Tj ET
+BT /F1 6 Tf 437 515 Td (samplebet.example) Tj ET
+BT /F1 6 Tf 527 515 Td (Online) Tj ET
+BT /F1 6 Tf 622 515 Td (NLGRB-GB-26-0000) Tj ET
+BT /F1 6 Tf 19 481 Td (2.) Tj ET
+BT /F1 6 Tf 47 481 Td (Sample Betting Company Ltd) Tj ET
+BT /F1 6 Tf 197 481 Td (Sample Games) Tj ET
+BT /F1 6 Tf 287 481 Td (Gambling Software Operating Licence) Tj ET
+BT /F1 6 Tf 437 481 Td (samplebet.example) Tj ET
+BT /F1 6 Tf 527 481 Td (Online) Tj ET
+BT /F1 6 Tf 622 481 Td (NLGRB-GS-26-0000) Tj ET
+
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 792 612] /Resources << /Font << /F1 4 0 R >> >> /Contents 7 0 R >>
+endobj
+7 0 obj
+<< /Length 1221 >>
+stream
+0.5 w
+16 468 m 16 570 l S
+44 468 m 44 570 l S
+194 468 m 194 570 l S
+284 468 m 284 570 l S
+434 468 m 434 570 l S
+524 468 m 524 570 l S
+619 468 m 619 570 l S
+776 468 m 776 570 l S
+16 570 m 776 570 l S
+16 536 m 776 536 l S
+16 502 m 776 502 l S
+16 468 m 776 468 l S
+BT /F1 6 Tf 19 549 Td (No.) Tj ET
+BT /F1 6 Tf 47 549 Td (Company Name) Tj ET
+BT /F1 6 Tf 197 549 Td (Trade Name) Tj ET
+BT /F1 6 Tf 287 549 Td (Licence Type) Tj ET
+BT /F1 6 Tf 437 549 Td (Website) Tj ET
+BT /F1 6 Tf 527 549 Td (Mode of Operation) Tj ET
+BT /F1 6 Tf 622 549 Td (Licence Number) Tj ET
+BT /F1 6 Tf 19 515 Td (3.) Tj ET
+BT /F1 6 Tf 47 515 Td (Example Gaming Company Ltd) Tj ET
+BT /F1 6 Tf 197 515 Td (Example Casino) Tj ET
+BT /F1 6 Tf 287 515 Td (Casino Operating Licence) Tj ET
+BT /F1 6 Tf 437 515 Td (examplecasino.invalid) Tj ET
+BT /F1 6 Tf 527 515 Td (Land Based) Tj ET
+BT /F1 6 Tf 622 515 Td (NLGRB-CS-26-0000) Tj ET
+BT /F1 6 Tf 19 481 Td (4.) Tj ET
+BT /F1 6 Tf 47 481 Td (Sample Incomplete Company Ltd) Tj ET
+BT /F1 6 Tf 197 481 Td (Sample Incomplete) Tj ET
+BT /F1 6 Tf 287 481 Td (General Betting Operating Licence) Tj ET
+BT /F1 6 Tf 437 481 Td (incomplete.invalid) Tj ET
+BT /F1 6 Tf 527 481 Td (Online) Tj ET
+BT /F1 6 Tf 622 481 Td () Tj ET
+
+endstream
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000018 00000 n 
+0000000067 00000 n 
+0000000130 00000 n 
+0000000256 00000 n 
+0000000326 00000 n 
+0000001605 00000 n 
+0000001731 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+3004
+%%EOF

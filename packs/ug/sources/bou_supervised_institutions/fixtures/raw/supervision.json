@@ -1,0 +1,46 @@
+{
+  "data": {
+    "supervisedInstitutions": {
+      "category": [
+        {
+          "category": "  Tier I Commercial Banks  ",
+          "items": [
+            {
+              "title": "  Example Commercial Bank Ltd  ",
+              "phoneNumber": "+256 700 000 001",
+              "email": "registry@example.invalid",
+              "address": "Example House, Sample Road",
+              "code": " EXAMUGKA "
+            },
+            {
+              "title": "Sample Commercial Bank Ltd",
+              "phoneNumber": "+256 700 000 002",
+              "email": "sample@example.invalid",
+              "address": "Sample Building, Example Street",
+              "code": "SAMPUGKA"
+            },
+            {
+              "title": " ",
+              "phoneNumber": "+256 700 000 003",
+              "email": "missing@example.invalid",
+              "address": "Missing Name House",
+              "code": "MISSUGKA"
+            }
+          ]
+        },
+        {
+          "category": "Tier III Credit Institutions",
+          "items": [
+            {
+              "title": "Sample Savings Institution Ltd",
+              "phoneNumber": "",
+              "email": "",
+              "address": "Sample District",
+              "code": ""
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

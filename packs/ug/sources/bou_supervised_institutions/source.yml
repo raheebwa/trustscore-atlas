@@ -1,0 +1,24 @@
+slug: bou.supervised_institutions
+country: UG
+publisher: Bank of Uganda
+title: Supervised financial institutions
+url: https://www.bou.or.ug/
+endpoint: https://bou.or.ug/api/supervision?populate[supervisedInstitutions][populate][category][populate]=*
+licence: public-record
+rights: public_register
+attribution: Bank of Uganda, supervised financial institutions register (bou.or.ug)
+cadence: monthly
+coverage: >-
+  Institutions published by the Bank of Uganda across its regulatory categories.
+precedence_class: regulator_or_authority
+pii:
+  excluded_columns: [phone, email, address]
+  hashed_columns: []
+terms:
+  url: https://www.bou.or.ug/
+  checked_on: "2026-08-30"
+  note: >-
+    Public register served as structured data by the website's public supervision endpoint.
+identifier_schemes: [ug:bou_code]
+adapter_version: 0.1.0
+row_count_tolerance: 0.15

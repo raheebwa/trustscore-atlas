@@ -1,0 +1,20 @@
+country: UG
+precedence_class: regulator_or_authority
+confidence: official
+record_id:
+  columns: [name, category, code]
+entity_id:
+  columns: [name, category]
+  normalise: [name]
+source_ref:
+  from: source_ref
+statements:
+  - field: canonical_name
+    from: name
+  - field: sector.source_category
+    from: category
+  - field: status.bou_supervised
+    value: supervised
+  - field: identifiers
+    identifier: ug:bou_code
+    from: code

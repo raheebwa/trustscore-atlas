@@ -1,0 +1,25 @@
+slug: nlgrb.gaming_operators
+country: UG
+publisher: National Lotteries and Gaming Regulatory Board
+title: Licensed gaming operators
+url: https://lgrb.go.ug/licensed-companies/
+endpoint: https://lgrb.go.ug/wp-json/wpdm/search
+licence: public-record
+rights: public_register
+attribution: >-
+  National Lotteries and Gaming Regulatory Board, licensed companies register (lgrb.go.ug)
+cadence: annual
+coverage: >-
+  Companies and licences in the latest annual licensed-companies list published by NLGRB.
+precedence_class: regulator_or_authority
+pii:
+  excluded_columns: []
+  hashed_columns: []
+terms:
+  url: https://lgrb.go.ug/licensed-companies/
+  checked_on: "2026-08-30"
+  note: >-
+    Public annual register published as a PDF through the website's download manager.
+identifier_schemes: [ug:nlgrb_licence]
+adapter_version: 0.1.0
+row_count_tolerance: 0.15

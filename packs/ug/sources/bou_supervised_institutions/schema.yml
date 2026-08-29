@@ -1,0 +1,21 @@
+# Table Schema for records.parquet after contact-column exclusion.
+fields:
+  - name: record_id
+    type: string
+    description: Deterministic key of the institution, category and published code.
+    constraints: { required: true, pattern: "^[0-9a-f]{16}$" }
+  - name: name
+    type: string
+    description: Institution name published by the Bank of Uganda.
+    constraints: { required: true }
+  - name: category
+    type: string
+    description: Bank of Uganda regulatory category or tier.
+    constraints: { required: true }
+  - name: code
+    type: string
+    description: Published bank, bureau, remitter or credit-reference code, when present.
+  - name: source_ref
+    type: string
+    description: Public supervision endpoint from which the institution was parsed.
+    constraints: { required: true }

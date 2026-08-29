@@ -1,0 +1,26 @@
+country: UG
+precedence_class: regulator_or_authority
+confidence: official
+record_id:
+  columns: [company_name, licence_number, year]
+entity_id:
+  columns: [company_name]
+  normalise: [company_name]
+source_ref:
+  from: source_ref
+statements:
+  - field: canonical_name
+    from: company_name
+  - field: name_variants
+    from: trade_name
+  - field: identifiers
+    identifier: ug:nlgrb_licence
+    from: licence_number
+  - field: licence.type
+    from: licence_type
+  - field: licence.year
+    from: year
+  - field: status.nlgrb_licensed
+    value: licensed
+  - field: website
+    from: website
