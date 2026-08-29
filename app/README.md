@@ -20,8 +20,8 @@ Worker configuration, including the `DB` and `DB_STATEMENTS` D1 bindings, is in
 
 ## Local database
 
-The app reads two Cloudflare D1 (SQLite) databases; it never writes to them. To set up
-local copies from the repository root:
+The app reads two Cloudflare D1 (SQLite) databases. Claim requests write only to the
+append-only operations tables in the main database. To set up local copies from the repository root:
 
 ```sh
 cd app
@@ -29,6 +29,13 @@ pnpm exec wrangler d1 execute atlas --local --file ../infra/d1/schema.sql
 pnpm exec wrangler d1 execute atlas-statements --local --file ../infra/d1/schema.sql
 pnpm exec wrangler d1 execute atlas --local --file seed/dev.sql
 pnpm exec wrangler d1 execute atlas-statements --local --file seed/dev-statements.sql
+pnpm exec wrangler d1 execute atlas --local --file migrations/0001_ops_tables.sql
+```
+
+Apply the operations migration to the remote main database with:
+
+```sh
+pnpm exec wrangler d1 execute atlas --remote --file migrations/0001_ops_tables.sql
 ```
 
 The two seed files form one small, entirely fictional dataset: five businesses across

@@ -22,6 +22,10 @@
 		{/if}
 	</p>
 	<p class="text-sm text-stone-400">atlas_id: {record.atlas_id}</p>
+	<a
+		href={resolve('/claim/[atlas_id]', { atlas_id: record.atlas_id })}
+		class="mt-2 w-fit text-sm text-stone-600 underline">Request a claim</a
+	>
 </div>
 
 <section class="mt-6">

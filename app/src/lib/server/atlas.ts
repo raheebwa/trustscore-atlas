@@ -31,9 +31,13 @@ import type {
 	BusinessRecordResponse,
 	BusinessScoreSummary,
 	CoverageSummary,
+	EvidenceStatement,
+	FieldEvidenceResponse,
 	FormalitySummary,
 	Identifier,
+	JoinedScoreEvidenceItem,
 	ProvenanceRow,
+	RubricEvidenceResponse,
 	ScoreEvidenceItem,
 	ScoreSummary,
 	SearchResponse,
@@ -356,7 +360,7 @@ function toScoreSummary(row: ScoreRowDb, statements: StatementRow[] = []): Score
 	const unknownPredicates = Array.from(
 		new Set(
 			evidence
-				.filter((item) => item.reason?.toLowerCase().startsWith('not checked'))
+				.filter((item) => /not checked/i.test(item.reason ?? ''))
 				.map((item) => item.predicate)
 		)
 	);
@@ -1009,4 +1013,166 @@ export async function businessExists(db: D1Database, atlasId: string): Promise<b
 		.bind(atlasId)
 		.first<{ ok: number }>();
 	return row !== null;
+}
+
+export interface ScoreLookupOptions {
+	version?: number | string | null;
+}
+
+function parseScoreVersion(value: number | string | null | undefined): number | null {
+	if (value === null || value === undefined || value === '') return null;
+	const parsed = typeof value === 'number' ? value : Number(value);
+	if (!Number.isSafeInteger(parsed) || parsed < 1) return Number.NaN;
+	return parsed;
+}
+
+async function readScoreAtRegeneration(
+	db: D1Database,
+	atlasId: string,
+	rubric: string,
+	liveRegenerationId: string,
+	options: ScoreLookupOptions = {}
+): Promise<ScoreSummary | null> {
+	const version = parseScoreVersion(options.version);
+	if (Number.isNaN(version)) return null;
+	const versionClause = version === null ? '' : ' AND version = ?';
+	const bindings: unknown[] = [atlasId, rubric, liveRegenerationId];
+	if (version !== null) bindings.push(version);
+	const row = await db
+		.prepare(
+			`SELECT * FROM scores WHERE atlas_id = ? AND rubric = ? AND regeneration_id = ?${versionClause}
+			 ORDER BY version DESC LIMIT ?`
+		)
+		.bind(...bindings, 1)
+		.first<ScoreRowDb>();
+	return row ? toScoreSummary(row) : null;
+}
+
+/** Reads one score from the current regeneration after validating both serving bindings. */
+export async function getScore(
+	databases: AtlasDatabases,
+	atlasId: string,
+	rubric: string,
+	options: ScoreLookupOptions = {}
+): Promise<ScoreSummary | null> {
+	const liveRegenerationId = await getConsistentLiveRegenerationId(databases);
+	if (!liveRegenerationId) return null;
+	return readScoreAtRegeneration(databases.db, atlasId, rubric, liveRegenerationId, options);
+}
+
+function toEvidenceStatement(row: StatementRow): EvidenceStatement {
+	return {
+		source: row.source,
+		source_ref: row.source_ref,
+		asserted_at: row.asserted_at,
+		precedence: row.precedence,
+		value: row.value
+	};
+}
+
+export async function getFieldEvidencePage(
+	databases: AtlasDatabases,
+	atlasId: string,
+	field: string,
+	options: Omit<StatementsPageOptions, 'field'> = {}
+): Promise<FieldEvidenceResponse> {
+	const page = await getStatementsPage(databases, atlasId, { ...options, field });
+	return {
+		atlas_id: atlasId,
+		mode: 'field',
+		field,
+		returned: page.returned,
+		limit: page.limit,
+		next_cursor: page.next_cursor,
+		statements: page.statements.map(toEvidenceStatement)
+	};
+}
+
+async function fetchEvidenceStatements(
+	statementsDb: D1Database,
+	statementIds: string[]
+): Promise<Map<string, EvidenceStatement>> {
+	const statements = new Map<string, EvidenceStatement>();
+	if (statementIds.length === 0) return statements;
+	const { results } = await statementsDb
+		.prepare(
+			`SELECT ${STATEMENT_SELECT_COLUMNS} ${STATEMENT_FROM}
+			 WHERE s.statement_id IN (SELECT value FROM json_each(?))
+			 ORDER BY s.statement_id ASC`
+		)
+		.bind(JSON.stringify(statementIds))
+		.all<StatementRowDb>();
+	for (const row of filterPublishableStatements((results ?? []).map(toStatementRow))) {
+		statements.set(row.statement_id, toEvidenceStatement(row));
+	}
+	return statements;
+}
+
+async function joinScoreEvidence(
+	statementsDb: D1Database,
+	evidence: ScoreEvidenceItem[]
+): Promise<JoinedScoreEvidenceItem[]> {
+	const statementIds = Array.from(new Set(evidence.flatMap((item) => item.statement_ids ?? [])));
+	const statements = await fetchEvidenceStatements(statementsDb, statementIds);
+	return evidence.map((item) => ({
+		...item,
+		statements: (item.statement_ids ?? [])
+			.map((statementId) => statements.get(statementId))
+			.filter((statement): statement is EvidenceStatement => statement !== undefined)
+	}));
+}
+
+export interface RubricEvidencePageOptions {
+	limit?: number | string | null;
+	cursor?: string | null;
+}
+
+export async function getRubricEvidencePage(
+	databases: AtlasDatabases,
+	atlasId: string,
+	rubric: string,
+	options: RubricEvidencePageOptions = {}
+): Promise<RubricEvidenceResponse | null> {
+	const liveRegenerationId = await getConsistentLiveRegenerationId(databases);
+	if (!liveRegenerationId) return null;
+	const score = await readScoreAtRegeneration(databases.db, atlasId, rubric, liveRegenerationId);
+	if (!score) return null;
+	const context = statementCursorContext(atlasId, `rubric:${rubric}`);
+	const offset = decodeCursor(options.cursor, 'evidence', context, liveRegenerationId);
+	const limit = clampLimit(options.limit, { fallback: 20, max: STATEMENTS_MAX_ROWS });
+	const candidates = score.evidence.slice(offset, offset + limit + 1);
+	const pageEvidence = candidates.slice(0, limit);
+	const evidence = await joinScoreEvidence(databases.statementsDb, pageEvidence);
+	const nextOffset = offset + pageEvidence.length;
+	return {
+		atlas_id: atlasId,
+		mode: 'rubric',
+		rubric,
+		version: score.version,
+		returned: evidence.length,
+		limit,
+		next_cursor:
+			candidates.length > limit && nextOffset <= CURSOR_MAX_OFFSET
+				? encodeCursor('evidence', nextOffset, context, liveRegenerationId)
+				: null,
+		evidence
+	};
+}
+
+export interface JoinedScoreResult {
+	score: ScoreSummary;
+	evidence: JoinedScoreEvidenceItem[];
+}
+
+export async function getJoinedScore(
+	databases: AtlasDatabases,
+	atlasId: string,
+	rubric: string
+): Promise<JoinedScoreResult | null> {
+	const score = await getScore(databases, atlasId, rubric);
+	if (!score) return null;
+	return {
+		score,
+		evidence: await joinScoreEvidence(databases.statementsDb, score.evidence)
+	};
 }

@@ -144,3 +144,83 @@ export interface StatementRow {
 	precedence: number;
 	confidence: string;
 }
+
+export interface EvidenceStatement {
+	source: string;
+	source_ref: string;
+	asserted_at: string;
+	precedence: number;
+	value: string;
+}
+
+export interface JoinedScoreEvidenceItem extends ScoreEvidenceItem {
+	statements: EvidenceStatement[];
+}
+
+export interface FieldEvidenceResponse {
+	atlas_id: string;
+	mode: 'field';
+	field: string;
+	returned: number;
+	limit: number;
+	next_cursor: string | null;
+	statements: EvidenceStatement[];
+}
+
+export interface RubricEvidenceResponse {
+	atlas_id: string;
+	mode: 'rubric';
+	rubric: string;
+	version: number;
+	returned: number;
+	limit: number;
+	next_cursor: string | null;
+	evidence: JoinedScoreEvidenceItem[];
+}
+
+export type EvidenceResponse = FieldEvidenceResponse | RubricEvidenceResponse;
+
+export interface ScoreExplanationResponse {
+	atlas_id: string;
+	rubric: string;
+	explanation: string;
+}
+
+export interface SegmentFilters {
+	category?: string | null;
+	nature?: string | null;
+	district?: string | null;
+	division?: string | null;
+	present_in?: string | null;
+}
+
+export interface SegmentCandidate {
+	atlas_id: string;
+	canonical_name: string;
+	district: string | null;
+	division: string | null;
+	sector_category: string | null;
+	sector_nature: string | null;
+	formality: {
+		value: number;
+		max: number;
+		checkable: number;
+		unknown: number;
+		version: number;
+		evaluation_as_of: string;
+	};
+}
+
+export interface SegmentResponse {
+	filters: SegmentFilters;
+	total_count: number;
+	counts_by_division: { division: string | null; count: number }[];
+	top_candidates: SegmentCandidate[];
+	search_link: string;
+}
+
+export interface ClaimResponse {
+	claim_id: string;
+	status: 'requested';
+	verification_steps: string[];
+}

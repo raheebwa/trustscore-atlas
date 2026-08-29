@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+	EXPLAIN_SCORE_TOOL,
+	FIND_SEGMENT_TOOL,
+	GET_EVIDENCE_TOOL,
 	GET_BUSINESS_TOOL,
 	MAX_TOOL_RESULT_CHARS,
+	SCORE_BUSINESS_TOOL,
 	SEARCH_BUSINESSES_TOOL,
+	START_CLAIM_TOOL,
 	shapeBusinessRecord,
+	shapeEvidenceResults,
+	shapeExplanationResult,
+	shapeScoreResult,
 	shapeSearchResults,
+	shapeSegmentResult,
 	shapeToolError,
 	type ToolTextResult
 } from './tools';
@@ -105,7 +114,14 @@ function parsed(result: ToolTextResult): Record<string, unknown> {
 }
 
 describe('definitions', () => {
-	for (const definition of [SEARCH_BUSINESSES_TOOL, GET_BUSINESS_TOOL]) {
+	for (const definition of [
+		SEARCH_BUSINESSES_TOOL,
+		GET_BUSINESS_TOOL,
+		GET_EVIDENCE_TOOL,
+		SCORE_BUSINESS_TOOL,
+		EXPLAIN_SCORE_TOOL,
+		FIND_SEGMENT_TOOL
+	]) {
 		it(`${definition.name}: has bounded descriptions and safe annotations`, () => {
 			expect(definition.description.length).toBeLessThan(500);
 			for (const property of Object.values(definition.inputSchema.properties)) {
@@ -117,6 +133,35 @@ describe('definitions', () => {
 			});
 		});
 	}
+
+	it('start_claim: is a bounded write definition', () => {
+		expect(START_CLAIM_TOOL.name).toBe('start_claim');
+		expect(START_CLAIM_TOOL.description.length).toBeLessThan(500);
+		for (const property of Object.values(START_CLAIM_TOOL.inputSchema.properties)) {
+			expect(property.description.length).toBeLessThan(150);
+		}
+		expect(START_CLAIM_TOOL.annotations).toEqual({ readOnlyHint: false });
+	});
+
+	it('exports the seven expected page tool names', () => {
+		expect([
+			SEARCH_BUSINESSES_TOOL.name,
+			GET_BUSINESS_TOOL.name,
+			GET_EVIDENCE_TOOL.name,
+			SCORE_BUSINESS_TOOL.name,
+			EXPLAIN_SCORE_TOOL.name,
+			FIND_SEGMENT_TOOL.name,
+			START_CLAIM_TOOL.name
+		]).toEqual([
+			'search_businesses',
+			'get_business',
+			'get_evidence',
+			'score_business',
+			'explain_score',
+			'find_segment',
+			'start_claim'
+		]);
+	});
 });
 
 describe('shapeSearchResults', () => {
@@ -232,5 +277,70 @@ describe('shapeBusinessRecord', () => {
 		expect(parsed(shapeToolError('business_not_found'))).toEqual({
 			error: 'business_not_found'
 		});
+	});
+});
+
+describe('new tool result budgets', () => {
+	it('bounds evidence, score, explanation, and segment JSON', () => {
+		const longText = 'Example register value '.repeat(100);
+		const evidenceResult = shapeEvidenceResults({
+			atlas_id: 'atlas-example-1',
+			mode: 'field',
+			field: 'canonical_name',
+			returned: 2,
+			limit: 2,
+			next_cursor: 'next-example',
+			statements: Array.from({ length: 2 }, () => ({
+				source: longText,
+				source_ref: longText,
+				asserted_at: '2026-08-01T00:00:00Z',
+				precedence: 3,
+				value: longText
+			}))
+		});
+		const scoreResult = shapeScoreResult({
+			...businessFixture.scores[0],
+			evidence: Array.from({ length: 30 }, (_, index) => ({
+				predicate: `example_predicate_${index}`,
+				points: index,
+				reason: longText
+			}))
+		});
+		const explanationResult = shapeExplanationResult({
+			atlas_id: 'atlas-example-1',
+			rubric: 'formality',
+			explanation: longText
+		});
+		const segmentResult = shapeSegmentResult({
+			filters: {},
+			total_count: 30,
+			counts_by_division: Array.from({ length: 30 }, (_, index) => ({
+				division: `Example Division ${index}`,
+				count: index
+			})),
+			top_candidates: Array.from({ length: 10 }, (_, index) => ({
+				atlas_id: `atlas-example-${index}`,
+				canonical_name: longText,
+				district: 'Example District',
+				division: 'Example Division',
+				sector_category: 'Trade',
+				sector_nature: 'Hardware',
+				formality: {
+					value: 50,
+					max: 100,
+					checkable: 75,
+					unknown: 25,
+					version: 1,
+					evaluation_as_of: '2026-08-29T09:05:00Z'
+				}
+			})),
+			search_link: '/search?category=Trade'
+		});
+
+		for (const result of [evidenceResult, scoreResult, explanationResult, segmentResult]) {
+			expect(result.content[0].text.length).toBeLessThanOrEqual(MAX_TOOL_RESULT_CHARS);
+			expect(() => JSON.parse(result.content[0].text)).not.toThrow();
+		}
+		expect((parsed(segmentResult).top_candidates as unknown[]).length).toBe(10);
 	});
 });

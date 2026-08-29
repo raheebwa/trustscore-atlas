@@ -29,6 +29,38 @@
 		placeholder="District or division"
 		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
 	/>
+	<label class="sr-only" for="category">Sector category</label>
+	<input
+		id="category"
+		name="category"
+		value={data.segmentFilters.category ?? ''}
+		placeholder="Sector category"
+		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
+	/>
+	<label class="sr-only" for="nature">Sector nature</label>
+	<input
+		id="nature"
+		name="nature"
+		value={data.segmentFilters.nature ?? ''}
+		placeholder="Sector nature"
+		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
+	/>
+	<label class="sr-only" for="division">Division or subcounty</label>
+	<input
+		id="division"
+		name="division"
+		value={data.segmentFilters.division ?? ''}
+		placeholder="Division or subcounty"
+		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
+	/>
+	<label class="sr-only" for="present_in">Register slug</label>
+	<input
+		id="present_in"
+		name="present_in"
+		value={data.segmentFilters.present_in ?? ''}
+		placeholder="Present in register"
+		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
+	/>
 	<button
 		type="submit"
 		class="rounded-md bg-stone-900 px-5 py-2 text-base font-medium text-white hover:bg-stone-700"
@@ -37,7 +69,37 @@
 	</button>
 </form>
 
-{#if data.query.length === 0}
+{#if data.segment}
+	<p class="mt-6 text-sm text-stone-500">
+		{data.segment.total_count} matching business{data.segment.total_count === 1 ? '' : 'es'}
+	</p>
+	{#if data.segment.counts_by_division.length > 0}
+		<ul class="mt-3 flex flex-wrap gap-2 text-sm text-stone-600">
+			{#each data.segment.counts_by_division as row (row.division ?? 'unknown')}
+				<li class="rounded-full bg-stone-100 px-3 py-1">
+					{row.division ?? 'Unknown division'}: {row.count}
+				</li>
+			{/each}
+		</ul>
+	{/if}
+	{#if data.segment.top_candidates.length > 0}
+		<h2 class="mt-6 text-lg font-semibold text-stone-900">Highest Formality values</h2>
+		<ul class="mt-3 flex flex-col gap-3">
+			{#each data.segment.top_candidates as item (item.atlas_id)}
+				<li class="rounded-lg border border-stone-200 bg-white p-4">
+					<a
+						href={resolve('/b/[atlas_id]', { atlas_id: item.atlas_id })}
+						class="font-medium text-stone-900 hover:underline">{item.canonical_name}</a
+					>
+					<p class="mt-1 text-sm text-stone-600">
+						{item.division ?? 'Unknown division'}, {item.district ?? 'Unknown district'}
+						&middot; Formality {item.formality.value}/{item.formality.max}
+					</p>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+{:else if data.query.length === 0}
 	<p class="mt-6 text-stone-500">Type a business name above to search the atlas.</p>
 {:else}
 	{#if data.query.length < data.minLength}
