@@ -1,0 +1,32 @@
+# Table Schema for records.parquet.
+fields:
+  - name: record_id
+    type: string
+    description: Deterministic key of the TIN and exemption window.
+    constraints: { required: true, pattern: "^[0-9a-f]{16}$" }
+  - name: sr_no
+    type: string
+    description: Sequence number published in the report.
+  - name: tin
+    type: string
+    description: Uganda Revenue Authority taxpayer identification number.
+    constraints: { required: true, pattern: "^1[0-9]{9}$" }
+  - name: taxpayer_name
+    type: string
+    description: Registered taxpayer name.
+    constraints: { required: true }
+  - name: exemption_start_date
+    type: string
+    description: Start of the exemption window in ISO 8601 format.
+    constraints: { required: true }
+  - name: exemption_end_date
+    type: string
+    description: End of the exemption window in ISO 8601 format.
+    constraints: { required: true }
+  - name: location
+    type: string
+    description: Location or tax office published by the authority.
+  - name: source_ref
+    type: string
+    description: Result page URL from which the row was parsed.
+    constraints: { required: true }

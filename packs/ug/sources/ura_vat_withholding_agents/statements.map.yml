@@ -1,0 +1,19 @@
+country: UG
+precedence_class: register_of_record
+confidence: official
+record_id:
+  columns: [tin, designation_effective_date]
+entity_id:
+  columns: [tin]
+source_ref:
+  from: source_ref
+statements:
+  - field: canonical_name
+    from: name
+  - field: identifiers
+    identifier: ug:tin
+    from: tin
+  - field: status.ura_vat_withholding_agent
+    value: designated
+  - field: designation.effective_date
+    from: designation_effective_date

@@ -1,0 +1,25 @@
+# Table Schema for records.parquet.
+fields:
+  - name: record_id
+    type: string
+    description: Deterministic key of the TIN and designation effective date.
+    constraints: { required: true, pattern: "^[0-9a-f]{16}$" }
+  - name: sr_no
+    type: string
+    description: Sequence number published in the report.
+  - name: tin
+    type: string
+    description: Uganda Revenue Authority taxpayer identification number.
+    constraints: { required: true, pattern: "^1[0-9]{9}$" }
+  - name: name
+    type: string
+    description: Registered taxpayer name.
+    constraints: { required: true }
+  - name: designation_effective_date
+    type: string
+    description: Designation effective date in ISO 8601 format.
+    constraints: { required: true }
+  - name: source_ref
+    type: string
+    description: Result page URL from which the row was parsed.
+    constraints: { required: true }

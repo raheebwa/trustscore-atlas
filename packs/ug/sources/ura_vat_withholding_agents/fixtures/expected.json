@@ -1,0 +1,13 @@
+{
+  "rows": 3,
+  "rows_dropped": 1,
+  "entities": 2,
+  "identifier_statements": 3,
+  "company": "Example Hardware Supplies Ltd",
+  "statements_for_company": {
+    "canonical_name": ["Example Hardware Supplies Ltd"],
+    "status.ura_vat_withholding_agent": ["designated"],
+    "designation.effective_date": ["2026-01-15", "2026-08-01"]
+  },
+  "raw_files": ["page-1.html", "page-2.html", "parameter-page.html"]
+}

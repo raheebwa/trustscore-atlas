@@ -1,0 +1,25 @@
+slug: ura.customs_agents
+country: UG
+publisher: Uganda Revenue Authority
+title: Licensed customs agents
+url: https://ura.go.ug/Portal/reportController/do?reportCode=13&actionCode=RPRTPARAMETERPAGE
+endpoint: https://ura.go.ug/Portal/reportController/do
+licence: public-record
+rights: public_register
+attribution: Uganda Revenue Authority, licensed customs agents register (ura.go.ug)
+cadence: quarterly
+coverage: >-
+  Customs clearing agents licensed by the Uganda Revenue Authority for import and export work.
+precedence_class: register_of_record
+pii:
+  excluded_columns: []
+  hashed_columns: []
+terms:
+  url: https://ura.go.ug/Portal/reportController/do?reportCode=13&actionCode=RPRTPARAMETERPAGE
+  checked_on: "2026-08-30"
+  note: >-
+    Public register served through the report parameter and paged result flow. The adapter uses
+    the required licence date range from 01/01/2000 through 31/12/2099 and blank status for all.
+identifier_schemes: [ug:tin, ug:customs_licence]
+adapter_version: 0.1.0
+row_count_tolerance: 0.15

@@ -1,0 +1,26 @@
+country: UG
+precedence_class: register_of_record
+confidence: official
+record_id:
+  columns: [tin, license_number, license_issue_date]
+entity_id:
+  columns: [tin]
+source_ref:
+  from: source_ref
+statements:
+  - field: canonical_name
+    from: agent_name
+  - field: identifiers
+    identifier: ug:tin
+    from: tin
+  - field: identifiers
+    identifier: ug:customs_licence
+    from: license_number
+  - field: licence.issue_date
+    from: license_issue_date
+  - field: licence.expiry_date
+    from: license_expiry_date
+  - field: status.ura_customs_agent
+    from: registration_status
+  - field: location.tax_office
+    from: tax_office

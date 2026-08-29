@@ -1,0 +1,14 @@
+{
+  "rows": 3,
+  "rows_dropped": 1,
+  "entities": 2,
+  "identifier_statements": 3,
+  "company": "Example Hardware Supplies Ltd",
+  "statements_for_company": {
+    "canonical_name": ["Example Hardware Supplies Ltd"],
+    "status.ura_wht_exempt": ["exempt"],
+    "exemption.valid_from": ["2026-01-01", "2026-07-01"],
+    "exemption.valid_to": ["2026-06-30", "2026-12-31"]
+  },
+  "raw_files": ["page-1.html", "page-2.html", "parameter-page.html"]
+}

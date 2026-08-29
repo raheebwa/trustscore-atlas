@@ -1,0 +1,46 @@
+# Table Schema for records.parquet.
+fields:
+  - name: record_id
+    type: string
+    description: Deterministic key of the TIN, licence number and issue date.
+    constraints: { required: true, pattern: "^[0-9a-f]{16}$" }
+  - name: sr_no
+    type: string
+    description: Sequence number published in the report.
+  - name: tax_office
+    type: string
+    description: Uganda Revenue Authority office responsible for the licence.
+  - name: agent_name
+    type: string
+    description: Registered name of the licensed customs agent.
+    constraints: { required: true }
+  - name: tin
+    type: string
+    description: Uganda Revenue Authority taxpayer identification number.
+    constraints: { required: true, pattern: "^1[0-9]{9}$" }
+  - name: license_number
+    type: string
+    description: Customs agent licence number as published.
+    constraints: { required: true }
+  - name: license_issue_date
+    type: string
+    description: Licence issue date in ISO 8601 format.
+  - name: license_expiry_date
+    type: string
+    description: Licence expiry date in ISO 8601 format.
+  - name: date_of_approval
+    type: string
+    description: Approval date in ISO 8601 format.
+  - name: date_of_application
+    type: string
+    description: Application date in ISO 8601 format.
+  - name: registration_status
+    type: string
+    description: Registration status published by the authority.
+  - name: date_of_deactivation
+    type: string
+    description: Deactivation date or the source value N/A.
+  - name: source_ref
+    type: string
+    description: Result page URL from which the row was parsed.
+    constraints: { required: true }

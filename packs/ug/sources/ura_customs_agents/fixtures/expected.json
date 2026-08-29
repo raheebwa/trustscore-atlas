@@ -1,0 +1,15 @@
+{
+  "rows": 3,
+  "rows_dropped": 1,
+  "entities": 2,
+  "identifier_statements": 6,
+  "company": "Example Hardware Supplies Ltd",
+  "statements_for_company": {
+    "canonical_name": ["Example Hardware Supplies Ltd"],
+    "licence.issue_date": ["2026-01-01", "2026-07-01"],
+    "licence.expiry_date": ["2026-12-31", "2027-06-30"],
+    "status.ura_customs_agent": ["Registered"],
+    "location.tax_office": ["KAMPALA CENTRAL"]
+  },
+  "raw_files": ["page-1.html", "page-2.html", "parameter-page.html"]
+}

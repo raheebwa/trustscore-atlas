@@ -1,0 +1,21 @@
+country: UG
+precedence_class: register_of_record
+confidence: official
+record_id:
+  columns: [tin, exemption_start_date, exemption_end_date]
+entity_id:
+  columns: [tin]
+source_ref:
+  from: source_ref
+statements:
+  - field: canonical_name
+    from: taxpayer_name
+  - field: identifiers
+    identifier: ug:tin
+    from: tin
+  - field: status.ura_wht_exempt
+    value: exempt
+  - field: exemption.valid_from
+    from: exemption_start_date
+  - field: exemption.valid_to
+    from: exemption_end_date

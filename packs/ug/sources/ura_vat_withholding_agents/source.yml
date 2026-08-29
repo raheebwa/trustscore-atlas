@@ -1,0 +1,24 @@
+slug: ura.vat_withholding_agents
+country: UG
+publisher: Uganda Revenue Authority
+title: VAT withholding agents
+url: https://ura.go.ug/Portal/reportController/do?reportCode=1004&actionCode=RPRTPARAMETERPAGE
+endpoint: https://ura.go.ug/Portal/reportController/do
+licence: public-record
+rights: public_register
+attribution: Uganda Revenue Authority, VAT withholding agents register (ura.go.ug)
+cadence: quarterly
+coverage: >-
+  Taxpayers designated by the Uganda Revenue Authority as VAT withholding agents.
+precedence_class: register_of_record
+pii:
+  excluded_columns: []
+  hashed_columns: []
+terms:
+  url: https://ura.go.ug/Portal/reportController/do?reportCode=1004&actionCode=RPRTPARAMETERPAGE
+  checked_on: "2026-08-30"
+  note: >-
+    Public register served through the report parameter and paged result flow.
+identifier_schemes: [ug:tin]
+adapter_version: 0.1.0
+row_count_tolerance: 0.15
