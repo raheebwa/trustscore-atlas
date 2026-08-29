@@ -11,13 +11,14 @@
 	},
 	"workers_dev": true,
 	"preview_urls": true,
+	"routes": [{ "pattern": "atlas.trustscorehq.com", "custom_domain": true }],
+	"r2_buckets": [{ "binding": "DATA", "bucket_name": "atlas-data" }],
+	"kv_namespaces": [{ "binding": "CACHE", "id": "f4b549f2e82a4ef992f759f972415559" }],
 	"d1_databases": [
 		{
 			"binding": "DB",
 			"database_name": "atlas",
-			// Placeholder. The real database_id is set at deploy time (docs/ARCHITECTURE.md section 10);
-			// it is not committed for the production database.
-			"database_id": "00000000-0000-0000-0000-000000000000"
+			"database_id": "48f6a828-bd01-4a56-ba44-473c01b2bcea"
 		}
 	]
 }
