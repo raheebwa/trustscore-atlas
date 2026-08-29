@@ -45,9 +45,15 @@ def test_regenerate_from_one_source(tmp_path: Path):
     businesses = pq.read_table(out.directory / "businesses.parquet").to_pylist()
     assert len(businesses) == EXPECTED["entities"]
     scores = pq.read_table(out.directory / "scores.parquet").to_pylist()
-    assert {s["rubric"] for s in scores} == {"formality"}
+    assert {s["rubric"] for s in scores} == {
+        "formality",
+        "activity",
+        "compliance_signals",
+        "procurement_readiness",
+    }
     assert all(json.loads(s["evidence"]) for s in scores)
-    assert all(s["value"] == 25 for s in scores)  # KCCA only: local trading licence
+    formality = [s for s in scores if s["rubric"] == "formality"]
+    assert all(s["value"] == 25 for s in formality)  # KCCA only: local trading licence
     statements = pq.read_table(out.directory / "statements_resolved.parquet")
     assert "atlas_id" in statements.column_names and statements.num_rows == EXPECTED["rows"] * 6
     stage = (out.directory / "stage.sql").read_text()
@@ -208,3 +214,47 @@ def test_regenerate_writes_candidates_and_aliases_for_review(tmp_path: Path):
     assert db.execute("SELECT count(*) FROM linkage_candidates").fetchone() == (
         candidates.num_rows,
     )
+
+
+def test_regenerate_scores_all_four_rubrics_with_formality_first(tmp_path: Path):
+    spec = load_adapter(ADAPTER)
+    pages = {
+        spec.module.query_url(n): (ADAPTER / "fixtures" / "raw" / f"{_slug(n)}.html").read_bytes()
+        for n in EXPECTED["natures"]
+    }
+    run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=lambda url, **_: pages[url],
+        salt=SALT,
+        params={"natures": EXPECTED["natures"]},
+    )
+    out = regenerate(
+        pack_dir=PACKS / "ug",
+        data_root=tmp_path,
+        regeneration_id="20260829T210000Z",
+        computed_at="2026-08-29T21:00:00Z",
+        rubrics_dir=PACKS.parent / "rubrics",
+        schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
+    )
+    scores = pq.read_table(out.directory / "scores.parquet").to_pylist()
+    by_rubric = {}
+    for s in scores:
+        by_rubric.setdefault(s["rubric"], []).append(s)
+    assert set(by_rubric) == {
+        "formality",
+        "activity",
+        "compliance_signals",
+        "procurement_readiness",
+    }
+    assert all(len(v) == EXPECTED["entities"] for v in by_rubric.values())
+    procurement = by_rubric["procurement_readiness"][0]
+    formality_row = next(
+        e for e in json.loads(procurement["evidence"]) if e["predicate"] == "formality_threshold"
+    )
+    assert formality_row["reason"].startswith("formality 25 of 100 below 55")
+    businesses = pq.read_table(out.directory / "businesses.parquet").to_pylist()
+    assert out.summary["counts"]["scores"] == EXPECTED["entities"] * 4
+    assert businesses

@@ -16,7 +16,8 @@ from .linkage import name_candidates
 from .resolve import pack_sources, resolve
 from .score import load_rubric, score
 
-PHASE0_RUBRICS = ("formality",)
+# Formality first: Procurement Readiness reads the Formality value from the business.
+PHASE0_RUBRICS = ("formality", "activity", "compliance_signals", "procurement_readiness")
 # Regenerated tables dropped before a load so the free-plan peak stays under the cap.
 # The main database also drops statements and refs so a layout from before the split can
 # never inflate a load.
@@ -194,6 +195,13 @@ def regenerate(
                 rubric, b, by_business.get(b["atlas_id"], []), evaluation_as_of=computed_at
             )
             scores.append({"atlas_id": b["atlas_id"], **result})
+            b.setdefault("scores", {})[name] = {
+                "value": result["value"],
+                "max": result["max"],
+                "checkable": result["checkable"],
+                "unknown": result["unknown"],
+                "version": result["version"],
+            }
 
     out = data_root / "regen" / regeneration_id
     out.mkdir(parents=True, exist_ok=True)
