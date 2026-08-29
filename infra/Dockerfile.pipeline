@@ -1,0 +1,21 @@
+# Pipeline image: Python 3.13 with the adapter, resolution and scoring dependencies.
+# Build context is the repository root so packs/, rubrics/ and schemas/ are available.
+#   docker build -f infra/Dockerfile.pipeline -t atlas-pipeline .
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS build
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
+WORKDIR /srv/pipeline
+COPY pipeline/pyproject.toml pipeline/uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
+COPY pipeline/ ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+FROM python:3.13-slim-bookworm
+ENV PATH="/srv/pipeline/.venv/bin:$PATH" PYTHONUNBUFFERED=1
+WORKDIR /srv
+COPY --from=build /srv/pipeline /srv/pipeline
+COPY packs/ /srv/packs/
+COPY rubrics/ /srv/rubrics/
+COPY schemas/ /srv/schemas/
+ENTRYPOINT ["python", "-m", "atlas_pipeline"]
