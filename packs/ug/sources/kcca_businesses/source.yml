@@ -1,0 +1,26 @@
+slug: kcca.businesses
+country: UG
+publisher: Kampala Capital City Authority
+title: Licensed businesses
+url: https://kcca.go.ug/businesses
+endpoint: https://kcca.go.ug/sitePages/business_query.php
+licence: public-record
+rights: public_register
+attribution: Kampala Capital City Authority, licensed business directory (kcca.go.ug)
+cadence: quarterly
+coverage: >-
+  Businesses holding a KCCA trading licence in the five Kampala divisions (Central, Kawempe,
+  Makindye, Nakawa, Rubaga). Kampala only; no coverage of any other district.
+precedence_class: regulator_or_authority
+pii:
+  excluded_columns: [contact, email]
+  hashed_columns: [contact]
+terms:
+  url: https://kcca.go.ug/businesses
+  checked_on: "2026-08-29"
+  note: >-
+    Public directory served without authentication or rate limiting. No terms of use are
+    published on the page; robots directives are honoured and requests are spaced.
+identifier_schemes: [ug:kcca_licence]
+adapter_version: 0.1.0
+row_count_tolerance: 0.15

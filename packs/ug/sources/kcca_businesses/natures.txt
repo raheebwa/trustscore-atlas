@@ -1,0 +1,106 @@
+Agencies
+Airline Officers
+Apartments
+ATM Machine
+Auctioneers/ bailiffs/ court brokers
+Auditors/ accountants/ tax consultants
+Bakery
+Banks
+Bar/ Pub/ Inn Etc
+Beauty Saloon
+Boutique
+Brick/ Block/ Concrete Products Workshop
+Business Consultants
+Butchery
+Car Special Hire Services
+Car Washing Bay
+Casino
+Catering Business
+Cleaning Services
+Clearing and Forwarding
+Clinics
+Commission Agent
+Construction Company
+Cottage Industry
+Day Care Centre
+Decorator
+Dobi
+Driving School
+Drug Store
+Dry Cleaner Large
+Eating House
+Engravers
+Entertainment Venue/ Theatre/ Disco/ Hall/ Video Hall
+Event Managers
+Events Management Companies
+Flower selling
+Foreign Exchange Bureau
+Fumigation Firms
+Funeral services
+Garbage Collectors
+GENERAL
+Grinding Mills
+Grocery
+Guest House
+Herbal / Local medicine
+Hostels (100 Rooms and Above)
+Hostels (Less than 50 Rooms)
+Hostels (More than 50 Rooms but less than 100 Rooms)
+Hotel Business (3 Stars and Above)
+Hotel Business (Less than 3 Stars)
+Imaging Company
+Insurance Company
+Internet Cafe
+IT Solutions
+Kiosk
+Legal Firm
+Lodges (20 Rooms and Above)
+Lodges (Less than 20 Rooms)
+Manufacturer's Representative
+Maternity Home
+Members Club
+Metal Workshop
+Mineral Dealers
+Mobile Money
+Mobile Network Services Providers
+Money Lending and Savings Institution
+Motor Cycle/ Generator Repair Garage
+Motor Vehicle Garage
+Night Club
+Nursery School
+Nursing Home
+Office
+Other Service/ Repair Workshop
+Pharmacy
+Photo Booth
+Pool Table
+Power Distribution
+Power Generation
+Printing and Publishing Firm
+Private Car Park
+Private Fire Fighting
+Private Hospital
+Private Primary School
+Private Public Toilets and Bathrooms
+Private Secondary School
+Private University
+Radio Station
+Restaurant
+Retailers
+Satellite Connection
+Scrap Dealers
+Security Firm
+Security Investigation Companies
+Showroom
+Slot Machine
+Small Cottage Industry
+Sports Betting
+Supermarket
+Surveyors/Engineers/Valuers/Architects
+Tertiary Institution
+Transport
+Travel and Tour Agent
+Warehouse/Depot
+Website Design
+Wholesalers
+Wood workshop

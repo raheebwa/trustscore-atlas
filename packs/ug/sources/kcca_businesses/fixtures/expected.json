@@ -1,0 +1,24 @@
+{
+  "natures": [
+    "Bakery",
+    "Retailers"
+  ],
+  "rows": 4,
+  "rows_dropped": 1,
+  "entities": 3,
+  "statements_for": {
+    "EXAMPLE BAKERY LTD": {
+      "canonical_name": "EXAMPLE BAKERY LTD",
+      "sector.source_category": "GENERAL",
+      "sector.source_nature": [
+        "Bakery",
+        "Retailers"
+      ],
+      "location.division_or_subcounty": "Central Division",
+      "location.district": "Kampala",
+      "support": {
+        "canonical_name": 2
+      }
+    }
+  }
+}

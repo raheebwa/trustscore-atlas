@@ -1,0 +1,26 @@
+# Native column -> canonical field. Applied by the framework after the personal-data posture.
+country: UG
+precedence_class: regulator_or_authority
+confidence: official
+# Identity never derives from personal-data columns or from the linkage salt.
+record_id:
+  columns: [business_name, business_category, business_nature, division]
+entity_id:
+  columns: [business_name, division]
+  normalise: [business_name]
+source_ref:
+  from: source_ref
+statements:
+  - field: canonical_name
+    from: business_name
+  - field: sector.source_category
+    from: business_category
+  - field: sector.source_nature
+    from: business_nature
+  - field: location.division_or_subcounty
+    from: division
+  - field: location.district
+    value: Kampala
+  - field: identifiers
+    identifier: ug:kcca_licence
+    from: entity_key

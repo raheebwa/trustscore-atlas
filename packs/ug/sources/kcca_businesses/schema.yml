@@ -1,0 +1,30 @@
+# Table Schema for records.parquet (native columns after the personal-data posture is applied).
+fields:
+  - name: record_id
+    type: string
+    description: Deterministic key of one listing (name, category, nature, division). Never derived from personal-data columns.
+    constraints: { required: true, pattern: "^[0-9a-f]{16}$" }
+  - name: business_name
+    type: string
+    description: Trading name as published by KCCA, mostly upper case.
+    constraints: { required: true }
+  - name: business_category
+    type: string
+    description: One of the KCCA licence categories (GENERAL, FINANCIAL INSTITUTION BUSINESS, ...).
+  - name: business_nature
+    type: string
+    description: Licence sub-type; one of the values in natures.txt.
+  - name: division
+    type: string
+    description: One of Central, Kawempe, Makindye, Nakawa, Rubaga Division.
+    constraints: { required: true }
+  - name: contact_hash
+    type: string
+    description: Salted hash of the published contact number, kept for linkage only. Never emitted as a statement.
+  - name: source_nature_query
+    type: string
+    description: The nature value that surfaced the row.
+  - name: source_ref
+    type: string
+    description: The query URL the row was parsed from.
+    constraints: { required: true }
