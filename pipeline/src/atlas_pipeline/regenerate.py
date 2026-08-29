@@ -17,7 +17,12 @@ from .score import load_rubric, score
 
 PHASE0_RUBRICS = ("formality",)
 # Regenerated tables dropped before a load so the free-plan peak stays under the cap.
-PRELUDE_DROPS = {"DB": ("scores", "businesses_fts"), "DB_STATEMENTS": ("statements",)}
+# The main database also drops statements and refs so a layout from before the split can
+# never inflate a load.
+PRELUDE_DROPS = {
+    "DB": ("scores", "businesses_fts", "statements", "refs"),
+    "DB_STATEMENTS": ("statements",),
+}
 
 
 @dataclass

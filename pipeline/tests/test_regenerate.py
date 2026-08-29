@@ -86,7 +86,12 @@ def test_regenerate_writes_a_prelude_that_frees_the_largest_live_table(tmp_path:
         schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
     )
     prelude = (out.directory / "prelude.sql").read_text().splitlines()
-    assert prelude == ["DROP TABLE IF EXISTS scores;", "DROP TABLE IF EXISTS businesses_fts;"]
+    assert prelude == [
+        "DROP TABLE IF EXISTS scores;",
+        "DROP TABLE IF EXISTS businesses_fts;",
+        "DROP TABLE IF EXISTS statements;",
+        "DROP TABLE IF EXISTS refs;",
+    ]
     statements_prelude = (out.directory / "statements-prelude.sql").read_text().splitlines()
     assert statements_prelude == ["DROP TABLE IF EXISTS statements;"]
     order = json.loads((out.directory / "regeneration.json").read_text())["load_order"]
