@@ -127,6 +127,13 @@ def run(ctx) -> None:
 SNAPSHOT_DATE_COLUMNS = ["designation_effective_date"]
 
 
+def _snapshot_date(value: str) -> str:
+    """Typed tables received earlier carry ISO dates; the register prints dd/mm/yyyy."""
+    if not value:
+        return ""
+    return value if len(value) == 10 and value[4] == "-" else _iso_date(value)
+
+
 def from_snapshot_row(row: dict) -> dict:
     """Normalise a row from a dated typed table received earlier (snapshot runs)."""
-    return row | {c: _iso_date(row[c]) if row.get(c) else "" for c in SNAPSHOT_DATE_COLUMNS}
+    return row | {c: _snapshot_date(row.get(c, "")) for c in SNAPSHOT_DATE_COLUMNS}

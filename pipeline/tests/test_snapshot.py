@@ -29,7 +29,7 @@ def _snapshot(tmp_path: Path) -> Path:
                 "sr_no": "2",
                 "tin": "1000000002",
                 "name": "SAMPLE BAKERY",
-                "designation_effective_date": "15/03/2025",
+                "designation_effective_date": "2025-03-15",
             },
         ]
     )

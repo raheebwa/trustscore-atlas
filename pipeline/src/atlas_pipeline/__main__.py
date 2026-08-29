@@ -22,6 +22,11 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--param", action="append", default=[], help="key=v1,v2 passed to the adapter")
     run.add_argument("--previous-manifest", type=Path)
     run.add_argument(
+        "--snapshot", type=Path, help="dated typed table (parquet) loaded instead of a pull"
+    )
+    run.add_argument("--snapshot-at", help="original pull time of the snapshot, ISO 8601 UTC")
+    run.add_argument("--snapshot-ref", help="source reference recorded on every snapshot statement")
+    run.add_argument(
         "--replay-from", type=Path, help="manifest.json of a run whose raw objects to reuse"
     )
     regen = sub.add_parser("regenerate", help="resolve, score and write serving sql for a pack")
