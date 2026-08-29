@@ -13,6 +13,7 @@ identifier_schemes:
     title: Uganda Revenue Authority tax identification number
     issuer: Uganda Revenue Authority
     pattern: "^1[0-9]{9}$"
+    issuer_unique: true   # one TIN, one taxpayer: an exact match groups records across registers
     org_id_guide: null
   ug:kcca_licence:
     title: KCCA licensed business row key
@@ -64,15 +65,15 @@ sources:
   - slug: kcca.property_rates
     state: not_loaded
   - slug: ura.vat_withholding_agents
-    state: not_loaded
+    state: loaded
   - slug: ura.customs_agents
-    state: not_loaded
+    state: loaded
   - slug: ura.wht_exemptions
-    state: not_loaded
+    state: loaded
   - slug: ppda.ocds
-    state: not_loaded
+    state: loaded
   - slug: unbs.certified_products
-    state: not_loaded
+    state: loaded
   - slug: bou.supervised_institutions
     state: not_loaded
   - slug: cma.licensed_firms

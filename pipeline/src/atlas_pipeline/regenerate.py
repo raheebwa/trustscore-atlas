@@ -12,6 +12,7 @@ import yaml
 
 from .adapters import STATEMENT_ARROW_SCHEMA, accepted_run
 from .d1 import regeneration_sql, swap_sql
+from .linkage import name_candidates
 from .resolve import pack_sources, resolve
 from .score import load_rubric, score
 
@@ -197,6 +198,37 @@ def regenerate(
     out = data_root / "regen" / regeneration_id
     out.mkdir(parents=True, exist_ok=True)
     _append_crosswalk(crosswalk_path, resolution, regeneration_id)
+    candidates = name_candidates(resolution.businesses)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [{**c, "comparison": _json(c["comparison"])} for c in candidates],
+            schema=pa.schema(
+                [
+                    ("atlas_id_a", pa.string()),
+                    ("atlas_id_b", pa.string()),
+                    ("match_probability", pa.float64()),
+                    ("match_weight", pa.float64()),
+                    ("comparison", pa.string()),
+                    ("blocking_rule", pa.string()),
+                    ("model_version", pa.string()),
+                ]
+            ),
+        ),
+        out / "linkage_candidates.parquet",
+    )
+    pq.write_table(
+        pa.Table.from_pylist(
+            resolution.aliases,
+            schema=pa.schema(
+                [
+                    ("atlas_id", pa.string()),
+                    ("canonical_atlas_id", pa.string()),
+                    ("reason", pa.string()),
+                ]
+            ),
+        ),
+        out / "aliases.parquet",
+    )
     pq.write_table(
         pa.Table.from_pylist(
             [
@@ -268,6 +300,8 @@ def regenerate(
             scores,
             sources,
             database=database,
+            candidates=candidates,
+            aliases=resolution.aliases,
         )
         (out / f"{prefix}prelude.sql").write_text(
             "\n".join(f"DROP TABLE IF EXISTS {t};" for t in PRELUDE_DROPS[database]) + "\n"
@@ -282,6 +316,8 @@ def regenerate(
             "businesses": len(resolution.businesses),
             "statements": len(resolution.statements),
             "scores": len(scores),
+            "linkage_candidates": len(candidates),
+            "aliases": len(resolution.aliases),
             "stage_statements": sum(1 for _ in open(out / "stage.sql"))
             + sum(1 for _ in open(out / "statements-stage.sql")),
         },

@@ -17,7 +17,15 @@ _TARGET = 90_000
 # their references. Each has its own regenerations and meta tables so the live pointer can be
 # read from either.
 DATABASES = {
-    "DB": ("businesses", "identifiers", "scores", "sources", "businesses_fts"),
+    "DB": (
+        "businesses",
+        "identifiers",
+        "aliases",
+        "linkage_candidates",
+        "scores",
+        "sources",
+        "businesses_fts",
+    ),
     "DB_STATEMENTS": ("statements", "refs"),
 }
 STAGED_TABLES = DATABASES["DB"] + DATABASES["DB_STATEMENTS"]
@@ -196,6 +204,8 @@ def regeneration_sql(
     scores: list[dict],
     sources: list[dict],
     database: str = "DB",
+    candidates: list[dict] | None = None,
+    aliases: list[dict] | None = None,
 ) -> list[str]:
     """Staged tables and inserts for one database (see DATABASES)."""
     rid = _check_regeneration_id(regeneration["id"])
@@ -228,6 +238,22 @@ def regeneration_sql(
         f"identifiers__{rid}",
         ["atlas_id", "scheme", "value", "source"],
         [{"atlas_id": b["atlas_id"], **i} for b in businesses for i in b["identifiers"]],
+    )
+    out += insert_statements(
+        f"aliases__{rid}", ["atlas_id", "canonical_atlas_id", "reason"], list(aliases or [])
+    )
+    out += insert_statements(
+        f"linkage_candidates__{rid}",
+        [
+            "atlas_id_a",
+            "atlas_id_b",
+            "match_probability",
+            "match_weight",
+            "comparison",
+            "blocking_rule",
+            "model_version",
+        ],
+        [{**c, "comparison": _json(c["comparison"])} for c in (candidates or [])],
     )
     out += insert_statements(
         f"scores__{rid}",

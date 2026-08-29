@@ -54,6 +54,24 @@ CREATE TABLE refs (
   source_ref  TEXT NOT NULL
 );
 
+CREATE TABLE aliases (
+  atlas_id            TEXT PRIMARY KEY,               -- an id that merged into another
+  canonical_atlas_id  TEXT NOT NULL,                  -- the surviving id
+  reason              TEXT NOT NULL                   -- the identifier scheme that joined them
+);
+
+CREATE TABLE linkage_candidates (
+  atlas_id_a         TEXT NOT NULL,
+  atlas_id_b         TEXT NOT NULL,
+  match_probability  REAL NOT NULL,
+  match_weight       REAL NOT NULL,
+  comparison         TEXT NOT NULL,                   -- JSON comparison vector
+  blocking_rule      TEXT NOT NULL,
+  model_version      TEXT NOT NULL,
+  PRIMARY KEY (atlas_id_a, atlas_id_b, model_version)
+);
+CREATE INDEX linkage_candidates_b ON linkage_candidates (atlas_id_b);
+
 CREATE TABLE scores (
   atlas_id         TEXT NOT NULL,
   rubric           TEXT NOT NULL,

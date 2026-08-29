@@ -155,3 +155,56 @@ def test_regenerate_splits_statements_into_a_second_database(tmp_path: Path):
     assert second.execute(
         "SELECT count(*) FROM sqlite_master WHERE name = 'businesses'"
     ).fetchone() == (0,)
+
+
+def test_regenerate_writes_candidates_and_aliases_for_review(tmp_path: Path):
+    """Name candidates and aliases are outputs of every regeneration: parquet for the bundles
+    and tables in the main serving database, never merges."""
+    import sqlite3
+
+    from atlas_pipeline.d1 import apply_batch
+
+    spec = load_adapter(ADAPTER)
+    pages = {
+        spec.module.query_url(n): (ADAPTER / "fixtures" / "raw" / f"{_slug(n)}.html").read_bytes()
+        for n in EXPECTED["natures"]
+    }
+    run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=lambda url, **_: pages[url],
+        salt=SALT,
+        params={"natures": EXPECTED["natures"]},
+    )
+    out = regenerate(
+        pack_dir=PACKS / "ug",
+        data_root=tmp_path,
+        regeneration_id="20260829T210000Z",
+        computed_at="2026-08-29T21:00:00Z",
+        rubrics_dir=PACKS.parent / "rubrics",
+        schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
+    )
+    candidates = pq.read_table(out.directory / "linkage_candidates.parquet")
+    assert candidates.column_names == [
+        "atlas_id_a",
+        "atlas_id_b",
+        "match_probability",
+        "match_weight",
+        "comparison",
+        "blocking_rule",
+        "model_version",
+    ]
+    aliases = pq.read_table(out.directory / "aliases.parquet")
+    assert aliases.column_names == ["atlas_id", "canonical_atlas_id", "reason"]
+    assert out.summary["counts"]["linkage_candidates"] == candidates.num_rows
+    assert out.summary["counts"]["aliases"] == 0
+    db = sqlite3.connect(":memory:")
+    for name in ("prelude.sql", "stage.sql", "swap.sql"):
+        apply_batch(db, (out.directory / name).read_text())
+    tables = {n for (n,) in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert {"linkage_candidates", "aliases"} <= tables
+    assert db.execute("SELECT count(*) FROM linkage_candidates").fetchone() == (
+        candidates.num_rows,
+    )
