@@ -198,3 +198,23 @@ def test_statement_references_are_normalised_into_a_refs_table():
     ]
     ref_ids = {row[0] for row in db.execute("SELECT ref_id FROM refs")}
     assert all(len(r) == 12 for r in ref_ids)
+
+
+def test_same_identifier_from_two_registers_loads_as_two_rows():
+    """A business joined across registers on a TIN carries that TIN from each register; the
+    identifiers table keys on the source as well, so both provenance rows load."""
+    businesses, statements, scores, sources, regeneration = _sample()
+    businesses[0]["identifiers"] = [
+        {"scheme": "ug:tin", "value": "1000000001", "source": "ura.vat_withholding_agents"},
+        {"scheme": "ug:tin", "value": "1000000001", "source": "ura.customs_agents"},
+    ]
+    stage = regeneration_sql(SCHEMA, regeneration, businesses, statements, scores, sources)
+    swap = swap_sql(SCHEMA, regeneration)
+    db = sqlite3.connect(":memory:")
+    apply_batch(db, stage)
+    apply_batch(db, swap)
+    rows = db.execute("SELECT scheme, value, source FROM identifiers ORDER BY source").fetchall()
+    assert rows == [
+        ("ug:tin", "1000000001", "ura.customs_agents"),
+        ("ug:tin", "1000000001", "ura.vat_withholding_agents"),
+    ]

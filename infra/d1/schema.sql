@@ -27,7 +27,7 @@ CREATE TABLE identifiers (
   scheme    TEXT NOT NULL,
   value     TEXT NOT NULL,
   source    TEXT NOT NULL,
-  PRIMARY KEY (atlas_id, scheme, value)
+  PRIMARY KEY (atlas_id, scheme, value, source)   -- one row per register that carries the id
 );
 CREATE INDEX identifiers_lookup ON identifiers (scheme, value);
 
