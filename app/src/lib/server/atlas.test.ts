@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
 	PUBLISHABLE_STATEMENT_FIELDS,
 	buildProvenanceTable,
+	composeCoverage,
+	getConsistentLiveRegenerationId,
 	getFieldTrace,
 	getStatementsPage,
 	searchBusinesses
@@ -106,7 +108,7 @@ describe('publishable statement boundary', () => {
 			})
 		];
 		const db = statementDb(rows);
-		const databases = { db, statementsDb: db };
+		const databases = { db, statementsDb: db, scoresDb: db };
 
 		const statementPage = await getStatementsPage(databases, 'atlas-1');
 		const trace = await getFieldTrace(databases, 'atlas-1', 'canonical_name');
@@ -117,7 +119,48 @@ describe('publishable statement boundary', () => {
 	});
 });
 
-function searchDb(): D1Database {
+function metaDb(liveRegenerationId: string): D1Database {
+	return {
+		prepare: () => ({
+			bind: () => ({
+				first: async () => ({ value: liveRegenerationId })
+			})
+		})
+	} as unknown as D1Database;
+}
+
+describe('serving regeneration consistency', () => {
+	it('compares the main, statements, and scores live pointers', async () => {
+		await expect(
+			getConsistentLiveRegenerationId({
+				db: metaDb('regen-example-1'),
+				statementsDb: metaDb('regen-example-1'),
+				scoresDb: metaDb('regen-example-2')
+			})
+		).rejects.toMatchObject({ name: 'RegenerationInProgressError' });
+	});
+});
+
+describe('business coverage composition', () => {
+	it('combines pack metadata with row presence and excludes unchecked presence', () => {
+		expect(
+			composeCoverage(
+				JSON.stringify({
+					found_in: ['example.checked', 'example.not-checked', 'example.checked']
+				}),
+				['example.checked', 'example.not-checked', 'example.pending'],
+				['example.checked']
+			)
+		).toEqual({
+			applicable: ['example.checked', 'example.not-checked', 'example.pending'],
+			checked: ['example.checked'],
+			found_in: ['example.checked'],
+			not_yet_checked: ['example.not-checked', 'example.pending']
+		});
+	});
+});
+
+function searchDb(coverageReads: { value: number }): D1Database {
 	const business = {
 		atlas_id: 'atlas-search-1',
 		country: 'UG',
@@ -131,10 +174,15 @@ function searchDb(): D1Database {
 		division: 'Nakawa',
 		first_seen: '2026-08-01',
 		last_seen: '2026-08-29',
-		coverage: '{}',
+		coverage: JSON.stringify({ found_in: ['example.checked', 'example.not-checked'] }),
 		scores: JSON.stringify({
 			formality: { value: 25, max: 100, checkable: 55, unknown: 45, version: 1 }
 		})
+	};
+	const secondBusiness = {
+		...business,
+		atlas_id: 'atlas-search-2',
+		canonical_name: 'Example Hardware Traders Ltd'
 	};
 	const score = {
 		atlas_id: business.atlas_id,
@@ -149,19 +197,38 @@ function searchDb(): D1Database {
 		evidence: '[]',
 		evaluation_as_of: '2026-08-29T00:00:00Z'
 	};
+	const secondScore = { ...score, atlas_id: secondBusiness.atlas_id };
 
 	return {
 		prepare: (sql: string) => ({
 			bind: () => ({
 				first: async () => {
 					if (sql.includes('FROM meta')) return { value: 'regen-example-1' };
-					if (sql.includes('COUNT(*)')) return { n: 1 };
+					if (sql.includes('COUNT(*)')) return { n: 2 };
 					return null;
 				},
 				all: async () => {
-					if (sql.includes('FROM businesses_fts')) return { results: [business] };
+					if (sql.includes('SELECT key, value FROM meta')) {
+						coverageReads.value += 1;
+						return {
+							results: [
+								{
+									key: 'coverage_applicable',
+									value: JSON.stringify([
+										'example.checked',
+										'example.not-checked',
+										'example.pending'
+									])
+								},
+								{ key: 'coverage_checked', value: JSON.stringify(['example.checked']) }
+							]
+						};
+					}
+					if (sql.includes('FROM businesses_fts')) {
+						return { results: [business, secondBusiness] };
+					}
 					if (sql.includes('FROM identifiers')) return { results: [] };
-					if (sql.includes('FROM scores')) return { results: [score] };
+					if (sql.includes('FROM scores')) return { results: [score, secondScore] };
 					return { results: [] };
 				}
 			})
@@ -171,11 +238,29 @@ function searchDb(): D1Database {
 
 describe('search result shaping', () => {
 	it('places the score coverage sentence in each formality result', async () => {
-		const response = await searchBusinesses(searchDb(), { q: 'Example Hardware' });
+		const coverageReads = { value: 0 };
+		const db = searchDb(coverageReads);
+		const response = await searchBusinesses(
+			{ db, statementsDb: db, scoresDb: db },
+			{
+				q: 'Example Hardware'
+			}
+		);
 
 		expect(response.results[0].formality).toMatchObject({
 			summary: expect.stringContaining('Formality 25 of 55 checkable'),
 			coverage_summary: 'found in 1 of 2 checked; 2 not yet checked'
 		});
+		expect(response.results[0]).toMatchObject({
+			coverage: {
+				applicable: ['example.checked', 'example.not-checked', 'example.pending'],
+				checked: ['example.checked'],
+				found_in: ['example.checked'],
+				not_yet_checked: ['example.not-checked', 'example.pending']
+			},
+			coverage_summary: 'found in 1 of 1 checked; 2 not yet checked'
+		});
+		expect(response.results).toHaveLength(2);
+		expect(coverageReads.value).toBe(1);
 	});
 });

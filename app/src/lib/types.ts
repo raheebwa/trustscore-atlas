@@ -41,6 +41,8 @@ export interface SearchResultItem {
 	sector_nature: string | null;
 	identifiers: Identifier[];
 	formality: FormalitySummary | null;
+	coverage: CoverageSummary;
+	coverage_summary: string;
 }
 
 export interface SearchResponse {

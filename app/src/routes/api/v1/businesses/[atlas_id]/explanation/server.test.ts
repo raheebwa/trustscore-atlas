@@ -22,14 +22,14 @@ const scoreRow = {
 	evaluation_as_of: '2026-08-29T09:05:00Z'
 };
 
-function db(kind: 'main' | 'statements'): D1Database {
+function db(kind: 'main' | 'statements' | 'scores'): D1Database {
 	return {
 		prepare: (sql: string) => ({
 			bind: () => ({
 				first: async () => {
 					if (sql.includes('FROM meta')) return { value: 'regen-example-1' };
 					if (sql.includes('SELECT 1 AS ok')) return { ok: 1 };
-					if (kind === 'main' && sql.includes('FROM scores')) return scoreRow;
+					if (kind === 'scores' && sql.includes('FROM scores')) return scoreRow;
 					return null;
 				},
 				all: async () => ({ results: kind === 'statements' ? [statementRow] : [] })
@@ -59,7 +59,13 @@ describe('score explanation API', () => {
 			'https://atlas.example.invalid/api/v1/businesses/atlas-example-1/explanation?rubric=formality'
 		);
 		const response = await GET({
-			platform: { env: { DB: db('main'), DB_STATEMENTS: db('statements') } },
+			platform: {
+				env: {
+					DB: db('main'),
+					DB_STATEMENTS: db('statements'),
+					DB_SCORES: db('scores')
+				}
+			},
 			params: { atlas_id: 'atlas-example-1' },
 			request,
 			url: new URL(request.url)

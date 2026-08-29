@@ -38,7 +38,10 @@ VALUES (
   'live'
 );
 
-INSERT INTO meta (key, value) VALUES ('live_regeneration', 'regen-2026-08-29-0001');
+INSERT INTO meta (key, value) VALUES
+  ('live_regeneration', 'regen-2026-08-29-0001'),
+  ('coverage_applicable', '["kcca.businesses","ura.vat_withholding_agents","ura.customs_agents","ura.wht_exemptions","ppda.ocds","unbs.certified_products","bou.supervised_institutions","cma.licensed_firms","urbra.licensed_schemes","ucc.broadcasters","nlgrb.gaming_operators","kcca.property_rates"]'),
+  ('coverage_checked', '["kcca.businesses"]');
 
 -- ---------------------------------------------------------------------------
 -- businesses
@@ -47,19 +50,19 @@ INSERT INTO meta (key, value) VALUES ('live_regeneration', 'regen-2026-08-29-000
 INSERT INTO businesses (atlas_id, country, canonical_name, name_normalised, name_variants, entity_kind, sector_category, sector_nature, district, division, first_seen, last_seen, coverage, scores)
 VALUES
   ('ug-0001', 'UG', 'Example Hardware Supplies Ltd', 'EXAMPLE HARDWARE SUPPLIES LTD', '[]', 'company', 'Trade', 'Hardware', 'Kampala', 'Nakawa', '2026-07-15', '2026-08-12',
-   '{"applicable":["kcca.businesses","ura.vat_withholding_agents","ura.customs_agents","ura.wht_exemptions","ppda.ocds","unbs.certified_products","bou.supervised_institutions","cma.licensed_firms","urbra.licensed_schemes","ucc.broadcasters","nlgrb.gaming_operators","kcca.property_rates"],"checked":["kcca.businesses"],"found_in":["kcca.businesses"],"not_yet_checked":["ura.vat_withholding_agents","ura.customs_agents","ura.wht_exemptions","ppda.ocds","unbs.certified_products","bou.supervised_institutions","cma.licensed_firms","urbra.licensed_schemes","ucc.broadcasters","nlgrb.gaming_operators","kcca.property_rates"]}',
+   '{"found_in":["kcca.businesses"]}',
    '{"formality":{"value":25,"max":100,"checkable":55,"unknown":45,"version":1}}'),
   ('ug-0002', 'UG', 'Sample Bakery', 'SAMPLE BAKERY', '[]', 'business_name', 'Manufacturing', 'Bakery', 'Kampala', 'Kawempe', '2026-07-15', '2026-08-12',
-   '{"applicable":["kcca.businesses","ura.vat_withholding_agents","ura.customs_agents","ura.wht_exemptions","ppda.ocds","unbs.certified_products","bou.supervised_institutions","cma.licensed_firms","urbra.licensed_schemes","ucc.broadcasters","nlgrb.gaming_operators","kcca.property_rates"],"checked":["kcca.businesses"],"found_in":["kcca.businesses"],"not_yet_checked":["ura.vat_withholding_agents","ura.customs_agents","ura.wht_exemptions","ppda.ocds","unbs.certified_products","bou.supervised_institutions","cma.licensed_firms","urbra.licensed_schemes","ucc.broadcasters","nlgrb.gaming_operators","kcca.property_rates"]}',
+   '{"found_in":["kcca.businesses"]}',
    '{"formality":{"value":25,"max":100,"checkable":55,"unknown":45,"version":1}}'),
   ('ug-0003', 'UG', 'Example Electronics Traders Ltd', 'EXAMPLE ELECTRONICS TRADERS LTD', '[]', 'company', 'Trade', 'Electronics', 'Kampala', 'Nakawa', '2026-07-15', '2026-08-12',
-   '{"applicable":["kcca.businesses","ura.vat_withholding_agents","ura.customs_agents","ura.wht_exemptions","ppda.ocds","unbs.certified_products","bou.supervised_institutions","cma.licensed_firms","urbra.licensed_schemes","ucc.broadcasters","nlgrb.gaming_operators","kcca.property_rates"],"checked":["kcca.businesses"],"found_in":["kcca.businesses"],"not_yet_checked":["ura.vat_withholding_agents","ura.customs_agents","ura.wht_exemptions","ppda.ocds","unbs.certified_products","bou.supervised_institutions","cma.licensed_firms","urbra.licensed_schemes","ucc.broadcasters","nlgrb.gaming_operators","kcca.property_rates"]}',
+   '{"found_in":["kcca.businesses"]}',
    '{"formality":{"value":25,"max":100,"checkable":55,"unknown":45,"version":1}}'),
   ('ug-0004', 'UG', 'Example Textiles Ltd', 'EXAMPLE TEXTILES LTD', '[]', 'company', 'Manufacturing', 'Textiles', 'Kampala', 'Kampala Central', '2026-07-15', '2026-08-12',
-   '{"applicable":["kcca.businesses","ura.vat_withholding_agents","ura.customs_agents","ura.wht_exemptions","ppda.ocds","unbs.certified_products","bou.supervised_institutions","cma.licensed_firms","urbra.licensed_schemes","ucc.broadcasters","nlgrb.gaming_operators","kcca.property_rates"],"checked":["kcca.businesses"],"found_in":["kcca.businesses"],"not_yet_checked":["ura.vat_withholding_agents","ura.customs_agents","ura.wht_exemptions","ppda.ocds","unbs.certified_products","bou.supervised_institutions","cma.licensed_firms","urbra.licensed_schemes","ucc.broadcasters","nlgrb.gaming_operators","kcca.property_rates"]}',
+   '{"found_in":["kcca.businesses"]}',
    '{"formality":{"value":25,"max":100,"checkable":55,"unknown":45,"version":1}}'),
   ('ug-0005', 'UG', 'Example Fresh Produce Suppliers Ltd', 'EXAMPLE FRESH PRODUCE SUPPLIERS LTD', '[]', 'company', 'Trade', 'Agriculture', 'Kampala', 'Kawempe', '2026-07-15', '2026-08-12',
-   '{"applicable":["kcca.businesses","ura.vat_withholding_agents","ura.customs_agents","ura.wht_exemptions","ppda.ocds","unbs.certified_products","bou.supervised_institutions","cma.licensed_firms","urbra.licensed_schemes","ucc.broadcasters","nlgrb.gaming_operators","kcca.property_rates"],"checked":["kcca.businesses"],"found_in":["kcca.businesses"],"not_yet_checked":["ura.vat_withholding_agents","ura.customs_agents","ura.wht_exemptions","ppda.ocds","unbs.certified_products","bou.supervised_institutions","cma.licensed_firms","urbra.licensed_schemes","ucc.broadcasters","nlgrb.gaming_operators","kcca.property_rates"]}',
+   '{"found_in":["kcca.businesses"]}',
    '{"formality":{"value":25,"max":100,"checkable":55,"unknown":45,"version":1}}');
 
 -- ---------------------------------------------------------------------------
@@ -72,33 +75,6 @@ INSERT INTO identifiers (atlas_id, scheme, value, source) VALUES
   ('ug-0003', 'ug:kcca_licence', 'KCCA/2026/00103', 'kcca.businesses'),
   ('ug-0004', 'ug:kcca_licence', 'KCCA/2026/00104', 'kcca.businesses'),
   ('ug-0005', 'ug:kcca_licence', 'KCCA/2026/00105', 'kcca.businesses');
-
--- ---------------------------------------------------------------------------
--- scores: one Formality row per business (docs/PRD.md section 9.1 shape)
--- ---------------------------------------------------------------------------
-
-WITH score_seed(atlas_id, statement_id) AS (
-  VALUES
-    ('ug-0001', 'st-0001-06'),
-    ('ug-0002', 'st-0002-06'),
-    ('ug-0003', 'st-0003-06'),
-    ('ug-0004', 'st-0004-06'),
-    ('ug-0005', 'st-0005-06')
-)
-INSERT INTO scores (atlas_id, rubric, version, regeneration_id, value, max, checkable, unknown, coverage, evidence, evaluation_as_of)
-SELECT
-  atlas_id,
-  'formality',
-  1,
-  'regen-2026-08-29-0001',
-  25,
-  100,
-  55,
-  45,
-  '{"applicable":12,"checked":1,"found_in":1,"not_yet_checked":11}',
-  replace('[{"predicate":"kcca.businesses","points":25,"statement_ids":["__STATEMENT_ID__"],"as_of":"2026-08-12"},{"predicate":"ura.vat_withholding_agents","points":0,"reason":"not checked (register unavailable)"},{"predicate":"ura.customs_agents","points":0,"reason":"not checked (register unavailable)"},{"predicate":"ura.wht_exemptions","points":0,"reason":"not checked (register unavailable)"},{"predicate":"ppda.ocds","points":0,"reason":"not checked (register unavailable)"},{"predicate":"unbs.certified_products","points":0,"reason":"not checked (register unavailable)"},{"predicate":"bou.supervised_institutions","points":0,"reason":"not checked (register unavailable)"},{"predicate":"cma.licensed_firms","points":0,"reason":"not checked (register unavailable)"},{"predicate":"urbra.licensed_schemes","points":0,"reason":"not checked (register unavailable)"},{"predicate":"ucc.broadcasters","points":0,"reason":"not checked (register unavailable)"},{"predicate":"nlgrb.gaming_operators","points":0,"reason":"not checked (register unavailable)"},{"predicate":"kcca.property_rates","points":0,"reason":"not checked (register unavailable)"}]', '__STATEMENT_ID__', statement_id),
-  '2026-08-29T09:05:00Z'
-FROM score_seed;
 
 -- ---------------------------------------------------------------------------
 -- businesses_fts: mirrors the businesses table (name, name variants, identifiers)

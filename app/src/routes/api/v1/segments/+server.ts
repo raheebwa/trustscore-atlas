@@ -1,5 +1,12 @@
-import { apiBadRequest, apiOptions, apiResponse, apiServerError } from '$lib/server/api';
-import { getDatabase } from '$lib/server/platform';
+import { RegenerationInProgressError } from '$lib/server/atlas';
+import {
+	apiBadRequest,
+	apiOptions,
+	apiRegenerationInProgress,
+	apiResponse,
+	apiServerError
+} from '$lib/server/api';
+import { requireDatabases } from '$lib/server/platform';
 import { findSegment } from '$lib/server/segments';
 import type { SegmentFilters } from '$lib/types';
 import type { RequestHandler } from './$types';
@@ -15,10 +22,11 @@ export const GET: RequestHandler = async ({ platform, request, url }) => {
 			if (value.length > 200) return apiBadRequest(`invalid ${name}`);
 			filters[name] = value;
 		}
-		const db = getDatabase(platform, 'businesses');
-		const response = await findSegment(db, filters);
-		return await apiResponse(db, request, url.pathname + url.search, response);
+		const databases = requireDatabases(platform);
+		const response = await findSegment(databases, filters);
+		return await apiResponse(databases.db, request, url.pathname + url.search, response);
 	} catch (err) {
+		if (err instanceof RegenerationInProgressError) return apiRegenerationInProgress();
 		return apiServerError(err);
 	}
 };

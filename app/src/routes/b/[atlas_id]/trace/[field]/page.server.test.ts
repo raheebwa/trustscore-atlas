@@ -60,7 +60,7 @@ describe('trace page loader', () => {
 		);
 
 		const data = await load({
-			platform: { env: { DB: db, DB_STATEMENTS: statements } },
+			platform: { env: { DB: db, DB_STATEMENTS: statements, DB_SCORES: db } },
 			params: { atlas_id: 'atlas-example', field: 'canonical_name' },
 			url: new URL('https://atlas.example.invalid/b/atlas-example/trace/canonical_name')
 		} as never);

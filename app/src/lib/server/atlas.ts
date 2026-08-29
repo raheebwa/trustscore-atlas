@@ -15,7 +15,7 @@ import {
 } from './search';
 import { formatCoverageSentence, formatScoreSentence } from '$lib/format';
 import { rankValues } from '$lib/ordering';
-import type { AtlasDatabases } from './platform';
+import type { AtlasDatabases, CoverageMetadata } from './platform';
 import {
 	CURSOR_MAX_OFFSET,
 	STATEMENTS_BYTE_BUDGET,
@@ -47,6 +47,8 @@ import type {
 } from '$lib/types';
 
 export const LIVE_REGENERATION_KEY = 'live_regeneration';
+export const COVERAGE_APPLICABLE_KEY = 'coverage_applicable';
+export const COVERAGE_CHECKED_KEY = 'coverage_checked';
 
 export class RegenerationInProgressError extends Error {
 	constructor() {
@@ -194,30 +196,44 @@ interface RegenerationRow {
 	status: string;
 }
 
-function parseCoverage(json: string): CoverageSummary {
+function uniqueStrings(values: readonly unknown[]): string[] {
+	return Array.from(new Set(values.filter((value): value is string => typeof value === 'string')));
+}
+
+function parseStringArray(json: string | null): string[] {
 	try {
-		const parsed: unknown = JSON.parse(json);
-		if (typeof parsed !== 'object' || parsed === null) {
-			return { applicable: [], checked: [], found_in: [], not_yet_checked: [] };
-		}
-		const coverage = parsed as Record<string, unknown>;
-		return {
-			applicable: Array.isArray(coverage.applicable)
-				? coverage.applicable.filter((value): value is string => typeof value === 'string')
-				: [],
-			checked: Array.isArray(coverage.checked)
-				? coverage.checked.filter((value): value is string => typeof value === 'string')
-				: [],
-			found_in: Array.isArray(coverage.found_in)
-				? coverage.found_in.filter((value): value is string => typeof value === 'string')
-				: [],
-			not_yet_checked: Array.isArray(coverage.not_yet_checked)
-				? coverage.not_yet_checked.filter((value): value is string => typeof value === 'string')
-				: []
-		};
+		const parsed: unknown = JSON.parse(json ?? '[]');
+		return Array.isArray(parsed) ? uniqueStrings(parsed) : [];
 	} catch {
-		return { applicable: [], checked: [], found_in: [], not_yet_checked: [] };
+		return [];
 	}
+}
+
+/** Builds public business coverage from pack metadata and one business presence row. */
+export function composeCoverage(
+	rowCoverageJson: string,
+	applicableValues: readonly unknown[],
+	checkedValues: readonly unknown[]
+): CoverageSummary {
+	const applicable = uniqueStrings(applicableValues);
+	const checked = uniqueStrings(checkedValues);
+	const checkedSet = new Set(checked);
+	let foundValues: unknown[] = [];
+	try {
+		const parsed: unknown = JSON.parse(rowCoverageJson);
+		if (typeof parsed === 'object' && parsed !== null) {
+			const foundIn = (parsed as Record<string, unknown>).found_in;
+			if (Array.isArray(foundIn)) foundValues = foundIn;
+		}
+	} catch {
+		foundValues = [];
+	}
+	return {
+		applicable,
+		checked,
+		found_in: uniqueStrings(foundValues).filter((register) => checkedSet.has(register)),
+		not_yet_checked: applicable.filter((register) => !checkedSet.has(register))
+	};
 }
 
 function parseCachedScores(json: string): Record<string, BusinessScoreSummary> {
@@ -419,20 +435,44 @@ export async function getMetaValue(db: D1Database, key: string): Promise<string 
 	return row?.value ?? null;
 }
 
+async function readCoverageMetadata(db: D1Database): Promise<CoverageMetadata> {
+	const { results } = await db
+		.prepare('SELECT key, value FROM meta WHERE key IN (SELECT value FROM json_each(?))')
+		.bind(JSON.stringify([COVERAGE_APPLICABLE_KEY, COVERAGE_CHECKED_KEY]))
+		.all<{ key: string; value: string }>();
+	const rows = new Map((results ?? []).map((row) => [row.key, row.value]));
+	return {
+		applicable: parseStringArray(rows.get(COVERAGE_APPLICABLE_KEY) ?? null),
+		checked: parseStringArray(rows.get(COVERAGE_CHECKED_KEY) ?? null)
+	};
+}
+
+/** Caches pack-wide coverage metadata on the request-owned database set. */
+export function getCoverageMetadata(databases: AtlasDatabases): Promise<CoverageMetadata> {
+	databases.coverageMetadata ??= readCoverageMetadata(databases.db);
+	return databases.coverageMetadata;
+}
+
 export async function getLiveRegenerationId(db: D1Database): Promise<string | null> {
 	return getMetaValue(db, LIVE_REGENERATION_KEY);
 }
 
-/** Returns the main live id after confirming that the statement database has the same id. */
+/** Returns the live id after confirming all three serving databases have the same pointer. */
 export async function getConsistentLiveRegenerationId({
 	db,
-	statementsDb
+	statementsDb,
+	scoresDb
 }: AtlasDatabases): Promise<string | null> {
-	const [liveRegenerationId, statementsLiveRegenerationId] = await Promise.all([
-		getLiveRegenerationId(db),
-		getLiveRegenerationId(statementsDb)
-	]);
-	if (liveRegenerationId !== statementsLiveRegenerationId) {
+	const [liveRegenerationId, statementsLiveRegenerationId, scoresLiveRegenerationId] =
+		await Promise.all([
+			getLiveRegenerationId(db),
+			getLiveRegenerationId(statementsDb),
+			getLiveRegenerationId(scoresDb)
+		]);
+	if (
+		liveRegenerationId !== statementsLiveRegenerationId ||
+		liveRegenerationId !== scoresLiveRegenerationId
+	) {
 		throw new RegenerationInProgressError();
 	}
 	return liveRegenerationId;
@@ -502,8 +542,14 @@ async function fetchIdentifiersFor(
 function toSearchResultItem(
 	row: BusinessRow,
 	identifiers: Identifier[],
-	formality: FormalitySummary | null
+	formality: FormalitySummary | null,
+	coverageMetadata: CoverageMetadata
 ): SearchResultItem {
+	const coverage = composeCoverage(
+		row.coverage,
+		coverageMetadata.applicable,
+		coverageMetadata.checked
+	);
 	return {
 		atlas_id: row.atlas_id,
 		canonical_name: row.canonical_name,
@@ -512,13 +558,16 @@ function toSearchResultItem(
 		sector_category: row.sector_category,
 		sector_nature: row.sector_nature,
 		identifiers,
-		formality
+		formality,
+		coverage,
+		coverage_summary: formatCoverageSentence(coverage)
 	};
 }
 
 async function fetchFormalityFor(
 	db: D1Database,
-	businesses: BusinessRow[]
+	businesses: BusinessRow[],
+	liveRegenerationId: string | null
 ): Promise<Map<string, FormalitySummary>> {
 	const map = new Map<string, FormalitySummary>();
 	const atlasIds = businesses.map((business) => business.atlas_id);
@@ -529,7 +578,6 @@ async function fetchFormalityFor(
 			parseCachedScores(business.scores).formality?.version
 		])
 	);
-	const liveRegenerationId = await getLiveRegenerationId(db);
 	if (!liveRegenerationId) return map;
 	const { results } = await db
 		.prepare(
@@ -566,13 +614,17 @@ export interface SearchOptions {
 }
 
 export async function searchBusinesses(
-	db: D1Database,
+	databases: AtlasDatabases,
 	options: SearchOptions
 ): Promise<SearchResponse> {
+	const { db, scoresDb } = databases;
 	const query = normalizeQuery(options.q ?? '');
 	const limit = clampLimit(options.limit);
 	const normalisedDistrict = options.district ? normalizeQuery(options.district) : '';
-	const liveRegenerationId = await getLiveRegenerationId(db);
+	const liveRegenerationId =
+		query.length === 0
+			? await getLiveRegenerationId(db)
+			: await getConsistentLiveRegenerationId(databases);
 	const offset = decodeCursor(
 		options.cursor,
 		'search',
@@ -653,15 +705,17 @@ export async function searchBusinesses(
 	const hasMore = rows.length > limit;
 	const pageRows = rows.slice(0, limit);
 	const atlasIds = pageRows.map((row) => row.atlas_id);
-	const [identifierMap, formalityMap] = await Promise.all([
+	const [identifierMap, formalityMap, coverageMetadata] = await Promise.all([
 		fetchIdentifiersFor(db, atlasIds),
-		fetchFormalityFor(db, pageRows)
+		fetchFormalityFor(scoresDb, pageRows, liveRegenerationId),
+		getCoverageMetadata(databases)
 	]);
 	const items = pageRows.map((row) =>
 		toSearchResultItem(
 			row,
 			identifierMap.get(row.atlas_id) ?? [],
-			formalityMap.get(row.atlas_id) ?? null
+			formalityMap.get(row.atlas_id) ?? null,
+			coverageMetadata
 		)
 	);
 
@@ -683,11 +737,10 @@ export async function searchBusinesses(
 }
 
 async function fetchStatementsFor(
-	databases: AtlasDatabases,
+	statementsDb: D1Database,
 	atlasId: string
 ): Promise<StatementRow[]> {
-	await getConsistentLiveRegenerationId(databases);
-	const { results } = await databases.statementsDb
+	const { results } = await statementsDb
 		.prepare(
 			`SELECT ${STATEMENT_SELECT_COLUMNS} ${STATEMENT_FROM}
 			 WHERE atlas_id = ?
@@ -738,9 +791,9 @@ function resolveEvidenceFields(
 async function fetchScoresFor(
 	db: D1Database,
 	atlasId: string,
-	statements: StatementRow[]
+	statements: StatementRow[],
+	liveRegenerationId: string | null
 ): Promise<ScoreSummary[]> {
-	const liveRegenerationId = await getLiveRegenerationId(db);
 	if (!liveRegenerationId) return [];
 	const { results } = await db
 		.prepare('SELECT * FROM scores WHERE atlas_id = ? AND regeneration_id = ? ORDER BY rubric')
@@ -755,20 +808,23 @@ interface BusinessWithStatements {
 }
 
 async function getBusinessWithStatements(
-	{ db, statementsDb }: AtlasDatabases,
+	databases: AtlasDatabases,
 	atlasId: string
 ): Promise<BusinessWithStatements | null> {
+	const { db, statementsDb, scoresDb } = databases;
 	const businessRow = await db
 		.prepare('SELECT * FROM businesses WHERE atlas_id = ?')
 		.bind(atlasId)
 		.first<BusinessRow>();
 	if (!businessRow) return null;
 
-	const [identifierMap, statements] = await Promise.all([
+	const liveRegenerationId = await getConsistentLiveRegenerationId(databases);
+	const [identifierMap, statements, coverageMetadata] = await Promise.all([
 		fetchIdentifiersFor(db, [atlasId]),
-		fetchStatementsFor({ db, statementsDb }, atlasId)
+		fetchStatementsFor(statementsDb, atlasId),
+		getCoverageMetadata(databases)
 	]);
-	const scores = await fetchScoresFor(db, atlasId, statements);
+	const scores = await fetchScoresFor(scoresDb, atlasId, statements, liveRegenerationId);
 
 	const sourceSlugs = Array.from(new Set(statements.map((s) => s.source)));
 	let sources: SourceSummary[] = [];
@@ -781,7 +837,11 @@ async function getBusinessWithStatements(
 			.all<SourceRowDb>();
 		sources = (results ?? []).map(toSourceSummary);
 	}
-	const coverage = parseCoverage(businessRow.coverage);
+	const coverage = composeCoverage(
+		businessRow.coverage,
+		coverageMetadata.applicable,
+		coverageMetadata.checked
+	);
 
 	return {
 		record: {
@@ -1048,7 +1108,7 @@ async function readScoreAtRegeneration(
 	return row ? toScoreSummary(row) : null;
 }
 
-/** Reads one score from the current regeneration after validating both serving bindings. */
+/** Reads one score from the current regeneration after validating all serving bindings. */
 export async function getScore(
 	databases: AtlasDatabases,
 	atlasId: string,
@@ -1057,7 +1117,7 @@ export async function getScore(
 ): Promise<ScoreSummary | null> {
 	const liveRegenerationId = await getConsistentLiveRegenerationId(databases);
 	if (!liveRegenerationId) return null;
-	return readScoreAtRegeneration(databases.db, atlasId, rubric, liveRegenerationId, options);
+	return readScoreAtRegeneration(databases.scoresDb, atlasId, rubric, liveRegenerationId, options);
 }
 
 function toEvidenceStatement(row: StatementRow): EvidenceStatement {
@@ -1135,7 +1195,12 @@ export async function getRubricEvidencePage(
 ): Promise<RubricEvidenceResponse | null> {
 	const liveRegenerationId = await getConsistentLiveRegenerationId(databases);
 	if (!liveRegenerationId) return null;
-	const score = await readScoreAtRegeneration(databases.db, atlasId, rubric, liveRegenerationId);
+	const score = await readScoreAtRegeneration(
+		databases.scoresDb,
+		atlasId,
+		rubric,
+		liveRegenerationId
+	);
 	if (!score) return null;
 	const context = statementCursorContext(atlasId, `rubric:${rubric}`);
 	const offset = decodeCursor(options.cursor, 'evidence', context, liveRegenerationId);

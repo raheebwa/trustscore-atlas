@@ -24,6 +24,11 @@
 			"binding": "DB_STATEMENTS",
 			"database_name": "atlas-statements",
 			"database_id": "461857bc-23c5-4405-b0cf-de155dd1df9c"
+		},
+		{
+			"binding": "DB_SCORES",
+			"database_name": "atlas-scores",
+			"database_id": "40454aae-af10-4bcf-a1e2-e8f2346c71d4"
 		}
 	]
 }

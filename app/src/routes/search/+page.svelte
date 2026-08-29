@@ -144,6 +144,9 @@
 							{item.identifiers.map((id) => `${id.scheme}: ${id.value}`).join(', ')}
 						</p>
 					{/if}
+					<p class="mt-1 text-xs text-stone-500">
+						Register coverage: {item.coverage_summary}.
+					</p>
 				</li>
 			{/each}
 		</ul>

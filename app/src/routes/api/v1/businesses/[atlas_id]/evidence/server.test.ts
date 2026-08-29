@@ -44,6 +44,19 @@ function mainDb(): D1Database {
 				first: async () => {
 					if (sql.includes('FROM meta')) return { value: 'regen-example-1' };
 					if (sql.includes('SELECT 1 AS ok')) return { ok: 1 };
+					return null;
+				}
+			})
+		})
+	} as unknown as D1Database;
+}
+
+function scoresDb(): D1Database {
+	return {
+		prepare: (sql: string) => ({
+			bind: () => ({
+				first: async () => {
+					if (sql.includes('FROM meta')) return { value: 'regen-example-1' };
 					if (sql.includes('FROM scores')) return scoreRow;
 					return null;
 				}
@@ -75,7 +88,9 @@ describe('evidence API', () => {
 			'https://atlas.example.invalid/api/v1/businesses/atlas-example-1/evidence?field=canonical_name'
 		);
 		const response = await GET({
-			platform: { env: { DB: mainDb(), DB_STATEMENTS: statementsDb() } },
+			platform: {
+				env: { DB: mainDb(), DB_STATEMENTS: statementsDb(), DB_SCORES: scoresDb() }
+			},
 			params: { atlas_id: 'atlas-example-1' },
 			request,
 			url: new URL(request.url)
@@ -104,7 +119,9 @@ describe('evidence API', () => {
 			'https://atlas.example.invalid/api/v1/businesses/atlas-example-1/evidence?rubric=formality'
 		);
 		const response = await GET({
-			platform: { env: { DB: mainDb(), DB_STATEMENTS: statementsDb() } },
+			platform: {
+				env: { DB: mainDb(), DB_STATEMENTS: statementsDb(), DB_SCORES: scoresDb() }
+			},
 			params: { atlas_id: 'atlas-example-1' },
 			request,
 			url: new URL(request.url)

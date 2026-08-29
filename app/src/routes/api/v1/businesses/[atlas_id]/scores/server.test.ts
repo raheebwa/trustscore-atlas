@@ -19,7 +19,7 @@ const scoreRow = {
 };
 
 function database(
-	kind: 'main' | 'statements',
+	kind: 'main' | 'statements' | 'scores',
 	storedScore: typeof scoreRow | null = scoreRow
 ): D1Database {
 	return {
@@ -28,7 +28,7 @@ function database(
 				first: async () => {
 					if (sql.includes('FROM meta')) return { value: 'regen-example-1' };
 					if (sql.includes('SELECT 1 AS ok')) return { ok: 1 };
-					if (kind === 'main' && sql.includes('FROM scores')) {
+					if (kind === 'scores' && sql.includes('FROM scores')) {
 						expect(bindings).toContain('formality');
 						return storedScore;
 					}
@@ -45,7 +45,13 @@ describe('scores API', () => {
 			'https://atlas.example.invalid/api/v1/businesses/atlas-example-1/scores?rubric=formality'
 		);
 		const response = await GET({
-			platform: { env: { DB: database('main'), DB_STATEMENTS: database('statements') } },
+			platform: {
+				env: {
+					DB: database('main'),
+					DB_STATEMENTS: database('statements'),
+					DB_SCORES: database('scores')
+				}
+			},
 			params: { atlas_id: 'atlas-example-1' },
 			request,
 			url: new URL(request.url)
@@ -68,7 +74,11 @@ describe('scores API', () => {
 		);
 		const response = await GET({
 			platform: {
-				env: { DB: database('main', null), DB_STATEMENTS: database('statements') }
+				env: {
+					DB: database('main'),
+					DB_STATEMENTS: database('statements'),
+					DB_SCORES: database('scores', null)
+				}
 			},
 			params: { atlas_id: 'atlas-example-1' },
 			request,

@@ -14,13 +14,13 @@ pnpm build        # production build
 pnpm preview      # run the built Worker locally with wrangler
 ```
 
-Worker configuration, including the `DB` and `DB_STATEMENTS` D1 bindings, is in
+Worker configuration, including the `DB`, `DB_STATEMENTS`, and `DB_SCORES` D1 bindings, is in
 `wrangler.jsonc`. After changing it, run `pnpm gen` to regenerate
 `worker-configuration.d.ts`.
 
 ## Local database
 
-The app reads two Cloudflare D1 (SQLite) databases. Claim requests write only to the
+The app reads three Cloudflare D1 (SQLite) databases. Claim requests write only to the
 append-only operations tables in the main database. To set up local copies from the repository root:
 
 ```sh
@@ -29,6 +29,8 @@ pnpm exec wrangler d1 execute atlas --local --file ../infra/d1/schema.sql
 pnpm exec wrangler d1 execute atlas-statements --local --file ../infra/d1/schema.sql
 pnpm exec wrangler d1 execute atlas --local --file seed/dev.sql
 pnpm exec wrangler d1 execute atlas-statements --local --file seed/dev-statements.sql
+pnpm exec wrangler d1 execute atlas-scores --local --file ../infra/d1/schema.sql
+pnpm exec wrangler d1 execute atlas-scores --local --file seed/dev-scores.sql
 pnpm exec wrangler d1 execute atlas --local --file migrations/0001_ops_tables.sql
 ```
 
@@ -38,13 +40,13 @@ Apply the operations migration to the remote main database with:
 pnpm exec wrangler d1 execute atlas --remote --file migrations/0001_ops_tables.sql
 ```
 
-The two seed files form one small, entirely fictional dataset: five businesses across
+The three seed files form one small, entirely fictional dataset: five businesses across
 three Kampala divisions, a `kcca.businesses` source row, one Formality score per
 business, their statements and references, and matching live regeneration rows. No real
 business, person, or phone number appears in them.
 
 Both `pnpm dev` and `pnpm build && pnpm preview` expose the local D1 databases at
-`platform.env.DB` and `platform.env.DB_STATEMENTS` inside server code:
+`platform.env.DB`, `platform.env.DB_STATEMENTS`, and `platform.env.DB_SCORES` inside server code:
 
 - `pnpm dev` runs Vite directly. `@sveltejs/adapter-cloudflare` emulates `platform.env`
   in this mode using Wrangler's local bindings, built from `wrangler.jsonc`, without a
@@ -57,4 +59,4 @@ root by the `wrangler d1 execute --local` commands above, so seed once and eithe
 sees the data.
 
 To reset the local databases, delete `.wrangler/state/v3/d1` from the repository root
-and re-run the four `wrangler d1 execute` commands above.
+and re-run the seven `wrangler d1 execute` commands above.

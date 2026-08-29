@@ -32,6 +32,13 @@ function makeResult(index: number): SearchResultItem {
 		sector_category: 'Trade',
 		sector_nature: 'Hardware',
 		identifiers: [{ scheme: 'ug:kcca_licence', value: `KCCA-${index}`, source: 'kcca.businesses' }],
+		coverage: {
+			applicable: ['kcca.businesses', 'example.pending'],
+			checked: ['kcca.businesses'],
+			found_in: ['kcca.businesses'],
+			not_yet_checked: ['example.pending']
+		},
+		coverage_summary: 'found in 1 of 1 checked; 1 not yet checked',
 		formality: {
 			rubric: 'formality',
 			version: 1,
@@ -241,7 +248,7 @@ describe('shapeSearchResults', () => {
 			});
 			const value = parsed(result);
 			const shown = value.results as { atlas_id: string }[];
-			if (pageNumber === 0) expect(shown).toHaveLength(3);
+			if (pageNumber === 0) expect(shown).toHaveLength(2);
 			seen.push(...shown.map((item) => item.atlas_id));
 
 			const nextCursor = value.next_cursor as string | null;

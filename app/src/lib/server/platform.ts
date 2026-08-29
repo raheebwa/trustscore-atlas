@@ -3,11 +3,18 @@ import { error } from '@sveltejs/kit';
 export interface AtlasDatabases {
 	db: D1Database;
 	statementsDb: D1Database;
+	scoresDb: D1Database;
+	coverageMetadata?: Promise<CoverageMetadata>;
+}
+
+export interface CoverageMetadata {
+	applicable: string[];
+	checked: string[];
 }
 
 function requireBinding(
 	platform: App.Platform | undefined,
-	binding: 'DB' | 'DB_STATEMENTS'
+	binding: 'DB' | 'DB_STATEMENTS' | 'DB_SCORES'
 ): D1Database {
 	const db = platform?.env?.[binding];
 	if (!db) {
@@ -16,17 +23,20 @@ function requireBinding(
 	return db;
 }
 
-/** Resolves statement-owned tables to their database and all other tables to the main database. */
+/** Resolves tables owned by a dedicated serving database and defaults to the main database. */
 export function getDatabase(platform: App.Platform | undefined, table: string): D1Database {
-	return table === 'statements' || table === 'refs'
-		? requireBinding(platform, 'DB_STATEMENTS')
-		: requireBinding(platform, 'DB');
+	if (table === 'statements' || table === 'refs') {
+		return requireBinding(platform, 'DB_STATEMENTS');
+	}
+	if (table === 'scores') return requireBinding(platform, 'DB_SCORES');
+	return requireBinding(platform, 'DB');
 }
 
-/** Reads both serving bindings for request paths that combine main and statement data. */
+/** Reads all serving bindings for request paths that may combine databases. */
 export function requireDatabases(platform: App.Platform | undefined): AtlasDatabases {
 	return {
 		db: getDatabase(platform, 'businesses'),
-		statementsDb: getDatabase(platform, 'statements')
+		statementsDb: getDatabase(platform, 'statements'),
+		scoresDb: getDatabase(platform, 'scores')
 	};
 }

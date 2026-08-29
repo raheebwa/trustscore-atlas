@@ -1,4 +1,5 @@
-import { getLiveRegenerationId } from './atlas';
+import { getConsistentLiveRegenerationId } from './atlas';
+import type { AtlasDatabases } from './platform';
 import type { SegmentFilters, SegmentResponse } from '$lib/types';
 
 export interface SegmentFilterSql {
@@ -39,19 +40,24 @@ interface DivisionCountRow {
 	count: number;
 }
 
-interface CandidateRow {
+interface CandidateBusinessRow {
 	atlas_id: string;
 	canonical_name: string;
 	district: string | null;
 	division: string | null;
 	sector_category: string | null;
 	sector_nature: string | null;
-	formality_value: number;
-	formality_max: number;
-	formality_checkable: number;
-	formality_unknown: number;
-	formality_version: number;
-	formality_evaluation_as_of: string;
+	scores: string;
+}
+
+interface SegmentScoreRow {
+	atlas_id: string;
+	value: number;
+	max: number;
+	checkable: number;
+	unknown: number;
+	version: number;
+	evaluation_as_of: string;
 }
 
 function cleanFilters(filters: SegmentFilters): SegmentFilters {
@@ -72,16 +78,82 @@ function buildSearchLink(filters: SegmentFilters): string {
 	return query ? `/search?${query}` : '/search';
 }
 
-/** Executes four D1 reads including the live regeneration lookup. */
+function cachedFormalityVersion(json: string): number | null {
+	try {
+		const parsed: unknown = JSON.parse(json);
+		if (typeof parsed !== 'object' || parsed === null) return null;
+		const formality = (parsed as Record<string, unknown>).formality;
+		if (typeof formality !== 'object' || formality === null) return null;
+		const version = (formality as Record<string, unknown>).version;
+		return typeof version === 'number' && Number.isSafeInteger(version) ? version : null;
+	} catch {
+		return null;
+	}
+}
+
+async function topSegmentCandidates(
+	scoresDb: D1Database,
+	liveRegenerationId: string | null,
+	businesses: CandidateBusinessRow[]
+): Promise<SegmentResponse['top_candidates']> {
+	if (!liveRegenerationId || businesses.length === 0) return [];
+	const expectedVersions = new Map(
+		businesses.map((business) => [business.atlas_id, cachedFormalityVersion(business.scores)])
+	);
+	const atlasIds = businesses
+		.filter((business) => expectedVersions.get(business.atlas_id) !== null)
+		.map((business) => business.atlas_id);
+	if (atlasIds.length === 0) return [];
+	const { results } = await scoresDb
+		.prepare(
+			`SELECT atlas_id, value, max, checkable, unknown, version, evaluation_as_of
+			 FROM scores WHERE regeneration_id = ? AND rubric = ?
+			 AND atlas_id IN (SELECT value FROM json_each(?))`
+		)
+		.bind(liveRegenerationId, 'formality', JSON.stringify(atlasIds))
+		.all<SegmentScoreRow>();
+	const businessesById = new Map(businesses.map((business) => [business.atlas_id, business]));
+	return (results ?? [])
+		.filter((score) => score.version === expectedVersions.get(score.atlas_id))
+		.map((score) => ({ score, business: businessesById.get(score.atlas_id) }))
+		.filter(
+			(entry): entry is { score: SegmentScoreRow; business: CandidateBusinessRow } =>
+				entry.business !== undefined
+		)
+		.sort((left, right) => {
+			if (left.score.value !== right.score.value) return right.score.value - left.score.value;
+			const byName = left.business.canonical_name.localeCompare(right.business.canonical_name);
+			return byName || left.business.atlas_id.localeCompare(right.business.atlas_id);
+		})
+		.slice(0, 10)
+		.map(({ business, score }) => ({
+			atlas_id: business.atlas_id,
+			canonical_name: business.canonical_name,
+			district: business.district,
+			division: business.division,
+			sector_category: business.sector_category,
+			sector_nature: business.sector_nature,
+			formality: {
+				value: score.value,
+				max: score.max,
+				checkable: score.checkable,
+				unknown: score.unknown,
+				version: score.version,
+				evaluation_as_of: score.evaluation_as_of
+			}
+		}));
+}
+
 export async function findSegment(
-	db: D1Database,
+	databases: AtlasDatabases,
 	inputFilters: SegmentFilters
 ): Promise<SegmentResponse> {
+	const { db, scoresDb } = databases;
 	const filters = cleanFilters(inputFilters);
 	const { whereClause, bindings } = buildSegmentFilter(filters);
-	const liveRegenerationId = await getLiveRegenerationId(db);
+	const liveRegenerationId = await getConsistentLiveRegenerationId(databases);
 
-	const [countRow, divisionsResult, candidatesResult] = await Promise.all([
+	const [countRow, divisionsResult, businessesResult] = await Promise.all([
 		db
 			.prepare(`SELECT COUNT(*) AS n FROM businesses b${whereClause}`)
 			.bind(...bindings)
@@ -96,41 +168,25 @@ export async function findSegment(
 		db
 			.prepare(
 				`SELECT b.atlas_id, b.canonical_name, b.district, b.division,
-				 b.sector_category, b.sector_nature,
-				 s.value AS formality_value, s.max AS formality_max,
-				 s.checkable AS formality_checkable, s.unknown AS formality_unknown,
-				 s.version AS formality_version,
-				 s.evaluation_as_of AS formality_evaluation_as_of
-				 FROM businesses b
-				 JOIN scores s ON s.atlas_id = b.atlas_id
-				 AND s.regeneration_id = ? AND s.rubric = ?${whereClause}
-				 AND s.version = CAST(json_extract(b.scores, '$.formality.version') AS INTEGER)
-				 ORDER BY s.value DESC, b.canonical_name ASC, b.atlas_id ASC LIMIT ?`
+				 b.sector_category, b.sector_nature, b.scores
+				 FROM businesses b${whereClause}
+				 ORDER BY CAST(json_extract(b.scores, '$.formality.value') AS INTEGER) DESC,
+				 b.canonical_name ASC, b.atlas_id ASC LIMIT ?`
 			)
-			.bind(liveRegenerationId, 'formality', ...bindings, 10)
-			.all<CandidateRow>()
+			.bind(...bindings, 10)
+			.all<CandidateBusinessRow>()
 	]);
+	const topCandidates = await topSegmentCandidates(
+		scoresDb,
+		liveRegenerationId,
+		businessesResult.results ?? []
+	);
 
 	return {
 		filters,
 		total_count: countRow?.n ?? 0,
 		counts_by_division: divisionsResult.results ?? [],
-		top_candidates: (candidatesResult.results ?? []).map((row) => ({
-			atlas_id: row.atlas_id,
-			canonical_name: row.canonical_name,
-			district: row.district,
-			division: row.division,
-			sector_category: row.sector_category,
-			sector_nature: row.sector_nature,
-			formality: {
-				value: row.formality_value,
-				max: row.formality_max,
-				checkable: row.formality_checkable,
-				unknown: row.formality_unknown,
-				version: row.formality_version,
-				evaluation_as_of: row.formality_evaluation_as_of
-			}
-		})),
+		top_candidates: topCandidates,
 		search_link: buildSearchLink(filters)
 	};
 }

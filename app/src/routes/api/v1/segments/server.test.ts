@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GET } from './+server';
 
-function database(): D1Database {
+function mainDatabase(): D1Database {
 	return {
 		prepare: (sql: string) => ({
 			bind: (...bindings: unknown[]) => ({
@@ -14,10 +14,13 @@ function database(): D1Database {
 					return null;
 				},
 				all: async () => {
+					if (sql.includes('FROM scores')) {
+						throw new Error('Score rows must not be read from the main database');
+					}
 					if (sql.includes('GROUP BY b.division')) {
 						return { results: [{ division: 'Central Division', count: 2 }] };
 					}
-					if (sql.includes('FROM businesses b') && sql.includes('JOIN scores')) {
+					if (sql.includes('FROM businesses b')) {
 						return {
 							results: [
 								{
@@ -27,17 +30,56 @@ function database(): D1Database {
 									division: 'Central Division',
 									sector_category: 'Trade',
 									sector_nature: 'Hardware',
-									formality_value: 70,
-									formality_max: 100,
-									formality_checkable: 100,
-									formality_unknown: 0,
-									formality_version: 1,
-									formality_evaluation_as_of: '2026-08-29T09:05:00Z'
+									scores: JSON.stringify({
+										formality: {
+											value: 70,
+											max: 100,
+											checkable: 100,
+											unknown: 0,
+											version: 1
+										}
+									})
 								}
 							]
 						};
 					}
 					return { results: [] };
+				}
+			})
+		})
+	} as unknown as D1Database;
+}
+
+function pointerDatabase(): D1Database {
+	return {
+		prepare: () => ({
+			bind: () => ({ first: async () => ({ value: 'regen-example-1' }) })
+		})
+	} as unknown as D1Database;
+}
+
+function scoresDatabase(): D1Database {
+	return {
+		prepare: (sql: string) => ({
+			bind: () => ({
+				first: async () => ({ value: 'regen-example-1' }),
+				all: async () => {
+					if (sql.includes('FROM businesses')) {
+						throw new Error('Business rows must not be read from the scores database');
+					}
+					return {
+						results: [
+							{
+								atlas_id: 'atlas-example-1',
+								value: 70,
+								max: 100,
+								checkable: 100,
+								unknown: 0,
+								version: 1,
+								evaluation_as_of: '2026-08-29T09:05:00Z'
+							}
+						]
+					};
 				}
 			})
 		})
@@ -50,7 +92,13 @@ describe('segments API', () => {
 			'https://atlas.example.invalid/api/v1/segments?category=Trade&district=Example%20District'
 		);
 		const response = await GET({
-			platform: { env: { DB: database() } },
+			platform: {
+				env: {
+					DB: mainDatabase(),
+					DB_STATEMENTS: pointerDatabase(),
+					DB_SCORES: scoresDatabase()
+				}
+			},
 			request,
 			url: new URL(request.url)
 		} as never);

@@ -351,6 +351,7 @@ export function shapeSearchResults(response: SearchResponse): ToolTextResult {
 		sector_category: item.sector_category,
 		sector_nature: item.sector_nature,
 		identifiers: item.identifiers,
+		coverage: { ...item.coverage, summary: item.coverage_summary },
 		scores: item.formality ? [item.formality] : []
 	}));
 
