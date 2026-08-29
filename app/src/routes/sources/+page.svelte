@@ -56,6 +56,9 @@
 						>
 							{source.status}
 						</span>
+						{#if source.status_note}
+							<p class="mt-1 text-xs text-stone-600">{source.status_note}</p>
+						{/if}
 					</td>
 				</tr>
 			{:else}

@@ -99,6 +99,7 @@ export interface SourceSummary {
 	row_count: number | null;
 	adapter_version: string | null;
 	status: string;
+	status_note: string | null;
 }
 
 export interface ProvenanceRow {

@@ -140,7 +140,8 @@ interface StatementRowDb {
 }
 
 const STATEMENT_SELECT_COLUMNS =
-	'statement_id, atlas_id, country, field, value, source, source_ref, source_record_id, asserted_at, licence, precedence, confidence';
+	's.statement_id, s.atlas_id, s.country, s.field, s.value, s.source, r.source_ref, s.source_record_id, s.asserted_at, s.licence, s.precedence, s.confidence';
+const STATEMENT_FROM = 'FROM statements s JOIN refs r ON r.ref_id = s.ref_id';
 
 interface ScoreRowDb {
 	atlas_id: string;
@@ -170,6 +171,7 @@ interface SourceRowDb {
 	row_count: number | null;
 	adapter_version: string | null;
 	status: string;
+	status_note: string | null;
 }
 
 interface RegenerationRow {
@@ -252,7 +254,8 @@ function toSourceSummary(row: SourceRowDb): SourceSummary {
 		last_run_at: row.last_run_at,
 		row_count: row.row_count,
 		adapter_version: row.adapter_version,
-		status: row.status
+		status: row.status,
+		status_note: row.status_note ?? null
 	};
 }
 
@@ -655,7 +658,7 @@ export async function searchBusinesses(
 async function fetchStatementsFor(db: D1Database, atlasId: string): Promise<StatementRow[]> {
 	const { results } = await db
 		.prepare(
-			`SELECT ${STATEMENT_SELECT_COLUMNS} FROM statements
+			`SELECT ${STATEMENT_SELECT_COLUMNS} ${STATEMENT_FROM}
 			 WHERE atlas_id = ?
 			 ORDER BY field, precedence, COALESCE(unixepoch(asserted_at), -9223372036854775808) DESC`
 		)
@@ -915,7 +918,7 @@ async function readStatementsPage(
 	if (field) {
 		const { results } = await db
 			.prepare(
-				`SELECT ${STATEMENT_SELECT_COLUMNS} FROM statements
+				`SELECT ${STATEMENT_SELECT_COLUMNS} ${STATEMENT_FROM}
 				 WHERE atlas_id = ? AND field = ?
 				 ORDER BY precedence ASC,
 				 COALESCE(unixepoch(asserted_at), -9223372036854775808) DESC,
@@ -927,7 +930,7 @@ async function readStatementsPage(
 	} else {
 		const { results } = await db
 			.prepare(
-				`SELECT ${STATEMENT_SELECT_COLUMNS} FROM statements
+				`SELECT ${STATEMENT_SELECT_COLUMNS} ${STATEMENT_FROM}
 				 WHERE atlas_id = ?
 				 ORDER BY field, precedence ASC,
 				 COALESCE(unixepoch(asserted_at), -9223372036854775808) DESC,

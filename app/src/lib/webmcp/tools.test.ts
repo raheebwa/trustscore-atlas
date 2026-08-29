@@ -91,7 +91,8 @@ const businessFixture: BusinessRecordResponse = {
 			last_run_at: '2026-08-01',
 			row_count: 100,
 			adapter_version: '1.0.0',
-			status: 'fresh'
+			status: 'fresh',
+			status_note: null
 		}
 	]
 };
