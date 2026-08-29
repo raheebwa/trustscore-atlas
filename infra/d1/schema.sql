@@ -76,7 +76,8 @@ CREATE TABLE sources (
   last_run_at      TEXT,
   row_count        INTEGER,
   adapter_version  TEXT,
-  status           TEXT NOT NULL                    -- fresh | stale | failed
+  status           TEXT NOT NULL,                   -- fresh | stale | failed | not_loaded | disabled | flagged
+  status_note      TEXT                             -- plain-language qualifier shown on the sources page
 );
 
 CREATE TABLE regenerations (

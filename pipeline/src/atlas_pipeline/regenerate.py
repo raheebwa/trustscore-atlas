@@ -16,6 +16,8 @@ from .resolve import pack_sources, resolve
 from .score import load_rubric, score
 
 PHASE0_RUBRICS = ("formality",)
+# Regenerated tables dropped before a load so the free-plan peak stays under the cap.
+PRELUDE_DROPS = ("statements", "scores", "businesses_fts")
 
 
 @dataclass
@@ -30,6 +32,21 @@ def _source_dir(slug: str) -> str:
 
 def _json(value) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def _source_status(
+    slug: str, manifest: dict, empty_since: dict[str, str]
+) -> tuple[str, str | None]:
+    """A snapshot run keeps the register honest: the source is stale, with the original pull
+    date and, when known, the date the register started returning nothing."""
+    snapshot = manifest.get("snapshot")
+    if not snapshot:
+        return "fresh", None
+    observed = snapshot["observed_at"][:10]
+    note = f"last successful pull {observed}"
+    if slug in empty_since:
+        note += f"; portal returning empty results since {empty_since[slug]}"
+    return "stale", note
 
 
 def _placeholder(key: str) -> str | None:
@@ -91,6 +108,7 @@ def regenerate(
     computed_at: str | None = None,
     rubrics_dir: Path,
     schema_path: Path,
+    empty_since: dict[str, str] | None = None,
 ) -> Regeneration:
     started = datetime.now(UTC)
     regeneration_id = regeneration_id or started.strftime("%Y%m%dT%H%M%SZ")
@@ -133,6 +151,7 @@ def regenerate(
         _verify_checksums(run_dir, manifest)
         statements += pq.read_table(run_dir / "statements.parquet").to_pylist()
         inputs[slug] = manifest["run_id"]
+        status, note = _source_status(slug, manifest, empty_since or {})
         sources.append(
             row
             | {
@@ -140,7 +159,8 @@ def regenerate(
                 "last_run_at": manifest["started_at"],
                 "row_count": manifest["rows"],
                 "adapter_version": manifest["adapter_version"],
-                "status": "fresh",
+                "status": status,
+                "status_note": note,
             }
         )
 
@@ -230,7 +250,9 @@ def regenerate(
     # Free-plan size discipline: staged tables sit beside live ones during an import, so the
     # loader first drops the largest live table. The previous regeneration's stage.sql and
     # swap.sql stay on disk as the rollback path; trace reads fail closed during the load.
-    (out / "prelude.sql").write_text("DROP TABLE IF EXISTS statements;\n")
+    (out / "prelude.sql").write_text(
+        "\n".join(f"DROP TABLE IF EXISTS {table};" for table in PRELUDE_DROPS) + "\n"
+    )
     (out / "stage.sql").write_text("\n".join(stage) + "\n")
     (out / "swap.sql").write_text("\n".join(swap_sql(schema_path, regeneration)) + "\n")
     summary = regeneration | {

@@ -3,6 +3,7 @@
 import argparse
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from .adapters import load_adapter, run_adapter
@@ -27,6 +28,12 @@ def main(argv: list[str] | None = None) -> int:
     regen.add_argument("--pack", type=Path, required=True)
     regen.add_argument("--data-root", type=Path, default=Path("data"))
     regen.add_argument("--id", dest="regeneration_id")
+    regen.add_argument(
+        "--empty-since",
+        action="append",
+        default=[],
+        help="slug=YYYY-MM-DD for registers returning nothing",
+    )
     args = parser.parse_args(argv)
 
     if args.command == "regenerate":
@@ -36,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
             regeneration_id=args.regeneration_id,
             rubrics_dir=REPO / "rubrics",
             schema_path=REPO / "infra" / "d1" / "schema.sql",
+            empty_since=dict(item.split("=", 1) for item in args.empty_since),
         )
         print(json.dumps(result.summary, indent=2))
         return 0
@@ -52,6 +60,13 @@ def main(argv: list[str] | None = None) -> int:
         params=params,
         previous_manifest=previous,
         replay_from=args.replay_from,
+        snapshot=args.snapshot,
+        snapshot_at=(
+            datetime.fromisoformat(args.snapshot_at.replace("Z", "+00:00"))
+            if args.snapshot_at
+            else None
+        ),
+        snapshot_ref=args.snapshot_ref,
     )
     findings = check_run(args.adapter_dir, result.output_dir)
     print(json.dumps({"manifest": result.manifest, "conformance": findings}, indent=2))

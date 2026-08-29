@@ -68,3 +68,47 @@ def test_snapshot_run_loads_typed_rows_with_the_original_pull_time(tmp_path):
     assert {r["designation_effective_date"] for r in records} == {"2024-07-01", "2025-03-15"}
     accepted = json.loads((result.output_dir.parents[1] / "accepted.json").read_text())
     assert accepted["run_id"] == RUN_ID
+
+
+def test_snapshot_source_is_reported_stale_with_the_dates(tmp_path):
+    from atlas_pipeline.regenerate import regenerate
+
+    spec = load_adapter(ADAPTER)
+    run_adapter(
+        spec,
+        data_root=tmp_path / "data",
+        run_id=RUN_ID,
+        fetcher=lambda url, **_: b"",
+        salt=SALT,
+        snapshot=_snapshot(tmp_path),
+        snapshot_at=SNAPSHOT_AT,
+        snapshot_ref="URA report 1004, pulled 2026-05-12",
+    )
+    pack = tmp_path / "pack"
+    pack.mkdir()
+    (pack / "pack.yml").write_text(
+        (PACKS / "ug" / "pack.yml")
+        .read_text()
+        .replace(
+            "  - slug: ura.vat_withholding_agents\n    state: not_loaded",
+            "  - slug: ura.vat_withholding_agents\n    state: loaded",
+        )
+    )
+    (pack / "sources").symlink_to(PACKS / "ug" / "sources")
+    (pack / "rubrics").symlink_to(PACKS / "ug" / "rubrics")
+    out = regenerate(
+        pack_dir=pack,
+        data_root=tmp_path / "data",
+        regeneration_id="20260830T000000Z",
+        computed_at="2026-08-30T00:00:00Z",
+        rubrics_dir=PACKS.parent / "rubrics",
+        schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
+        empty_since={"ura.vat_withholding_agents": "2026-08-29"},
+    )
+    source = next(s for s in out.summary["sources"] if s["slug"] == "ura.vat_withholding_agents")
+    assert source["status"] == "stale"
+    assert source["last_run_at"] == "2026-05-12T00:00:00Z"
+    assert source["status_note"] == (
+        "last successful pull 2026-05-12; portal returning empty results since 2026-08-29"
+    )
+    assert "status_note" in (out.directory / "stage.sql").read_text()

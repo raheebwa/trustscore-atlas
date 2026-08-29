@@ -32,7 +32,7 @@ SCORE_COLUMNS = [
 REGENERATION_ID = re.compile(r"^[A-Za-z0-9_]+$")
 SOURCE_COLUMNS = [
     "slug", "country", "publisher", "title", "url", "licence", "cadence", "coverage",
-    "last_run_id", "last_run_at", "row_count", "adapter_version", "status",
+    "last_run_id", "last_run_at", "row_count", "adapter_version", "status", "status_note",
 ]  # fmt: skip
 
 
