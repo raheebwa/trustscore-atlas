@@ -6,7 +6,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from .adapters import load_adapter, run_adapter
+from .adapters import accept_run, load_adapter, run_adapter
 from .conformance import check_run
 from .regenerate import regenerate
 
@@ -82,9 +82,17 @@ def main(argv: list[str] | None = None) -> int:
             else None
         ),
         observation_note=args.observation_note,
+        accept=False,
     )
     findings = check_run(args.adapter_dir, result.output_dir)
-    print(json.dumps({"manifest": result.manifest, "conformance": findings}, indent=2))
+    accepted = accept_run(
+        result.output_dir.parents[1], result.manifest["run_id"], findings=findings
+    )
+    print(
+        json.dumps(
+            {"manifest": result.manifest, "conformance": findings, "accepted": accepted}, indent=2
+        )
+    )
     return 1 if findings else 0
 
 

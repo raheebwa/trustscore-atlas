@@ -8,6 +8,20 @@ ENDPOINT = (
 )
 
 
+def _code_pattern():
+    """The ug:bou_code pattern from the pack, so adapter and conformance agree."""
+    import re
+    from pathlib import Path
+
+    import yaml
+
+    pack = yaml.safe_load((Path(__file__).resolve().parents[2] / "pack.yml").read_text())
+    return re.compile(pack["identifier_schemes"]["ug:bou_code"]["pattern"])
+
+
+CODE_PATTERN = _code_pattern()
+
+
 def _clean(value) -> str:
     return " ".join(value.split()) if isinstance(value, str) else ""
 
@@ -39,10 +53,13 @@ def run(ctx) -> None:
             if not isinstance(item, dict):
                 ctx.drop_row("malformed institution row")
                 continue
+            code = _clean(item.get("code"))
             record = {
                 "name": _clean(item.get("title")),
                 "category": category,
-                "code": _clean(item.get("code")),
+                # Only values shaped like a register code become identifiers; the register
+                # also prints notes ("Expired License") in the code column.
+                "code": code if CODE_PATTERN.fullmatch(code) else "",
                 "source_ref": ENDPOINT,
             }
             if not record["name"] or not record["category"]:

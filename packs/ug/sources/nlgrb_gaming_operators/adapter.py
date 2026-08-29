@@ -58,23 +58,44 @@ def _latest_package(body: bytes) -> tuple[str, int, str]:
 
 
 def _emit_pdf_rows(ctx, pdf_bytes: bytes, year: str, source_ref: str) -> None:
+    """One record per licence. The register prints one row per licence, but only the first
+    row of an operator carries the operator's name, trade name and website; the rows that
+    follow belong to the same operator until the next numbered row."""
+    current: dict | None = None
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         for page in pdf.pages:
-            table = page.extract_table()
-            if not table:
-                continue
-            for raw_row in table:
-                cells = [_clean(cell) for cell in raw_row]
-                if not cells or not re.fullmatch(r"[0-9]+\.?", cells[0]):
-                    continue
-                if len(cells) != len(COLUMNS) + 1:
-                    ctx.drop_row("malformed operator row")
-                    continue
-                record = dict(zip(COLUMNS, cells[1:], strict=True))
-                if not record["company_name"] or not record["licence_number"]:
-                    ctx.drop_row("missing company name or licence number")
-                    continue
-                ctx.emit_record(record | {"year": year, "source_ref": source_ref})
+            for table in page.extract_tables():
+                for raw_row in table:
+                    cells = [_clean(cell) for cell in raw_row]
+                    if len(cells) != len(COLUMNS) + 1:
+                        if any(cells):
+                            ctx.drop_row("malformed operator row")
+                        continue
+                    index, values = cells[0], dict(zip(COLUMNS, cells[1:], strict=True))
+                    if values["company_name"].upper() in {"OPERATOR", "COMPANY NAME"}:
+                        continue  # header row
+                    if values["company_name"]:
+                        current = {
+                            "company_name": values["company_name"],
+                            "trade_name": values["trade_name"],
+                            "website": values["website"],
+                        }
+                    elif current is None or not (index == "" or index == "##"):
+                        ctx.drop_row("licence row with no operator")
+                        continue
+                    if current is None:
+                        ctx.drop_row("licence row with no operator")
+                        continue
+                    record = current | {
+                        "licence_type": values["licence_type"],
+                        "mode_of_operation": values["mode_of_operation"],
+                        "licence_number": values["licence_number"],
+                        "website": values["website"] or current["website"],
+                    }
+                    if not record["licence_number"]:
+                        ctx.drop_row("missing licence number")
+                        continue
+                    ctx.emit_record(record | {"year": year, "source_ref": source_ref})
 
 
 def run(ctx) -> None:

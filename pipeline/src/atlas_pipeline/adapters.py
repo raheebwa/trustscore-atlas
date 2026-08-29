@@ -178,6 +178,7 @@ def run_adapter(
     snapshot_ref: str | None = None,
     observed_at: datetime | None = None,
     observation_note: str | None = None,
+    accept: bool = True,
 ) -> RunResult:
     if replay_from is not None and started_at is None:
         # A replay re-derives records from the original observation; the assertion time is the
@@ -265,12 +266,22 @@ def run_adapter(
         }
     Draft202012Validator(_schema("manifest")).validate(manifest)
     (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    if not flags:
-        # Immutable run outputs are complete; move the accepted pointer atomically.
-        pointer = source_dir / "accepted.json"
-        tmp = pointer.with_suffix(".json.tmp")
-        tmp.write_text(
-            json.dumps({"run_id": run_id, "accepted_at": manifest["finished_at"]}) + "\n"
-        )
-        os.replace(tmp, pointer)
+    if accept and not flags:
+        accept_run(source_dir, run_id, findings=[])
     return RunResult(output_dir=output_dir, raw_dir=raw_dir, manifest=manifest)
+
+
+def accept_run(source_dir: Path, run_id: str, *, findings: list[str]) -> bool:
+    """Move the accepted pointer to a complete run, only when the conformance findings are
+    empty and the manifest carries no flags. The run stays on disk either way."""
+    if findings:
+        return False
+    source_dir = Path(source_dir)
+    manifest = json.loads((source_dir / "runs" / run_id / "manifest.json").read_text())
+    if manifest.get("flags"):
+        return False
+    pointer = source_dir / "accepted.json"
+    tmp = pointer.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps({"run_id": run_id, "accepted_at": manifest["finished_at"]}) + "\n")
+    os.replace(tmp, pointer)
+    return True

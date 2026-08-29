@@ -40,12 +40,15 @@ identifier_schemes:
   ug:bou_code:
     title: Bank of Uganda supervised institution code
     issuer: Bank of Uganda
-    pattern: "^(?:[A-Z]{4}UG[A-Z0-9]{2}(?:[A-Z0-9]{3})?|FXB [0-9]{3}|MR [0-9]{3}|CRB[0-9]{3})$"
+    # Bank SWIFT-style codes, forex bureau (FXB) and money remitter (MR) licence references
+    # (with optional branch suffixes), credit reference bureaus, and the register's own
+    # four-digit codes. Free text such as an expiry note is not a code and is not emitted.
+    pattern: "^(?:(?:SC: )?[A-Z]{4}UG[A-Z0-9]{2}(?:[A-Z0-9]{3})?|FXB ?[0-9]{2,3}|MR [0-9]{2,3}(?: ?\\([a-z]\\))?(?:/MR [0-9]{2,3} ?\\([a-z]\\))?|CRB[0-9]{3,4}|[0-9]{4})$"
     org_id_guide: null
   ug:nlgrb_licence:
     title: NLGRB gaming operator licence number
     issuer: National Lotteries and Gaming Regulatory Board
-    pattern: "^NLGRB-[A-Z]{2,4}-[0-9]{2}-[0-9]{4}$"
+    pattern: "^NLGRB-[A-Z]{2,5}-[0-9]{2}-[0-9]{4}$"
     org_id_guide: null
   ug:ursb_reg_no:
     title: URSB registration number

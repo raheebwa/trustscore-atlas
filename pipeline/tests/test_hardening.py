@@ -218,3 +218,30 @@ def test_swap_failure_leaves_previous_regeneration_live(tmp_path):
     assert db.execute("SELECT count(*) FROM businesses").fetchone() == (1,)
     apply_batch(db, swap)
     assert db.execute("SELECT count(*) FROM businesses").fetchone() == (EXPECTED["entities"],)
+
+
+def test_a_run_is_accepted_only_after_conformance_passes(tmp_path):
+    """The accepted pointer must not move for a run whose statements fail a conformance check
+    (for example an identifier outside the pack pattern); the run stays on disk for inspection."""
+    from atlas_pipeline.adapters import accept_run, accepted_run
+
+    spec = load_adapter(ADAPTER)
+    result = run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=_fixture_fetcher(spec),
+        salt=SALT,
+        params={"natures": EXPECTED["natures"]},
+        accept=False,
+    )
+    source_dir = result.output_dir.parents[1]
+    assert accepted_run(source_dir) is None
+    assert (
+        accept_run(source_dir, RUN_ID, findings=["ug:kcca_licence value 'x' fails pattern"])
+        is False
+    )
+    assert accepted_run(source_dir) is None
+    assert accept_run(source_dir, RUN_ID, findings=[]) is True
+    assert accepted_run(source_dir) == result.output_dir
