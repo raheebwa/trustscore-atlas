@@ -39,7 +39,7 @@ CREATE TABLE statements (
   field             TEXT NOT NULL,
   value             TEXT NOT NULL,
   source            TEXT NOT NULL,
-  source_ref        TEXT NOT NULL,
+  ref_id            TEXT NOT NULL,                  -- refs.ref_id; the source reference text lives once in refs
   source_record_id  TEXT NOT NULL,
   asserted_at       TEXT NOT NULL,                  -- ISO timestamp, UTC
   licence           TEXT NOT NULL,
@@ -47,6 +47,12 @@ CREATE TABLE statements (
   confidence        TEXT NOT NULL
 );
 CREATE INDEX statements_trace ON statements (atlas_id, field, precedence, asserted_at);
+
+-- Distinct source references (URLs, document names, API calls) shared by many statements.
+CREATE TABLE refs (
+  ref_id      TEXT PRIMARY KEY,                     -- first 12 hex of sha256(source_ref)
+  source_ref  TEXT NOT NULL
+);
 
 CREATE TABLE scores (
   atlas_id         TEXT NOT NULL,

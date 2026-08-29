@@ -13,7 +13,15 @@ from pathlib import Path
 
 STATEMENT_LIMIT = 100_000
 _TARGET = 90_000
-STAGED_TABLES = ("businesses", "identifiers", "statements", "scores", "sources", "businesses_fts")
+STAGED_TABLES = (
+    "businesses",
+    "identifiers",
+    "statements",
+    "refs",
+    "scores",
+    "sources",
+    "businesses_fts",
+)
 PERSISTENT_TABLES = ("regenerations", "meta")
 
 BUSINESS_COLUMNS = [
@@ -22,7 +30,7 @@ BUSINESS_COLUMNS = [
     "coverage", "scores",
 ]  # fmt: skip
 STATEMENT_COLUMNS = [
-    "statement_id", "atlas_id", "entity_id", "country", "field", "value", "source", "source_ref",
+    "statement_id", "atlas_id", "entity_id", "country", "field", "value", "source", "ref_id",
     "source_record_id", "asserted_at", "licence", "precedence", "confidence",
 ]  # fmt: skip
 SCORE_COLUMNS = [
@@ -94,6 +102,13 @@ def _staged(statement: str, rid: str) -> str:
 def _table_of(statement: str) -> str | None:
     m = re.match(r"^CREATE (?:VIRTUAL )?TABLE (\w+)", statement)
     return m.group(1) if m else None
+
+
+def ref_id(source_ref: str) -> str:
+    """Short stable key for a source reference shared by many statements."""
+    import hashlib
+
+    return hashlib.sha256(source_ref.encode("utf-8")).hexdigest()[:12]
 
 
 def _check_regeneration_id(rid: str) -> str:
@@ -193,7 +208,17 @@ def regeneration_sql(
         ["atlas_id", "scheme", "value", "source"],
         [{"atlas_id": b["atlas_id"], **i} for b in businesses for i in b["identifiers"]],
     )
-    out += insert_statements(f"statements__{rid}", STATEMENT_COLUMNS, statements)
+    refs = {s["source_ref"]: ref_id(s["source_ref"]) for s in statements}
+    out += insert_statements(
+        f"statements__{rid}",
+        STATEMENT_COLUMNS,
+        [{**s, "ref_id": refs[s["source_ref"]]} for s in statements],
+    )
+    out += insert_statements(
+        f"refs__{rid}",
+        ["ref_id", "source_ref"],
+        [{"ref_id": rid_, "source_ref": ref} for ref, rid_ in sorted(refs.items())],
+    )
     out += insert_statements(
         f"scores__{rid}",
         SCORE_COLUMNS,

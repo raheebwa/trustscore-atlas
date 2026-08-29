@@ -3,7 +3,13 @@
 import sqlite3
 from pathlib import Path
 
-from atlas_pipeline.d1 import STATEMENT_LIMIT, insert_statements, regeneration_sql, swap_sql
+from atlas_pipeline.d1 import (
+    STATEMENT_LIMIT,
+    apply_batch,
+    insert_statements,
+    regeneration_sql,
+    swap_sql,
+)
 
 REPO = Path(__file__).resolve().parents[2]
 SCHEMA = REPO / "infra" / "d1" / "schema.sql"
@@ -148,3 +154,36 @@ def test_regeneration_sql_loads_into_sqlite_and_swap_makes_it_live():
             "SELECT name FROM sqlite_master WHERE name LIKE '%\\_\\_%' ESCAPE '\\'"
         )
     ]
+
+
+def test_statement_references_are_normalised_into_a_refs_table():
+    """Serving tables store each distinct source reference once; statements carry ref_id."""
+    businesses, statements, scores, sources, regeneration = _sample()
+    statements = [
+        statements[0],
+        {
+            **statements[0],
+            "statement_id": "s2",
+            "field": "sector.source_category",
+            "value": "GENERAL",
+        },
+        {**statements[0], "statement_id": "s3", "source_ref": "https://example.org/other"},
+    ]
+    stage = regeneration_sql(SCHEMA, regeneration, businesses, statements, scores, sources)
+    swap = swap_sql(SCHEMA, regeneration)
+    db = sqlite3.connect(":memory:")
+    apply_batch(db, stage)
+    apply_batch(db, swap)
+    assert db.execute("SELECT count(*) FROM refs").fetchone() == (2,)
+    assert "source_ref" not in [c[1] for c in db.execute("PRAGMA table_info(statements)")]
+    joined = db.execute(
+        "SELECT s.statement_id, r.source_ref FROM statements s "
+        "JOIN refs r ON r.ref_id = s.ref_id ORDER BY 1"
+    ).fetchall()
+    assert joined == [
+        ("s1", "https://example.org/r"),
+        ("s2", "https://example.org/r"),
+        ("s3", "https://example.org/other"),
+    ]
+    ref_ids = {row[0] for row in db.execute("SELECT ref_id FROM refs")}
+    assert all(len(r) == 12 for r in ref_ids)

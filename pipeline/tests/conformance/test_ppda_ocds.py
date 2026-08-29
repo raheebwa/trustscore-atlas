@@ -132,8 +132,7 @@ def test_4_identifier_values_match_pack_patterns(run):
 def test_5_rerun_on_same_raw_input_is_byte_identical(spec, run, tmp_path):
     again, _ = _run(spec, tmp_path / "again")
     assert (
-        check_run(ADAPTER, run.output_dir, compare_to=again.output_dir, checks=["idempotent"])
-        == []
+        check_run(ADAPTER, run.output_dir, compare_to=again.output_dir, checks=["idempotent"]) == []
     )
 
 
