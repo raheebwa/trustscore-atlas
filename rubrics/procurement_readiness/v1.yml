@@ -1,0 +1,25 @@
+name: procurement_readiness
+version: 1
+title: Procurement Readiness
+question: What is the track record with public buyers?
+max: 100
+licence: CC-BY-4.0
+predicates:
+  - id: registered_party
+    points: 20
+    description: Registered as a procurement party with a supplier or tenderer role.
+  - id: any_award
+    points: 20
+    description: At least one public contract award.
+  - id: awards_across_buyers
+    points: 20
+    description: At least three awards across at least two distinct buyers.
+    minimum_awards: 3
+    minimum_buyers: 2
+  - id: contract_signed_recently
+    points: 20
+    description: A public contract signed within the last 24 months.
+    window_months: 24
+  - id: formality_threshold
+    points: 20
+    description: Formality score of at least 55.

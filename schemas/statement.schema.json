@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atlas.trustscorehq.com/schemas/statement.schema.json",
+  "title": "Statement",
+  "description": "One sourced claim about one field of one entity. The atomic unit of Atlas; entities are views over statements.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "statement_id",
+    "entity_id",
+    "country",
+    "field",
+    "value",
+    "source",
+    "source_ref",
+    "source_record_id",
+    "asserted_at",
+    "licence",
+    "precedence",
+    "confidence"
+  ],
+  "properties": {
+    "statement_id": {
+      "type": "string",
+      "description": "Deterministic hash of (entity_id, field, value, source, source_record_id). One statement per source record; stable across re-runs.",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "Source-scoped entity identifier, '<source>:<key>'. Resolution maps entity ids to atlas ids; adapters never assign atlas ids.",
+      "minLength": 3
+    },
+    "country": {
+      "type": "string",
+      "description": "ISO 3166-1 alpha-2 of the jurisdiction the statement is about.",
+      "pattern": "^[A-Z]{2}$"
+    },
+    "field": {
+      "type": "string",
+      "description": "Dotted path into the Business record, for example 'canonical_name', 'sector.source_category', 'identifiers'.",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+    },
+    "value": {
+      "type": "string",
+      "description": "The asserted value as text. List and struct values are JSON text."
+    },
+    "source": {
+      "type": "string",
+      "description": "Source slug, '<publisher>.<register>'.",
+      "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+$"
+    },
+    "source_ref": {
+      "type": "string",
+      "description": "URL, document name, or API call that produced the value.",
+      "minLength": 1
+    },
+    "source_record_id": {
+      "type": "string",
+      "description": "The source's own key for the row, or a deterministic hash of the row when the source publishes none.",
+      "minLength": 1
+    },
+    "asserted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the source was pulled, or when the operator asserted the value."
+    },
+    "licence": {
+      "type": "string",
+      "description": "Licence of the source material, as an SPDX identifier or 'public-record'.",
+      "minLength": 1
+    },
+    "precedence": {
+      "type": "integer",
+      "description": "1 operator_verified, 2 register_of_record, 3 regulator_or_authority, 4 derived, 5 inferred.",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "verified",
+        "official",
+        "derived",
+        "inferred"
+      ]
+    }
+  }
+}

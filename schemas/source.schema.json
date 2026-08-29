@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atlas.trustscorehq.com/schemas/source.schema.json",
+  "title": "Source",
+  "description": "Declaration of one register adapter: packs/<iso2>/sources/<slug>/source.yml. Also the shape of a row on the public sources page.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "slug",
+    "country",
+    "publisher",
+    "title",
+    "url",
+    "licence",
+    "rights",
+    "cadence",
+    "precedence_class",
+    "pii",
+    "terms",
+    "identifier_schemes",
+    "adapter_version",
+    "row_count_tolerance"
+  ],
+  "properties": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+$"
+    },
+    "country": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$"
+    },
+    "publisher": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "endpoint": {
+      "type": "string",
+      "format": "uri"
+    },
+    "licence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rights": {
+      "type": "string",
+      "enum": [
+        "public_register",
+        "open_licence",
+        "restricted"
+      ],
+      "description": "Redistribution posture. public_register: data the issuing authority publishes for public access, redistributable on every surface with attribution and a takedown path. open_licence: an explicit open licence such as CC-BY-4.0. restricted: not redistributed."
+    },
+    "attribution": {
+      "type": "string",
+      "description": "Attribution line carried with every published row and bundle from this source."
+    },
+    "cadence": {
+      "type": "string",
+      "enum": [
+        "daily",
+        "weekly",
+        "monthly",
+        "quarterly",
+        "annual",
+        "irregular"
+      ]
+    },
+    "coverage": {
+      "type": "string",
+      "description": "Plain-language statement of what the register covers and does not cover."
+    },
+    "precedence_class": {
+      "type": "string",
+      "enum": [
+        "operator_verified",
+        "register_of_record",
+        "regulator_or_authority",
+        "derived",
+        "inferred"
+      ]
+    },
+    "pii": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "excluded_columns",
+        "hashed_columns"
+      ],
+      "properties": {
+        "excluded_columns": {
+          "type": "array",
+          "description": "Native columns dropped at mapping time. They never reach records or statements.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hashed_columns": {
+          "type": "array",
+          "description": "Native columns kept only as a salted hash for linkage. Never emitted as statements or exported.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "terms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "checked_on",
+        "note"
+      ],
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "checked_on": {
+          "type": "string",
+          "format": "date"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "identifier_schemes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z]{2}:[a-z0-9_]+$"
+      }
+    },
+    "adapter_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "row_count_tolerance": {
+      "type": "number",
+      "description": "Fraction by which the row count may differ from the previous run before the run is flagged instead of published.",
+      "minimum": 0,
+      "maximum": 1
+    }
+  }
+}

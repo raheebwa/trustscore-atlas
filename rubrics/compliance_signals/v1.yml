@@ -1,0 +1,19 @@
+name: compliance_signals
+version: 1
+title: Compliance Signals
+question: What do regulators say about standing? Register-published statuses only, company rows only.
+max: 100
+licence: CC-BY-4.0
+predicates:
+  - id: no_adverse_status
+    points: 40
+    description: No suspended or deactivated status in any register.
+  - id: certification_permits_current
+    points: 30
+    description: The majority of the business's product certification permits are valid.
+  - id: property_rates_compliant
+    points: 20
+    description: Listed as compliant on the local property-rates roster (companies only).
+  - id: regulator_licence_current
+    points: 10
+    description: A sector regulator licence is current.

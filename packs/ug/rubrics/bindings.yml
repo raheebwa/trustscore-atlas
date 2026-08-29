@@ -1,0 +1,42 @@
+# Binds the abstract predicates in rubrics/<name>/v<N>.yml to this pack's registers.
+# A predicate with an empty binding is reported as "not checked", never as 0 points.
+formality:
+  legal_register_presence:
+    sources: []            # URSB arrives in Phase 1
+  tax_identity_present:
+    identifier_schemes: [ug:tin]
+    sources: [ura.vat_withholding_agents, ura.customs_agents, ura.wht_exemptions]
+  local_trading_licence:
+    sources: [kcca.businesses]
+  sector_regulator_licence:
+    sources: [bou.supervised_institutions, cma.licensed_firms, urbra.licensed_schemes, ucc.broadcasters, nlgrb.gaming_operators, unbs.certified_products]
+activity:
+  recent_statement:
+    sources: [kcca.businesses, ura.customs_agents, ura.vat_withholding_agents, unbs.certified_products, ucc.broadcasters, ppda.parties]
+  valid_licence_or_permit:
+    expiry_fields: [ura.customs_agents.licence_expiry, unbs.certified_products.expiry, ucc.broadcasters.licence_expiry]
+  public_contract_awarded:
+    sources: [ppda.awards]
+  seen_in_multiple_registers:
+    minimum: 2
+compliance_signals:
+  no_adverse_status:
+    status_fields: [ura.customs_agents.registration_status, ucc.broadcasters.status]
+  certification_permits_current:
+    sources: [unbs.certified_products]
+  property_rates_compliant:
+    sources: [kcca.property_rates]
+  regulator_licence_current:
+    sources: [bou.supervised_institutions, cma.licensed_firms, urbra.licensed_schemes, nlgrb.gaming_operators]
+procurement_readiness:
+  registered_party:
+    sources: [ppda.parties]
+  any_award:
+    sources: [ppda.awards]
+  awards_across_buyers:
+    sources: [ppda.awards]
+  contract_signed_recently:
+    sources: [ppda.contracts]
+  formality_threshold:
+    rubric: formality
+    minimum: 55

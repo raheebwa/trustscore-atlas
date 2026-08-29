@@ -1,0 +1,19 @@
+name: formality
+version: 1
+title: Formality
+question: Does the state know this business exists?
+max: 100
+licence: CC-BY-4.0
+predicates:
+  - id: legal_register_presence
+    points: 30
+    description: The business appears in the jurisdiction's legal register of record.
+  - id: tax_identity_present
+    points: 30
+    description: A tax identifier is present in any tax-authority list.
+  - id: local_trading_licence
+    points: 25
+    description: A local trading licence row exists.
+  - id: sector_regulator_licence
+    points: 15
+    description: A sector regulator lists the business as licensed or permitted.

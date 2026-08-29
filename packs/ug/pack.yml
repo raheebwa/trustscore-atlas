@@ -1,0 +1,79 @@
+# Uganda country pack. The canonical layer, score engine and surfaces are pack-agnostic;
+# everything Uganda-specific is declared here or under this directory.
+country: UG
+name: Uganda
+currency: UGX
+languages: [en]
+timezone: Africa/Kampala
+
+# Identifier schemes emitted by this pack's adapters. Codes follow org-id.guide where a
+# scheme exists there (UG-RSB for URSB); the rest are proposed upstream, not invented privately.
+identifier_schemes:
+  ug:tin:
+    title: Uganda Revenue Authority tax identification number
+    issuer: Uganda Revenue Authority
+    pattern: "^1[0-9]{9}$"
+    org_id_guide: null
+  ug:kcca_licence:
+    title: KCCA licensed business row key
+    issuer: Kampala Capital City Authority
+    pattern: "^[0-9a-f]{16}$"
+    org_id_guide: null
+    note: KCCA publishes no licence number; the key is a deterministic hash of the published row.
+  ug:ppda_party_id:
+    title: PPDA OCDS party identifier
+    issuer: Public Procurement and Disposal of Public Assets Authority
+    pattern: "^[A-Za-z0-9_.:-]+$"
+    org_id_guide: null
+  ug:unbs_permit:
+    title: UNBS product certification permit number
+    issuer: Uganda National Bureau of Standards
+    pattern: "^[A-Za-z0-9/-]+$"
+    org_id_guide: null
+  ug:ursb_reg_no:
+    title: URSB registration number
+    issuer: Uganda Registration Services Bureau
+    pattern: "^[0-9]+$"
+    org_id_guide: UG-RSB
+
+# Precedence bindings: which rank each source class takes in this pack (see docs/adrs/0001).
+precedence:
+  operator_verified: 1
+  register_of_record: 2
+  regulator_or_authority: 3
+  derived: 4
+  inferred: 5
+
+# Administrative boundaries used for location tagging and the explorer map.
+boundaries:
+  provider: HDX COD-AB (UBOS)
+  licence: CC-BY-IGO
+  levels: [adm1, adm2, adm3, adm4]
+
+# Every register in the Phase 0 universe, with its load state. Coverage counts only sources in
+# state loaded that have an accepted run; not_loaded sources are 'not yet checked', never 'checked'.
+sources:
+  - slug: kcca.businesses
+    state: loaded
+  - slug: kcca.property_rates
+    state: not_loaded
+  - slug: ura.vat_withholding_agents
+    state: not_loaded
+  - slug: ura.customs_agents
+    state: not_loaded
+  - slug: ura.wht_exemptions
+    state: not_loaded
+  - slug: ppda.ocds
+    state: not_loaded
+  - slug: unbs.certified_products
+    state: not_loaded
+  - slug: bou.supervised_institutions
+    state: not_loaded
+  - slug: cma.licensed_firms
+    state: not_loaded
+  - slug: urbra.licensed_schemes
+    state: not_loaded
+  - slug: ucc.broadcasters
+    state: not_loaded
+  - slug: nlgrb.gaming_operators
+    state: not_loaded

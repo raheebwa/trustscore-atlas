@@ -1,0 +1,135 @@
+{
+  "description": "Total ordering for competing statement values on one field: precedence rank (lower wins), then support (distinct source records carrying the value), then most recent asserted_at, then shortest normalised form, then alphabetical. Consumed by pipeline resolution and the site trace.",
+  "cases": [
+    {
+      "name": "support beats recency within one rank",
+      "statements": [
+        {
+          "value": "Example Bakery Ltd",
+          "precedence": 3,
+          "source_record_id": "r1",
+          "asserted_at": "2026-08-29T00:00:00Z"
+        },
+        {
+          "value": "EXAMPLE BAKERY LTD",
+          "precedence": 3,
+          "source_record_id": "r2",
+          "asserted_at": "2026-08-01T00:00:00Z"
+        },
+        {
+          "value": "EXAMPLE BAKERY LTD",
+          "precedence": 3,
+          "source_record_id": "r3",
+          "asserted_at": "2026-08-01T00:00:00Z"
+        }
+      ],
+      "ranked": [
+        "EXAMPLE BAKERY LTD",
+        "Example Bakery Ltd"
+      ]
+    },
+    {
+      "name": "equal support, most recent wins",
+      "statements": [
+        {
+          "value": "SAMPLE STORES",
+          "precedence": 3,
+          "source_record_id": "r1",
+          "asserted_at": "2026-08-01T00:00:00Z"
+        },
+        {
+          "value": "SAMPLE  STORES",
+          "precedence": 3,
+          "source_record_id": "r2",
+          "asserted_at": "2026-08-29T00:00:00Z"
+        }
+      ],
+      "ranked": [
+        "SAMPLE  STORES",
+        "SAMPLE STORES"
+      ]
+    },
+    {
+      "name": "precedence beats support",
+      "statements": [
+        {
+          "value": "SAMPLE STORES",
+          "precedence": 3,
+          "source_record_id": "r1",
+          "asserted_at": "2026-08-29T00:00:00Z"
+        },
+        {
+          "value": "SAMPLE STORES",
+          "precedence": 3,
+          "source_record_id": "r2",
+          "asserted_at": "2026-08-29T00:00:00Z"
+        },
+        {
+          "value": "Sample Stores Ltd",
+          "precedence": 1,
+          "source_record_id": "op",
+          "asserted_at": "2026-08-10T00:00:00Z"
+        }
+      ],
+      "ranked": [
+        "Sample Stores Ltd",
+        "SAMPLE STORES"
+      ]
+    },
+    {
+      "name": "all equal, shortest normalised then alphabetical",
+      "statements": [
+        {
+          "value": "EXAMPLE TRADERS (U) LIMITED",
+          "precedence": 3,
+          "source_record_id": "r1",
+          "asserted_at": "2026-08-01T00:00:00Z"
+        },
+        {
+          "value": "EXAMPLE TRADERS LTD",
+          "precedence": 3,
+          "source_record_id": "r2",
+          "asserted_at": "2026-08-01T00:00:00Z"
+        },
+        {
+          "value": "EXAMPLE TRADERS",
+          "precedence": 3,
+          "source_record_id": "r3",
+          "asserted_at": "2026-08-01T00:00:00Z"
+        }
+      ],
+      "ranked": [
+        "EXAMPLE TRADERS",
+        "EXAMPLE TRADERS LTD",
+        "EXAMPLE TRADERS (U) LIMITED"
+      ]
+    },
+    {
+      "name": "same record repeated does not add support",
+      "statements": [
+        {
+          "value": "A",
+          "precedence": 3,
+          "source_record_id": "r1",
+          "asserted_at": "2026-08-01T00:00:00Z"
+        },
+        {
+          "value": "A",
+          "precedence": 3,
+          "source_record_id": "r1",
+          "asserted_at": "2026-08-01T00:00:00Z"
+        },
+        {
+          "value": "B",
+          "precedence": 3,
+          "source_record_id": "r2",
+          "asserted_at": "2026-08-02T00:00:00Z"
+        }
+      ],
+      "ranked": [
+        "B",
+        "A"
+      ]
+    }
+  ]
+}

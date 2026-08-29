@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atlas.trustscorehq.com/schemas/manifest.schema.json",
+  "title": "Run manifest",
+  "description": "Written by the framework after every adapter run next to records.parquet and statements.parquet.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "source",
+    "country",
+    "started_at",
+    "finished_at",
+    "rows",
+    "statements",
+    "rows_dropped",
+    "raw_objects",
+    "adapter_version",
+    "framework_version",
+    "checksums"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "pattern": "^[0-9]{8}T[0-9]{6}Z(-[a-z0-9]+)?$"
+    },
+    "source": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+$"
+    },
+    "country": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "finished_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "statements": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rows_dropped": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source rows the adapter rejected as malformed. Counted, never published."
+    },
+    "raw_objects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "url": {
+            "type": "string",
+            "description": "The URL the object was fetched from, when the adapter fetched it. Enables replay without a re-crawl."
+          }
+        }
+      }
+    },
+    "adapter_version": {
+      "type": "string"
+    },
+    "framework_version": {
+      "type": "string"
+    },
+    "checksums": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "records_parquet",
+        "statements_parquet"
+      ],
+      "properties": {
+        "records_parquet": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "statements_parquet": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "flags": {
+      "type": "array",
+      "description": "Conformance or tolerance flags raised during the run. A flagged run is not published.",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

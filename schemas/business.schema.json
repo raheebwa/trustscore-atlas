@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atlas.trustscorehq.com/schemas/business.schema.json",
+  "title": "Business",
+  "description": "One resolved legal or trading entity. Every field is the winning statement for that field; losing statements remain queryable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "atlas_id",
+    "country",
+    "canonical_name",
+    "name_normalised",
+    "identifiers",
+    "entity_kind",
+    "first_seen",
+    "last_seen",
+    "coverage"
+  ],
+  "properties": {
+    "atlas_id": {
+      "type": "string",
+      "description": "Stable, opaque identifier assigned on first sighting; never reused.",
+      "pattern": "^atl_[0-9a-z]{16}$"
+    },
+    "country": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$"
+    },
+    "canonical_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name_normalised": {
+      "type": "string",
+      "description": "Upper case, punctuation stripped, LIMITED to LTD. Used for blocking and search.",
+      "minLength": 1
+    },
+    "identifiers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scheme",
+          "value",
+          "source"
+        ],
+        "properties": {
+          "scheme": {
+            "type": "string",
+            "description": "Namespaced scheme code declared in the country pack, for example 'ug:kcca_licence'.",
+            "pattern": "^[a-z]{2}:[a-z0-9_]+$"
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "entity_kind": {
+      "type": "string",
+      "enum": [
+        "company",
+        "business_name",
+        "sole_trader",
+        "public_body",
+        "unknown"
+      ]
+    },
+    "sector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source_category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_nature": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "isic_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "isic_confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "district": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "division_or_subcounty": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "adm2_pcode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "adm4_pcode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lat": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lon": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "description": "Per-register status values keyed by source slug, each with an as_of date.",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "value",
+          "as_of"
+        ],
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      }
+    },
+    "first_seen": {
+      "type": "string",
+      "format": "date"
+    },
+    "last_seen": {
+      "type": "string",
+      "format": "date"
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applicable",
+        "checked",
+        "found_in",
+        "not_yet_checked"
+      ],
+      "properties": {
+        "applicable": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "checked": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "found_in": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "not_yet_checked": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Applicable registers with no accepted run yet. Never counted as checked; absence in them is unknown, not evidence."
+        }
+      },
+      "description": "Registers applicable to the business, the subset actually checked (accepted runs), where it was found, and the applicable registers not yet checked. Coverage statements read 'found in N of M checked; K not yet checked'."
+    }
+  }
+}
