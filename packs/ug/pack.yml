@@ -88,7 +88,7 @@ sources:
   - slug: unbs.certified_products
     state: loaded
   - slug: bou.supervised_institutions
-    state: not_loaded
+    state: loaded
   - slug: cma.licensed_firms
     state: not_loaded
   - slug: urbra.licensed_schemes
@@ -96,4 +96,4 @@ sources:
   - slug: ucc.broadcasters
     state: not_loaded
   - slug: nlgrb.gaming_operators
-    state: not_loaded
+    state: loaded
