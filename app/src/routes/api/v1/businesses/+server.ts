@@ -1,12 +1,12 @@
 import { searchBusinesses } from '$lib/server/atlas';
 import { InvalidCursorError } from '$lib/pagination';
 import { apiBadRequest, apiOptions, apiResponse, apiServerError } from '$lib/server/api';
-import { requireDb } from '$lib/server/platform';
+import { getDatabase } from '$lib/server/platform';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ platform, request, url }) => {
 	try {
-		const db = requireDb(platform);
+		const db = getDatabase(platform, 'businesses');
 		const q = url.searchParams.get('q') ?? '';
 		const limit = url.searchParams.get('limit');
 		const district = url.searchParams.get('district');

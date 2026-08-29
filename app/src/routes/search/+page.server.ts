@@ -2,11 +2,11 @@ import { error } from '@sveltejs/kit';
 import { InvalidCursorError } from '$lib/pagination';
 import { searchBusinesses } from '$lib/server/atlas';
 import { FTS_MIN_QUERY_LENGTH, normalizeQuery } from '$lib/server/search';
-import { requireDb } from '$lib/server/platform';
+import { getDatabase } from '$lib/server/platform';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ platform, url }) => {
-	const db = requireDb(platform);
+	const db = getDatabase(platform, 'businesses');
 	const rawQuery = url.searchParams.get('q') ?? '';
 	const query = normalizeQuery(rawQuery);
 	const district = normalizeQuery(url.searchParams.get('district') ?? '');

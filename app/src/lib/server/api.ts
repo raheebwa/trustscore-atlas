@@ -48,6 +48,13 @@ export function apiBadRequest(message = 'invalid request'): Response {
 	return json({ error: message }, { status: 400, headers: CORS_HEADERS });
 }
 
+export function apiRegenerationInProgress(): Response {
+	return json(
+		{ error: 'regeneration in progress' },
+		{ status: 503, headers: { ...CORS_HEADERS, 'Retry-After': '60' } }
+	);
+}
+
 /** A safe 500 for the API: logs server-side, never echoes the error to the client. */
 export function apiServerError(err: unknown): Response {
 	console.error(

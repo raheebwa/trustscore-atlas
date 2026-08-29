@@ -1,8 +1,8 @@
 /**
  * Query functions shared by the pages and the JSON API (docs/ARCHITECTURE.md
- * section 9 "Serving paths"). Every function takes the D1Database binding as
- * an argument rather than importing `platform.env` directly, so it can be
- * exercised in tests against a fake binding. No user-supplied value is ever
+ * section 9 "Serving paths"). Functions take the required database bindings
+ * as arguments rather than importing `platform.env` directly, so they can be
+ * exercised in tests against fake bindings. No user-supplied value is ever
  * interpolated into SQL text; everything goes through `.bind()`.
  */
 
@@ -15,6 +15,7 @@ import {
 } from './search';
 import { formatCoverageSentence, formatScoreSentence } from '$lib/format';
 import { rankValues } from '$lib/ordering';
+import type { AtlasDatabases } from './platform';
 import {
 	CURSOR_MAX_OFFSET,
 	STATEMENTS_BYTE_BUDGET,
@@ -42,6 +43,13 @@ import type {
 } from '$lib/types';
 
 export const LIVE_REGENERATION_KEY = 'live_regeneration';
+
+export class RegenerationInProgressError extends Error {
+	constructor() {
+		super('Serving databases have different live regenerations');
+		this.name = 'RegenerationInProgressError';
+	}
+}
 
 /**
  * Statement fields that may cross the public serving boundary. An entry ending
@@ -411,6 +419,21 @@ export async function getLiveRegenerationId(db: D1Database): Promise<string | nu
 	return getMetaValue(db, LIVE_REGENERATION_KEY);
 }
 
+/** Returns the main live id after confirming that the statement database has the same id. */
+export async function getConsistentLiveRegenerationId({
+	db,
+	statementsDb
+}: AtlasDatabases): Promise<string | null> {
+	const [liveRegenerationId, statementsLiveRegenerationId] = await Promise.all([
+		getLiveRegenerationId(db),
+		getLiveRegenerationId(statementsDb)
+	]);
+	if (liveRegenerationId !== statementsLiveRegenerationId) {
+		throw new RegenerationInProgressError();
+	}
+	return liveRegenerationId;
+}
+
 export async function getLiveRegeneration(db: D1Database): Promise<RegenerationRow | null> {
 	const id = await getLiveRegenerationId(db);
 	if (!id) return null;
@@ -655,8 +678,12 @@ export async function searchBusinesses(
 	};
 }
 
-async function fetchStatementsFor(db: D1Database, atlasId: string): Promise<StatementRow[]> {
-	const { results } = await db
+async function fetchStatementsFor(
+	databases: AtlasDatabases,
+	atlasId: string
+): Promise<StatementRow[]> {
+	await getConsistentLiveRegenerationId(databases);
+	const { results } = await databases.statementsDb
 		.prepare(
 			`SELECT ${STATEMENT_SELECT_COLUMNS} ${STATEMENT_FROM}
 			 WHERE atlas_id = ?
@@ -718,10 +745,15 @@ async function fetchScoresFor(
 	return (results ?? []).map((row) => toScoreSummary(row, statements));
 }
 
-export async function getBusiness(
-	db: D1Database,
+interface BusinessWithStatements {
+	record: BusinessRecordResponse;
+	statements: StatementRow[];
+}
+
+async function getBusinessWithStatements(
+	{ db, statementsDb }: AtlasDatabases,
 	atlasId: string
-): Promise<BusinessRecordResponse | null> {
+): Promise<BusinessWithStatements | null> {
 	const businessRow = await db
 		.prepare('SELECT * FROM businesses WHERE atlas_id = ?')
 		.bind(atlasId)
@@ -730,7 +762,7 @@ export async function getBusiness(
 
 	const [identifierMap, statements] = await Promise.all([
 		fetchIdentifiersFor(db, [atlasId]),
-		fetchStatementsFor(db, atlasId)
+		fetchStatementsFor({ db, statementsDb }, atlasId)
 	]);
 	const scores = await fetchScoresFor(db, atlasId, statements);
 
@@ -748,22 +780,32 @@ export async function getBusiness(
 	const coverage = parseCoverage(businessRow.coverage);
 
 	return {
-		atlas_id: businessRow.atlas_id,
-		country: businessRow.country,
-		canonical_name: businessRow.canonical_name,
-		entity_kind: businessRow.entity_kind,
-		sector_category: businessRow.sector_category,
-		sector_nature: businessRow.sector_nature,
-		district: businessRow.district,
-		division: businessRow.division,
-		first_seen: businessRow.first_seen,
-		last_seen: businessRow.last_seen,
-		identifiers: identifierMap.get(atlasId) ?? [],
-		coverage,
-		coverage_summary: formatCoverageSentence(coverage),
-		scores,
-		sources
+		record: {
+			atlas_id: businessRow.atlas_id,
+			country: businessRow.country,
+			canonical_name: businessRow.canonical_name,
+			entity_kind: businessRow.entity_kind,
+			sector_category: businessRow.sector_category,
+			sector_nature: businessRow.sector_nature,
+			district: businessRow.district,
+			division: businessRow.division,
+			first_seen: businessRow.first_seen,
+			last_seen: businessRow.last_seen,
+			identifiers: identifierMap.get(atlasId) ?? [],
+			coverage,
+			coverage_summary: formatCoverageSentence(coverage),
+			scores,
+			sources
+		},
+		statements
 	};
+}
+
+export async function getBusiness(
+	databases: AtlasDatabases,
+	atlasId: string
+): Promise<BusinessRecordResponse | null> {
+	return (await getBusinessWithStatements(databases, atlasId))?.record ?? null;
 }
 
 export interface BusinessDetail {
@@ -774,12 +816,12 @@ export interface BusinessDetail {
 
 /** Everything the business page needs, in the queries the page load function actually issues. */
 export async function getBusinessDetail(
-	db: D1Database,
+	databases: AtlasDatabases,
 	atlasId: string
 ): Promise<BusinessDetail | null> {
-	const record = await getBusiness(db, atlasId);
-	if (!record) return null;
-	const statements = await fetchStatementsFor(db, atlasId);
+	const result = await getBusinessWithStatements(databases, atlasId);
+	if (!result) return null;
+	const { record, statements } = result;
 	const provenance = buildProvenanceTable(statements);
 	const fields = provenance.map((row) => row.field);
 	return { record, provenance, fields };
@@ -795,12 +837,12 @@ export interface TraceResult {
 }
 
 export async function getFieldTrace(
-	db: D1Database,
+	databases: AtlasDatabases,
 	atlasId: string,
 	field: string,
 	options: Omit<StatementsPageOptions, 'field'> = {}
 ): Promise<TraceResult> {
-	const page = await readStatementsPage(db, atlasId, { ...options, field }, 'trace');
+	const page = await readStatementsPage(databases, atlasId, { ...options, field }, 'trace');
 	const winner = pickWinnerStatement(page.statements);
 	return {
 		field,
@@ -901,7 +943,7 @@ export interface StatementsPageOptions {
 }
 
 async function readStatementsPage(
-	db: D1Database,
+	databases: AtlasDatabases,
 	atlasId: string,
 	options: StatementsPageOptions,
 	cursorKind: 'statements' | 'trace'
@@ -911,12 +953,12 @@ async function readStatementsPage(
 		fallback: STATEMENTS_MAX_ROWS,
 		max: STATEMENTS_MAX_ROWS
 	});
-	const liveRegenerationId = await getLiveRegenerationId(db);
+	const liveRegenerationId = await getConsistentLiveRegenerationId(databases);
 	const cursorContext = statementCursorContext(atlasId, field);
 	const offset = decodeCursor(options.cursor, cursorKind, cursorContext, liveRegenerationId);
 	let rows: StatementRowDb[];
 	if (field) {
-		const { results } = await db
+		const { results } = await databases.statementsDb
 			.prepare(
 				`SELECT ${STATEMENT_SELECT_COLUMNS} ${STATEMENT_FROM}
 				 WHERE atlas_id = ? AND field = ?
@@ -928,7 +970,7 @@ async function readStatementsPage(
 			.all<StatementRowDb>();
 		rows = results ?? [];
 	} else {
-		const { results } = await db
+		const { results } = await databases.statementsDb
 			.prepare(
 				`SELECT ${STATEMENT_SELECT_COLUMNS} ${STATEMENT_FROM}
 				 WHERE atlas_id = ?
@@ -954,11 +996,11 @@ async function readStatementsPage(
 
 /** Reads one bounded statement page directly from D1. */
 export async function getStatementsPage(
-	db: D1Database,
+	databases: AtlasDatabases,
 	atlasId: string,
 	options: StatementsPageOptions = {}
 ): Promise<StatementsPage> {
-	return readStatementsPage(db, atlasId, options, 'statements');
+	return readStatementsPage(databases, atlasId, options, 'statements');
 }
 
 export async function businessExists(db: D1Database, atlasId: string): Promise<boolean> {

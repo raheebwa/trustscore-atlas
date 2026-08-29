@@ -106,9 +106,10 @@ describe('publishable statement boundary', () => {
 			})
 		];
 		const db = statementDb(rows);
+		const databases = { db, statementsDb: db };
 
-		const statementPage = await getStatementsPage(db, 'atlas-1');
-		const trace = await getFieldTrace(db, 'atlas-1', 'canonical_name');
+		const statementPage = await getStatementsPage(databases, 'atlas-1');
+		const trace = await getFieldTrace(databases, 'atlas-1', 'canonical_name');
 
 		expect(PUBLISHABLE_STATEMENT_FIELDS).toContain('status.*');
 		expect(statementPage.statements.map((row) => row.statement_id)).toEqual(['safe']);

@@ -19,6 +19,11 @@
 			"binding": "DB",
 			"database_name": "atlas",
 			"database_id": "48f6a828-bd01-4a56-ba44-473c01b2bcea"
+		},
+		{
+			"binding": "DB_STATEMENTS",
+			"database_name": "atlas-statements",
+			"database_id": "461857bc-23c5-4405-b0cf-de155dd1df9c"
 		}
 	]
 }

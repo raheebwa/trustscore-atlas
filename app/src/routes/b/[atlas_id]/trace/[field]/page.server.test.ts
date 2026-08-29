@@ -20,7 +20,20 @@ function traceStatement(index: number): StatementRow {
 	};
 }
 
-function traceDb(rows: StatementRow[], statementSql: string[]): D1Database {
+function mainDb(): D1Database {
+	return {
+		prepare: (sql: string) => ({
+			bind: () => ({
+				first: async () => {
+					if (sql.includes('FROM meta')) return { value: 'regen-example-1' };
+					return { ok: 1 };
+				}
+			})
+		})
+	} as unknown as D1Database;
+}
+
+function statementsDb(rows: StatementRow[], statementSql: string[]): D1Database {
 	return {
 		prepare: (sql: string) => {
 			if (sql.includes('FROM statements')) statementSql.push(sql);
@@ -40,13 +53,14 @@ function traceDb(rows: StatementRow[], statementSql: string[]): D1Database {
 describe('trace page loader', () => {
 	it('returns a bounded first page and a continuation when more rows exist', async () => {
 		const statementSql: string[] = [];
-		const db = traceDb(
+		const db = mainDb();
+		const statements = statementsDb(
 			Array.from({ length: STATEMENTS_MAX_ROWS + 1 }, (_, index) => traceStatement(index)),
 			statementSql
 		);
 
 		const data = await load({
-			platform: { env: { DB: db } },
+			platform: { env: { DB: db, DB_STATEMENTS: statements } },
 			params: { atlas_id: 'atlas-example', field: 'canonical_name' },
 			url: new URL('https://atlas.example.invalid/b/atlas-example/trace/canonical_name')
 		} as never);

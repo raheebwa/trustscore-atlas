@@ -1,23 +1,31 @@
 import { error } from '@sveltejs/kit';
 import { InvalidCursorError } from '$lib/pagination';
-import { PRECEDENCE_RANKS, businessExists, getFieldTrace } from '$lib/server/atlas';
-import { requireDb } from '$lib/server/platform';
+import {
+	PRECEDENCE_RANKS,
+	RegenerationInProgressError,
+	businessExists,
+	getFieldTrace
+} from '$lib/server/atlas';
+import { requireDatabases } from '$lib/server/platform';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ platform, params, url }) => {
-	const db = requireDb(platform);
-	const exists = await businessExists(db, params.atlas_id);
+	const databases = requireDatabases(platform);
+	const exists = await businessExists(databases.db, params.atlas_id);
 	if (!exists) {
 		error(404, `No business found for atlas_id "${params.atlas_id}".`);
 	}
 
 	let trace;
 	try {
-		trace = await getFieldTrace(db, params.atlas_id, params.field, {
+		trace = await getFieldTrace(databases, params.atlas_id, params.field, {
 			cursor: url.searchParams.get('cursor')
 		});
 	} catch (cause) {
 		if (cause instanceof InvalidCursorError) error(400, 'Invalid trace cursor.');
+		if (cause instanceof RegenerationInProgressError) {
+			error(503, 'Data is being refreshed, try again in a minute.');
+		}
 		throw cause;
 	}
 	if (trace.statements.length === 0) {
