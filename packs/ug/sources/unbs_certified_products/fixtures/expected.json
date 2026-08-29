@@ -1,0 +1,16 @@
+{
+  "rows": 3,
+  "rows_dropped": 1,
+  "entities": 2,
+  "identifier_statements": 3,
+  "company": "Example Hardware Supplies Ltd",
+  "statements_for_company": {
+    "canonical_name": ["Example Hardware Supplies Ltd"],
+    "certification.product": ["Example Fortified Flour", "Example Mineral Water"],
+    "certification.standard": ["US EAS 000:2026", "US EAS 001:2026"],
+    "certification.status": ["Valid"],
+    "certification.expiry_date": ["30-06-2027", "31-12-2026"],
+    "location.district": ["Kampala"]
+  },
+  "raw_files": ["certified-products.html"]
+}

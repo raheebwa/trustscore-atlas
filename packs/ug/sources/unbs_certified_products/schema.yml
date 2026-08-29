@@ -1,0 +1,38 @@
+# Table Schema for records.parquet.
+fields:
+  - name: record_id
+    type: string
+    description: Deterministic key of the permit, product, brand and standard.
+    constraints: { required: true, pattern: "^[0-9a-f]{16}$" }
+  - name: permit_number
+    type: string
+    description: UNBS product certification permit number.
+    constraints: { required: true }
+  - name: certified_product
+    type: string
+    description: Product covered by the certification permit.
+    constraints: { required: true }
+  - name: holding_company
+    type: string
+    description: Company holding the certification permit.
+    constraints: { required: true }
+  - name: district
+    type: string
+    description: District of the permit holder or production site.
+    constraints: { required: true }
+  - name: product_brand
+    type: string
+    description: Brand published for the certified product.
+  - name: relevant_standard
+    type: string
+    description: Standard against which the product is certified.
+  - name: status
+    type: string
+    description: Certification status published by UNBS.
+  - name: expiry_date
+    type: string
+    description: Certification expiry date in the published DD-MM-YYYY format.
+  - name: source_ref
+    type: string
+    description: Full-register endpoint from which the row was parsed.
+    constraints: { required: true }

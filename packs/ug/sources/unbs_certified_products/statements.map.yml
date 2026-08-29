@@ -1,0 +1,26 @@
+country: UG
+precedence_class: regulator_or_authority
+confidence: official
+record_id:
+  columns: [permit_number, certified_product, product_brand, relevant_standard]
+entity_id:
+  columns: [holding_company, district]
+  normalise: [holding_company, district]
+source_ref:
+  from: source_ref
+statements:
+  - field: canonical_name
+    from: holding_company
+  - field: identifiers
+    identifier: ug:unbs_permit
+    from: permit_number
+  - field: certification.product
+    from: certified_product
+  - field: certification.standard
+    from: relevant_standard
+  - field: certification.status
+    from: status
+  - field: certification.expiry_date
+    from: expiry_date
+  - field: location.district
+    from: district

@@ -1,0 +1,24 @@
+slug: unbs.certified_products
+country: UG
+publisher: Uganda National Bureau of Standards
+title: Certified products
+url: https://unbs.go.ug/e-services/certified-products/
+endpoint: https://cims.unbs.go.ug/api/website/?per_page=20000
+licence: public-record
+rights: public_register
+attribution: Uganda National Bureau of Standards, certified products register (unbs.go.ug)
+cadence: monthly
+coverage: >-
+  Products and permit holders published under the UNBS Product Certification Scheme.
+precedence_class: regulator_or_authority
+pii:
+  excluded_columns: []
+  hashed_columns: []
+terms:
+  url: https://unbs.go.ug/e-services/certified-products/
+  checked_on: "2026-08-30"
+  note: >-
+    Public register returned as one server-rendered table when per_page is set above the row count.
+identifier_schemes: [ug:unbs_permit]
+adapter_version: 0.1.0
+row_count_tolerance: 0.15
