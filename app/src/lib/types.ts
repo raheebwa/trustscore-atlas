@@ -21,6 +21,7 @@ export interface FormalitySummary {
 	unknown_predicates: string[];
 	evaluation_as_of: string;
 	summary: string;
+	coverage_summary: string;
 }
 
 export interface BusinessScoreSummary {
@@ -44,9 +45,13 @@ export interface SearchResultItem {
 
 export interface SearchResponse {
 	query: string;
+	district: string;
 	total_count: number;
 	returned: number;
+	page_returned: number;
 	limit: number;
+	offset: number;
+	regeneration_id: string | null;
 	next_cursor: string | null;
 	results: SearchResultItem[];
 }

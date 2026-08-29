@@ -20,7 +20,7 @@
 </p>
 <h1 class="mt-2 text-2xl font-semibold text-stone-900">{formatFieldLabel(trace.field)}</h1>
 <p class="mt-1 text-stone-600">
-	Every statement on file for this field. The winner is highlighted.
+	Statements on this page for the field. The winning value is highlighted when it appears here.
 </p>
 
 <div class="mt-4 overflow-x-auto rounded-lg border border-stone-200 bg-white">
@@ -65,6 +65,17 @@
 		</tbody>
 	</table>
 </div>
+
+{#if trace.next_cursor}
+	<a
+		href={resolve(`/b/[atlas_id]/trace/[field]?cursor=${encodeURIComponent(trace.next_cursor)}`, {
+			atlas_id: atlasId,
+			field: trace.field
+		})}
+		class="mt-4 inline-block rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+		>Next page</a
+	>
+{/if}
 
 <section class="mt-8">
 	<h2 class="text-lg font-semibold text-stone-900">How precedence works</h2>

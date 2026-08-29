@@ -130,6 +130,27 @@
         "B",
         "A"
       ]
+    },
+    {
+      "name": "mixed offsets are ordered by instant",
+      "statements": [
+        {
+          "value": "EXAMPLE OFFSET TRADERS",
+          "precedence": 3,
+          "source_record_id": "offset-local",
+          "asserted_at": "2026-08-29T00:00:00+03:00"
+        },
+        {
+          "value": "SAMPLE OFFSET TRADERS",
+          "precedence": 3,
+          "source_record_id": "offset-utc",
+          "asserted_at": "2026-08-28T22:00:00Z"
+        }
+      ],
+      "ranked": [
+        "SAMPLE OFFSET TRADERS",
+        "EXAMPLE OFFSET TRADERS"
+      ]
     }
   ]
 }

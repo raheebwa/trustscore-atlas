@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { buildStatementsPage } from '$lib/server/atlas';
 import type { StatementRow } from '$lib/types';
-import { InvalidCursorError, decodeCursor, encodeCursor, jsonByteLength } from './pagination';
+import {
+	CURSOR_MAX_OFFSET,
+	InvalidCursorError,
+	buildSearchCursor,
+	decodeCursor,
+	encodeCursor,
+	jsonByteLength,
+	searchCursorContext,
+	statementCursorContext
+} from './pagination';
 
 function statement(index: number): StatementRow {
 	return {
@@ -21,24 +30,65 @@ function statement(index: number): StatementRow {
 }
 
 describe('cursor encoding', () => {
-	it('round trips an offset for the expected cursor kind', () => {
-		const cursor = encodeCursor('search', 40);
+	const searchContext = searchCursorContext('  Example   Hardware ', ' Kampala ');
+
+	it('round trips an offset for the expected cursor scope', () => {
+		const cursor = encodeCursor('search', 40, searchContext, 'regen-example-2');
 		expect(cursor).not.toContain('40');
-		expect(decodeCursor(cursor, 'search')).toBe(40);
+		expect(decodeCursor(cursor, 'search', searchContext, 'regen-example-2')).toBe(40);
 	});
 
-	it('rejects malformed, mismatched, and invalid offsets', () => {
-		expect(() => decodeCursor('not-valid!', 'search')).toThrow(InvalidCursorError);
-		expect(() => decodeCursor(encodeCursor('statements', 20), 'search')).toThrow(
+	it('rejects a search cursor reused with another query', () => {
+		const cursor = buildSearchCursor(20, 'Example Hardware', 'Kampala', 'regen-example-2');
+
+		expect(() =>
+			decodeCursor(
+				cursor,
+				'search',
+				searchCursorContext('Sample Bakery', 'Kampala'),
+				'regen-example-2'
+			)
+		).toThrow(InvalidCursorError);
+	});
+
+	it('rejects a cursor from a previous live regeneration', () => {
+		const cursor = buildSearchCursor(20, 'Example Hardware', 'Kampala', 'regen-example-1');
+
+		expect(() => decodeCursor(cursor, 'search', searchContext, 'regen-example-2')).toThrow(
 			InvalidCursorError
 		);
-		expect(() => encodeCursor('search', -1)).toThrow(InvalidCursorError);
+	});
+
+	it('rejects malformed, mismatched, and out-of-range offsets', () => {
+		expect(() => decodeCursor('not-valid!', 'search', searchContext, 'regen-example-2')).toThrow(
+			InvalidCursorError
+		);
+		expect(() =>
+			decodeCursor(
+				encodeCursor(
+					'statements',
+					20,
+					statementCursorContext('atlas-example', null),
+					'regen-example-2'
+				),
+				'search',
+				searchContext,
+				'regen-example-2'
+			)
+		).toThrow(InvalidCursorError);
+		expect(() => encodeCursor('search', -1, searchContext, 'regen-example-2')).toThrow(
+			InvalidCursorError
+		);
+		expect(() =>
+			encodeCursor('search', CURSOR_MAX_OFFSET + 1, searchContext, 'regen-example-2')
+		).toThrow(InvalidCursorError);
 	});
 });
 
 describe('statement byte budget', () => {
 	it('returns only whole rows that fit and advances by the returned row count', () => {
 		const byteBudget = 1_600;
+		const context = statementCursorContext('ug-example', null);
 		const page = buildStatementsPage(
 			Array.from({ length: 20 }, (_, index) => statement(index)),
 			{
@@ -47,6 +97,9 @@ describe('statement byte budget', () => {
 				offset: 10,
 				limit: 20,
 				hasMore: false,
+				cursorKind: 'statements',
+				cursorContext: context,
+				regenerationId: 'regen-example-2',
 				byteBudget
 			}
 		);
@@ -55,6 +108,30 @@ describe('statement byte budget', () => {
 		expect(page.returned).toBeLessThan(20);
 		expect(jsonByteLength(page)).toBeLessThanOrEqual(byteBudget);
 		expect(page.next_cursor).not.toBeNull();
-		expect(decodeCursor(page.next_cursor, 'statements')).toBe(10 + page.returned);
+		expect(decodeCursor(page.next_cursor, 'statements', context, 'regen-example-2')).toBe(
+			10 + page.returned
+		);
+	});
+
+	it('advances past filtered rows instead of repeating a visible statement', () => {
+		const context = statementCursorContext('ug-example', null);
+		const rows = [
+			statement(1),
+			{ ...statement(2), value: 'records@example.invalid' },
+			statement(3)
+		];
+		const page = buildStatementsPage(rows, {
+			atlasId: 'ug-example',
+			field: null,
+			offset: 10,
+			limit: 3,
+			hasMore: true,
+			cursorKind: 'statements',
+			cursorContext: context,
+			regenerationId: 'regen-example-2'
+		});
+
+		expect(page.statements.map((row) => row.statement_id)).toEqual(['statement-1', 'statement-3']);
+		expect(decodeCursor(page.next_cursor, 'statements', context, 'regen-example-2')).toBe(13);
 	});
 });

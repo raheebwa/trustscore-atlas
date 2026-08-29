@@ -1,4 +1,5 @@
 import type { BusinessRecordResponse, SearchResponse } from '$lib/types';
+import { CURSOR_MAX_OFFSET, buildSearchCursor } from '$lib/pagination';
 
 export const MAX_TOOL_RESULT_CHARS = 1500;
 
@@ -75,12 +76,24 @@ export function shapeSearchResults(response: SearchResponse): ToolTextResult {
 	}));
 
 	for (let count = mappedResults.length; count >= 0; count -= 1) {
+		const resumesInsidePage = count < mappedResults.length;
+		const continuationOffset = response.offset + count;
+		const nextCursor = resumesInsidePage
+			? count > 0 && continuationOffset <= CURSOR_MAX_OFFSET
+				? buildSearchCursor(
+						continuationOffset,
+						response.query,
+						response.district,
+						response.regeneration_id
+					)
+				: null
+			: response.next_cursor;
 		const payload = {
 			query: response.query,
 			total_count: response.total_count,
 			returned: count,
-			page_returned: response.returned,
-			next_cursor: response.next_cursor,
+			page_returned: response.page_returned,
+			next_cursor: nextCursor,
 			results: mappedResults.slice(0, count),
 			truncated: count < mappedResults.length
 		};

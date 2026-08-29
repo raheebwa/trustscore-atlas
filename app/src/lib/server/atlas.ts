@@ -16,11 +16,15 @@ import {
 import { formatCoverageSentence, formatScoreSentence } from '$lib/format';
 import { rankValues } from '$lib/ordering';
 import {
+	CURSOR_MAX_OFFSET,
 	STATEMENTS_BYTE_BUDGET,
 	STATEMENTS_MAX_ROWS,
+	buildSearchCursor,
 	decodeCursor,
 	encodeCursor,
-	jsonByteLength
+	jsonByteLength,
+	searchCursorContext,
+	statementCursorContext
 } from '$lib/pagination';
 import type {
 	BusinessRecordResponse,
@@ -38,6 +42,29 @@ import type {
 } from '$lib/types';
 
 export const LIVE_REGENERATION_KEY = 'live_regeneration';
+
+/**
+ * Statement fields that may cross the public serving boundary. An entry ending
+ * in `.*` matches only non-empty descendants of that prefix. No other wildcard
+ * form is supported.
+ */
+export const PUBLISHABLE_STATEMENT_FIELDS = [
+	'canonical_name',
+	'name_variants',
+	'entity_kind',
+	'sector.source_category',
+	'sector.source_nature',
+	'location.district',
+	'location.division_or_subcounty',
+	'location.adm2_pcode',
+	'location.adm4_pcode',
+	'identifiers',
+	'status.*'
+] as const;
+
+const CONTACT_FIELD_PATTERN = /(contact|email|phone|address)/i;
+const EMAIL_VALUE_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
+const PHONE_VALUE_PATTERN = /(?:\+\d[\d\s().-]{6,}\d|\b0\d{8,14}\b)/;
 
 /** Precedence labels shown alongside the shared total ordering contract. */
 export const PRECEDENCE_RANKS: { rank: number; label: string; explanation: string }[] = [
@@ -111,6 +138,9 @@ interface StatementRowDb {
 	precedence: number;
 	confidence: string;
 }
+
+const STATEMENT_SELECT_COLUMNS =
+	'statement_id, atlas_id, country, field, value, source, source_ref, source_record_id, asserted_at, licence, precedence, confidence';
 
 interface ScoreRowDb {
 	atlas_id: string;
@@ -243,6 +273,28 @@ function toStatementRow(row: StatementRowDb): StatementRow {
 	};
 }
 
+function isPublishableStatementField(field: string): boolean {
+	return PUBLISHABLE_STATEMENT_FIELDS.some((allowed) => {
+		if (!allowed.endsWith('.*')) return field === allowed;
+		const prefix = allowed.slice(0, -1);
+		return field.startsWith(prefix) && field.length > prefix.length;
+	});
+}
+
+function isPublishableStatement(statement: StatementRow): boolean {
+	return (
+		isPublishableStatementField(statement.field) &&
+		!CONTACT_FIELD_PATTERN.test(statement.field) &&
+		!EMAIL_VALUE_PATTERN.test(statement.value) &&
+		!PHONE_VALUE_PATTERN.test(statement.value)
+	);
+}
+
+/** Applies the public statement boundary to an in-memory row set. */
+export function filterPublishableStatements(statements: readonly StatementRow[]): StatementRow[] {
+	return statements.filter(isPublishableStatement);
+}
+
 function parseEvidence(json: string): ScoreEvidenceItem[] {
 	try {
 		const parsed: unknown = JSON.parse(json);
@@ -327,8 +379,14 @@ function pickWinnerStatement(statements: StatementRow[]): StatementRow | null {
 		.filter((statement) => statement.value === winningValue)
 		.sort((left, right) => {
 			if (left.precedence !== right.precedence) return left.precedence - right.precedence;
-			if (left.asserted_at !== right.asserted_at) {
-				return left.asserted_at > right.asserted_at ? -1 : 1;
+			const leftAssertedAt = Date.parse(left.asserted_at);
+			const rightAssertedAt = Date.parse(right.asserted_at);
+			const leftInstant = Number.isNaN(leftAssertedAt) ? Number.NEGATIVE_INFINITY : leftAssertedAt;
+			const rightInstant = Number.isNaN(rightAssertedAt)
+				? Number.NEGATIVE_INFINITY
+				: rightAssertedAt;
+			if (leftInstant !== rightInstant) {
+				return rightInstant - leftInstant;
 			}
 			if (left.source_record_id !== right.source_record_id) {
 				return left.source_record_id < right.source_record_id ? -1 : 1;
@@ -463,7 +521,8 @@ async function fetchFormalityFor(
 			unknown: score.unknown,
 			unknown_predicates: score.unknown_predicates,
 			evaluation_as_of: score.evaluation_as_of,
-			summary: score.summary
+			summary: score.summary,
+			coverage_summary: score.coverage_summary
 		});
 	}
 	return map;
@@ -482,13 +541,30 @@ export async function searchBusinesses(
 ): Promise<SearchResponse> {
 	const query = normalizeQuery(options.q ?? '');
 	const limit = clampLimit(options.limit);
-	const offset = decodeCursor(options.cursor, 'search');
+	const normalisedDistrict = options.district ? normalizeQuery(options.district) : '';
+	const liveRegenerationId = await getLiveRegenerationId(db);
+	const offset = decodeCursor(
+		options.cursor,
+		'search',
+		searchCursorContext(query, normalisedDistrict),
+		liveRegenerationId
+	);
 
 	if (query.length === 0) {
-		return { query, total_count: 0, returned: 0, limit, next_cursor: null, results: [] };
+		return {
+			query,
+			district: normalisedDistrict,
+			total_count: 0,
+			returned: 0,
+			page_returned: 0,
+			limit,
+			offset,
+			regeneration_id: liveRegenerationId,
+			next_cursor: null,
+			results: []
+		};
 	}
 
-	const normalisedDistrict = options.district ? normalizeQuery(options.district) : '';
 	const districtFilter = normalisedDistrict || null;
 	const districtClause = districtFilter
 		? ' AND (b.district = ? COLLATE NOCASE OR b.division = ? COLLATE NOCASE)'
@@ -561,10 +637,17 @@ export async function searchBusinesses(
 
 	return {
 		query,
+		district: normalisedDistrict,
 		total_count: totalCount,
 		returned: items.length,
+		page_returned: items.length,
 		limit,
-		next_cursor: hasMore ? encodeCursor('search', offset + items.length) : null,
+		offset,
+		regeneration_id: liveRegenerationId,
+		next_cursor:
+			hasMore && offset + items.length <= CURSOR_MAX_OFFSET
+				? buildSearchCursor(offset + items.length, query, normalisedDistrict, liveRegenerationId)
+				: null,
 		results: items
 	};
 }
@@ -572,16 +655,18 @@ export async function searchBusinesses(
 async function fetchStatementsFor(db: D1Database, atlasId: string): Promise<StatementRow[]> {
 	const { results } = await db
 		.prepare(
-			'SELECT * FROM statements WHERE atlas_id = ? ORDER BY field, precedence, asserted_at DESC'
+			`SELECT ${STATEMENT_SELECT_COLUMNS} FROM statements
+			 WHERE atlas_id = ?
+			 ORDER BY field, precedence, COALESCE(unixepoch(asserted_at), -9223372036854775808) DESC`
 		)
 		.bind(atlasId)
 		.all<StatementRowDb>();
-	return (results ?? []).map(toStatementRow);
+	return filterPublishableStatements((results ?? []).map(toStatementRow));
 }
 
 export function buildProvenanceTable(statements: StatementRow[]): ProvenanceRow[] {
 	const byField = new Map<string, StatementRow[]>();
-	for (const statement of statements) {
+	for (const statement of filterPublishableStatements(statements)) {
 		const list = byField.get(statement.field) ?? [];
 		list.push(statement);
 		byField.set(statement.field, list);
@@ -699,6 +784,9 @@ export async function getBusinessDetail(
 
 export interface TraceResult {
 	field: string;
+	returned: number;
+	limit: number;
+	next_cursor: string | null;
 	statements: StatementRow[];
 	winnerStatementId: string | null;
 }
@@ -706,17 +794,19 @@ export interface TraceResult {
 export async function getFieldTrace(
 	db: D1Database,
 	atlasId: string,
-	field: string
+	field: string,
+	options: Omit<StatementsPageOptions, 'field'> = {}
 ): Promise<TraceResult> {
-	const { results } = await db
-		.prepare(
-			'SELECT * FROM statements WHERE atlas_id = ? AND field = ? ORDER BY precedence ASC, asserted_at DESC'
-		)
-		.bind(atlasId, field)
-		.all<StatementRowDb>();
-	const statements = (results ?? []).map(toStatementRow);
-	const winner = pickWinnerStatement(statements);
-	return { field, statements, winnerStatementId: winner?.statement_id ?? null };
+	const page = await readStatementsPage(db, atlasId, { ...options, field }, 'trace');
+	const winner = pickWinnerStatement(page.statements);
+	return {
+		field,
+		returned: page.returned,
+		limit: page.limit,
+		next_cursor: page.next_cursor,
+		statements: page.statements,
+		winnerStatementId: winner?.statement_id ?? null
+	};
 }
 
 export interface StatementsPage {
@@ -734,20 +824,32 @@ interface BuildStatementsPageOptions {
 	offset: number;
 	limit: number;
 	hasMore: boolean;
+	cursorKind: 'statements' | 'trace';
+	cursorContext: string;
+	regenerationId: string | null;
 	byteBudget?: number;
 }
 
 function statementPagePayload(
 	statements: StatementRow[],
 	options: BuildStatementsPageOptions,
-	hasMore: boolean
+	hasMore: boolean,
+	nextOffset: number
 ): StatementsPage {
 	return {
 		atlas_id: options.atlasId,
 		field: options.field,
 		returned: statements.length,
 		limit: options.limit,
-		next_cursor: hasMore ? encodeCursor('statements', options.offset + statements.length) : null,
+		next_cursor:
+			hasMore && nextOffset <= CURSOR_MAX_OFFSET
+				? encodeCursor(
+						options.cursorKind,
+						nextOffset,
+						options.cursorContext,
+						options.regenerationId
+					)
+				: null,
 		statements
 	};
 }
@@ -759,22 +861,34 @@ export function buildStatementsPage(
 	const byteBudget = options.byteBudget ?? STATEMENTS_BYTE_BUDGET;
 	const candidates = statements.slice(0, options.limit);
 	let included: StatementRow[] = [];
+	let consumed = 0;
+	let sawPublishable = false;
 
 	for (let index = 0; index < candidates.length; index += 1) {
+		if (!isPublishableStatement(candidates[index])) {
+			consumed = index + 1;
+			continue;
+		}
+		sawPublishable = true;
 		const proposed = [...included, candidates[index]];
 		const moreAfterProposed = index < candidates.length - 1 || options.hasMore;
-		if (jsonByteLength(statementPagePayload(proposed, options, moreAfterProposed)) > byteBudget) {
+		if (
+			jsonByteLength(
+				statementPagePayload(proposed, options, moreAfterProposed, options.offset + index + 1)
+			) > byteBudget
+		) {
 			break;
 		}
 		included = proposed;
+		consumed = index + 1;
 	}
 
-	if (included.length === 0 && candidates.length > 0) {
+	if (included.length === 0 && sawPublishable) {
 		throw new Error('A statement exceeds the response byte budget');
 	}
 
-	const hasMore = included.length < candidates.length || options.hasMore;
-	return statementPagePayload(included, options, hasMore);
+	const hasMore = consumed < candidates.length || options.hasMore;
+	return statementPagePayload(included, options, hasMore, options.offset + consumed);
 }
 
 export interface StatementsPageOptions {
@@ -783,24 +897,29 @@ export interface StatementsPageOptions {
 	cursor?: string | null;
 }
 
-/** Reads one bounded statement page directly from D1. */
-export async function getStatementsPage(
+async function readStatementsPage(
 	db: D1Database,
 	atlasId: string,
-	options: StatementsPageOptions = {}
+	options: StatementsPageOptions,
+	cursorKind: 'statements' | 'trace'
 ): Promise<StatementsPage> {
 	const field = options.field || null;
 	const limit = clampLimit(options.limit, {
 		fallback: STATEMENTS_MAX_ROWS,
 		max: STATEMENTS_MAX_ROWS
 	});
-	const offset = decodeCursor(options.cursor, 'statements');
+	const liveRegenerationId = await getLiveRegenerationId(db);
+	const cursorContext = statementCursorContext(atlasId, field);
+	const offset = decodeCursor(options.cursor, cursorKind, cursorContext, liveRegenerationId);
 	let rows: StatementRowDb[];
 	if (field) {
 		const { results } = await db
 			.prepare(
-				`SELECT * FROM statements WHERE atlas_id = ? AND field = ?
-				 ORDER BY precedence ASC, asserted_at DESC, statement_id ASC LIMIT ? OFFSET ?`
+				`SELECT ${STATEMENT_SELECT_COLUMNS} FROM statements
+				 WHERE atlas_id = ? AND field = ?
+				 ORDER BY precedence ASC,
+				 COALESCE(unixepoch(asserted_at), -9223372036854775808) DESC,
+				 statement_id ASC LIMIT ? OFFSET ?`
 			)
 			.bind(atlasId, field, limit + 1, offset)
 			.all<StatementRowDb>();
@@ -808,8 +927,11 @@ export async function getStatementsPage(
 	} else {
 		const { results } = await db
 			.prepare(
-				`SELECT * FROM statements WHERE atlas_id = ?
-				 ORDER BY field, precedence ASC, asserted_at DESC, statement_id ASC LIMIT ? OFFSET ?`
+				`SELECT ${STATEMENT_SELECT_COLUMNS} FROM statements
+				 WHERE atlas_id = ?
+				 ORDER BY field, precedence ASC,
+				 COALESCE(unixepoch(asserted_at), -9223372036854775808) DESC,
+				 statement_id ASC LIMIT ? OFFSET ?`
 			)
 			.bind(atlasId, limit + 1, offset)
 			.all<StatementRowDb>();
@@ -820,8 +942,20 @@ export async function getStatementsPage(
 		field,
 		offset,
 		limit,
-		hasMore: rows.length > limit
+		hasMore: rows.length > limit,
+		cursorKind,
+		cursorContext,
+		regenerationId: liveRegenerationId
 	});
+}
+
+/** Reads one bounded statement page directly from D1. */
+export async function getStatementsPage(
+	db: D1Database,
+	atlasId: string,
+	options: StatementsPageOptions = {}
+): Promise<StatementsPage> {
+	return readStatementsPage(db, atlasId, options, 'statements');
 }
 
 export async function businessExists(db: D1Database, atlasId: string): Promise<boolean> {

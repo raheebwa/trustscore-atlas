@@ -9,6 +9,7 @@ import {
 	type ToolTextResult
 } from './tools';
 import type { BusinessRecordResponse, SearchResponse, SearchResultItem } from '$lib/types';
+import { buildSearchCursor, decodeCursor, searchCursorContext } from '$lib/pagination';
 
 const scoreSummary =
 	'Formality 25 of 55 checkable; 45 unknown (not yet checked: ura.vat_withholding_agents, ppda.ocds)';
@@ -31,7 +32,8 @@ function makeResult(index: number): SearchResultItem {
 			unknown: 45,
 			unknown_predicates: ['ura.vat_withholding_agents', 'ppda.ocds'],
 			evaluation_as_of: '2026-08-29T09:05:00Z',
-			summary: scoreSummary
+			summary: scoreSummary,
+			coverage_summary: 'found in 1 of 1 checked; 2 not yet checked'
 		}
 	};
 }
@@ -120,9 +122,13 @@ describe('shapeSearchResults', () => {
 	it('returns one compact JSON text item with paging fields', () => {
 		const response: SearchResponse = {
 			query: 'example hardware',
+			district: '',
 			total_count: 4,
 			returned: 1,
+			page_returned: 1,
 			limit: 1,
+			offset: 0,
+			regeneration_id: 'regen-example-1',
 			next_cursor: 'next-page',
 			results: [makeResult(1)]
 		};
@@ -139,9 +145,13 @@ describe('shapeSearchResults', () => {
 		const results = Array.from({ length: 20 }, (_, index) => makeResult(index));
 		const result = shapeSearchResults({
 			query: 'example',
+			district: '',
 			total_count: 20,
 			returned: 20,
+			page_returned: 20,
 			limit: 20,
+			offset: 0,
+			regeneration_id: 'regen-example-1',
 			next_cursor: null,
 			results
 		});
@@ -150,6 +160,56 @@ describe('shapeSearchResults', () => {
 		expect(result.content[0].text.length).toBeLessThanOrEqual(MAX_TOOL_RESULT_CHARS);
 		expect(value.truncated).toBe(true);
 		expect((value.results as unknown[]).length).toBeLessThan(20);
+	});
+
+	it('continues after the last result shown so every database result is reachable once', () => {
+		const query = 'example trading';
+		const district = 'Kampala';
+		const regenerationId = 'regen-example-1';
+		const allResults = Array.from({ length: 20 }, (_, index) => ({
+			...makeResult(index),
+			canonical_name: `Example ${index} ${'Trading House '.repeat(14)}`,
+			identifiers: [],
+			formality: null
+		}));
+		const seen: string[] = [];
+		let offset = 0;
+
+		for (let pageNumber = 0; pageNumber < 20; pageNumber += 1) {
+			const apiResults = allResults.slice(offset, offset + 20);
+			const apiNextOffset = offset + apiResults.length;
+			const result = shapeSearchResults({
+				query,
+				district,
+				total_count: allResults.length,
+				returned: apiResults.length,
+				page_returned: apiResults.length,
+				limit: 20,
+				offset,
+				regeneration_id: regenerationId,
+				next_cursor:
+					apiNextOffset < allResults.length
+						? buildSearchCursor(apiNextOffset, query, district, regenerationId)
+						: null,
+				results: apiResults
+			});
+			const value = parsed(result);
+			const shown = value.results as { atlas_id: string }[];
+			if (pageNumber === 0) expect(shown).toHaveLength(3);
+			seen.push(...shown.map((item) => item.atlas_id));
+
+			const nextCursor = value.next_cursor as string | null;
+			if (!nextCursor) break;
+			offset = decodeCursor(
+				nextCursor,
+				'search',
+				searchCursorContext(query, district),
+				regenerationId
+			);
+		}
+
+		expect(seen).toEqual(allResults.map((item) => item.atlas_id));
+		expect(new Set(seen).size).toBe(allResults.length);
 	});
 });
 

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildProvenanceTable } from './atlas';
+import {
+	PUBLISHABLE_STATEMENT_FIELDS,
+	buildProvenanceTable,
+	getFieldTrace,
+	getStatementsPage,
+	searchBusinesses
+} from './atlas';
 import type { StatementRow } from '$lib/types';
 
 function statement(overrides: Partial<StatementRow>): StatementRow {
@@ -71,5 +77,104 @@ describe('buildProvenanceTable', () => {
 		]);
 
 		expect(table[0].value).toBe('Example Hardware Supplies Ltd');
+	});
+});
+
+function statementDb(rows: StatementRow[]): D1Database {
+	return {
+		prepare: () => ({
+			bind: () => ({
+				all: async () => ({ results: rows }),
+				first: async () => ({ value: 'regen-example-1' })
+			})
+		})
+	} as unknown as D1Database;
+}
+
+describe('publishable statement boundary', () => {
+	it('drops contact fields and contact-like values from statement and trace response data', async () => {
+		const rows = [
+			statement({ statement_id: 'safe', value: 'Example Hardware Supplies Ltd' }),
+			statement({
+				statement_id: 'email-value',
+				value: 'records@example.invalid'
+			}),
+			statement({
+				statement_id: 'contact-field',
+				field: 'status.contact',
+				value: 'Ask at the main counter'
+			})
+		];
+		const db = statementDb(rows);
+
+		const statementPage = await getStatementsPage(db, 'atlas-1');
+		const trace = await getFieldTrace(db, 'atlas-1', 'canonical_name');
+
+		expect(PUBLISHABLE_STATEMENT_FIELDS).toContain('status.*');
+		expect(statementPage.statements.map((row) => row.statement_id)).toEqual(['safe']);
+		expect(trace.statements.map((row) => row.statement_id)).toEqual(['safe']);
+	});
+});
+
+function searchDb(): D1Database {
+	const business = {
+		atlas_id: 'atlas-search-1',
+		country: 'UG',
+		canonical_name: 'Example Hardware Supplies Ltd',
+		name_normalised: 'EXAMPLE HARDWARE SUPPLIES LTD',
+		name_variants: '[]',
+		entity_kind: 'company',
+		sector_category: 'Trade',
+		sector_nature: 'Hardware',
+		district: 'Kampala',
+		division: 'Nakawa',
+		first_seen: '2026-08-01',
+		last_seen: '2026-08-29',
+		coverage: '{}',
+		scores: JSON.stringify({
+			formality: { value: 25, max: 100, checkable: 55, unknown: 45, version: 1 }
+		})
+	};
+	const score = {
+		atlas_id: business.atlas_id,
+		rubric: 'formality',
+		version: 1,
+		regeneration_id: 'regen-example-1',
+		value: 25,
+		max: 100,
+		checkable: 55,
+		unknown: 45,
+		coverage: JSON.stringify({ applicable: 4, checked: 2, found_in: 1, not_yet_checked: 2 }),
+		evidence: '[]',
+		evaluation_as_of: '2026-08-29T00:00:00Z'
+	};
+
+	return {
+		prepare: (sql: string) => ({
+			bind: () => ({
+				first: async () => {
+					if (sql.includes('FROM meta')) return { value: 'regen-example-1' };
+					if (sql.includes('COUNT(*)')) return { n: 1 };
+					return null;
+				},
+				all: async () => {
+					if (sql.includes('FROM businesses_fts')) return { results: [business] };
+					if (sql.includes('FROM identifiers')) return { results: [] };
+					if (sql.includes('FROM scores')) return { results: [score] };
+					return { results: [] };
+				}
+			})
+		})
+	} as unknown as D1Database;
+}
+
+describe('search result shaping', () => {
+	it('places the score coverage sentence in each formality result', async () => {
+		const response = await searchBusinesses(searchDb(), { q: 'Example Hardware' });
+
+		expect(response.results[0].formality).toMatchObject({
+			summary: expect.stringContaining('Formality 25 of 55 checkable'),
+			coverage_summary: 'found in 1 of 2 checked; 2 not yet checked'
+		});
 	});
 });

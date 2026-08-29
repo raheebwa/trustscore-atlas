@@ -64,6 +64,7 @@
 						{#if item.formality}
 							<span class="max-w-xl rounded-lg bg-stone-100 px-3 py-1 text-sm text-stone-700">
 								<span class="font-medium">{item.formality.summary}</span>
+								<span class="block text-xs text-stone-500">{item.formality.coverage_summary}</span>
 								<span class="block text-xs text-stone-500"
 									>Evaluated {item.formality.evaluation_as_of}</span
 								>

@@ -19,4 +19,23 @@ describe('rankValues golden contract', () => {
 			expect(rankValues(testCase.statements), testCase.name).toEqual(testCase.ranked);
 		}
 	});
+
+	it('treats invalid asserted timestamps as older than valid timestamps', () => {
+		expect(
+			rankValues([
+				{
+					value: 'Example Invalid Date Traders',
+					precedence: 3,
+					source_record_id: 'invalid-date',
+					asserted_at: 'not-a-date'
+				},
+				{
+					value: 'Sample Valid Date Traders',
+					precedence: 3,
+					source_record_id: 'valid-date',
+					asserted_at: '2026-08-28T22:00:00Z'
+				}
+			])
+		).toEqual(['Sample Valid Date Traders', 'Example Invalid Date Traders']);
+	});
 });
