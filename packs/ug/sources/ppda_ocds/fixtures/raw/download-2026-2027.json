@@ -1,0 +1,104 @@
+{
+  "uri": "https://example.invalid/ppda/ocds/2026-2027.json",
+  "version": "1.1",
+  "publishedDate": "2026-08-20T00:00:00Z",
+  "publisher": {
+    "name": "Example Open Contracting Publisher"
+  },
+  "releases": [
+    {
+      "ocid": "ocds-example-000003",
+      "id": "ocds-example-000003-2026-07-15",
+      "date": "2026-07-15T00:00:00Z",
+      "tag": ["award", "contract"],
+      "buyer": {
+        "id": "UG-PPDA-000003",
+        "name": "Example District Local Government"
+      },
+      "parties": [
+        {
+          "id": "UG-PPDA-000001",
+          "name": "Example Hardware Supplies Ltd",
+          "roles": ["supplier", "tenderer"]
+        },
+        {
+          "id": "UG-PPDA-000003",
+          "name": "Example District Local Government",
+          "roles": ["buyer", "procuringEntity"]
+        }
+      ],
+      "tender": {
+        "id": "TENDER-000003",
+        "title": "Example equipment tender",
+        "tenderers": []
+      },
+      "awards": [
+        {
+          "id": "AWARD-000003",
+          "date": "2026-07-05T00:00:00Z",
+          "suppliers": [
+            {
+              "id": "UG-PPDA-000001",
+              "name": "Example Hardware Supplies Ltd"
+            }
+          ]
+        }
+      ],
+      "contracts": [
+        {
+          "id": "CONTRACT-000003",
+          "awardID": "AWARD-000003",
+          "dateSigned": "2026-07-15T00:00:00Z",
+          "period": {
+            "startDate": "2026-07-20T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "ocid": "ocds-example-000004",
+      "id": "ocds-example-000004-2026-07-10",
+      "date": "2026-07-10T00:00:00Z",
+      "tag": ["award"],
+      "buyer": {
+        "id": "UG-PPDA-000003",
+        "name": "Example District Local Government"
+      },
+      "parties": [
+        {
+          "id": "UG-PPDA-000002",
+          "name": "Example Office Furnishings Ltd",
+          "roles": ["supplier"]
+        },
+        {
+          "id": "UG-PPDA-000003",
+          "name": "Example District Local Government",
+          "roles": ["buyer", "procuringEntity"]
+        }
+      ],
+      "tender": {
+        "id": "TENDER-000004",
+        "title": "Example office furnishing tender",
+        "tenderers": [
+          {
+            "id": "UG-PPDA-000002",
+            "name": "Example Office Furnishings Ltd"
+          }
+        ]
+      },
+      "awards": [
+        {
+          "id": "AWARD-000004",
+          "date": "2026-07-10T00:00:00Z",
+          "suppliers": [
+            {
+              "id": "UG-PPDA-000002",
+              "name": "Example Office Furnishings Ltd"
+            }
+          ]
+        }
+      ],
+      "contracts": []
+    }
+  ]
+}

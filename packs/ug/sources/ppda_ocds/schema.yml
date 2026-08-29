@@ -1,0 +1,54 @@
+# Table Schema for records.parquet after party aggregation and personal-data exclusion.
+fields:
+  - name: record_id
+    type: string
+    description: Deterministic key of the PPDA party identifier.
+    constraints: { required: true, pattern: "^[0-9a-f]{16}$" }
+  - name: party_id
+    type: string
+    description: PPDA OCDS party identifier.
+    constraints: { required: true, pattern: "^[A-Za-z0-9_.:-]+$" }
+  - name: name
+    type: string
+    description: Latest non-empty party name across the selected fiscal years.
+    constraints: { required: true }
+  - name: roles
+    type: string
+    description: Distinct OCDS party roles, sorted and joined with semicolons.
+  - name: is_buyer
+    type: string
+    description: True when the party has a buyer role or is named as a release buyer.
+    constraints: { required: true }
+  - name: awards_count
+    type: string
+    description: Awards that name the party as a supplier.
+    constraints: { required: true }
+  - name: distinct_buyers
+    type: string
+    description: Distinct release buyer identifiers across the party's supplier awards.
+    constraints: { required: true }
+  - name: first_award_date
+    type: string
+    description: Earliest supplier award date in ISO 8601 date format.
+  - name: last_award_date
+    type: string
+    description: Latest supplier award date in ISO 8601 date format.
+  - name: contracts_count
+    type: string
+    description: Contracts linked to awards that name the party as a supplier.
+    constraints: { required: true }
+  - name: last_contract_date
+    type: string
+    description: Latest contract dateSigned or period.startDate in ISO 8601 date format.
+  - name: tenders_count
+    type: string
+    description: Tenders that name the party as a tenderer.
+    constraints: { required: true }
+  - name: years_seen
+    type: string
+    description: Fiscal years containing the party, sorted and joined with semicolons.
+    constraints: { required: true }
+  - name: source_ref
+    type: string
+    description: PPDA OCDS export endpoint used to build the aggregate.
+    constraints: { required: true }

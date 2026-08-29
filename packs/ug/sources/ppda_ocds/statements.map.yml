@@ -1,0 +1,31 @@
+country: UG
+precedence_class: regulator_or_authority
+confidence: official
+record_id:
+  columns: [party_id]
+entity_id:
+  columns: [party_id]
+source_ref:
+  from: source_ref
+statements:
+  - field: canonical_name
+    from: name
+  - field: identifiers
+    identifier: ug:ppda_party_id
+    from: party_id
+  - field: procurement.roles
+    from: roles
+  - field: procurement.awards_count
+    from: awards_count
+  - field: procurement.distinct_buyers
+    from: distinct_buyers
+  - field: procurement.first_award_date
+    from: first_award_date
+  - field: procurement.last_award_date
+    from: last_award_date
+  - field: procurement.contracts_count
+    from: contracts_count
+  - field: procurement.last_contract_date
+    from: last_contract_date
+  - field: procurement.tenders_count
+    from: tenders_count

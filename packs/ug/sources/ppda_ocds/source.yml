@@ -1,0 +1,27 @@
+slug: ppda.ocds
+country: UG
+publisher: Public Procurement and Disposal of Public Assets Authority
+title: OCDS parties and procurement history
+url: https://gpp.ppda.go.ug/public/open-data/ocds/ocds-datasets
+endpoint: https://cdn.ppda.go.ug/api/open-data/v2/ocds
+licence: CC-BY-4.0
+rights: open_licence
+attribution: >-
+  Public Procurement and Disposal of Public Assets Authority, Uganda OCDS open data
+  (ppda.go.ug)
+cadence: weekly
+coverage: >-
+  Parties named in PPDA OCDS release packages, aggregated with their tender, award, buyer,
+  and contract history across published fiscal years.
+precedence_class: regulator_or_authority
+pii:
+  excluded_columns: [contact_name, telephone, email]
+  hashed_columns: []
+terms:
+  url: https://gpp.ppda.go.ug/public/open-data/ocds/ocds-datasets
+  checked_on: "2026-08-30"
+  note: >-
+    OCDS release packages are published under CC-BY-4.0 through the public export endpoint.
+identifier_schemes: [ug:ppda_party_id]
+adapter_version: 0.1.0
+row_count_tolerance: 0.15

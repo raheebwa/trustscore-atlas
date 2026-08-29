@@ -1,0 +1,113 @@
+{
+  "uri": "https://example.invalid/ppda/ocds/2025-2026.json",
+  "version": "1.1",
+  "publishedDate": "2026-06-30T00:00:00Z",
+  "publisher": {
+    "name": "Example Open Contracting Publisher"
+  },
+  "releases": [
+    {
+      "ocid": "ocds-example-000001",
+      "id": "ocds-example-000001-2025-08-10",
+      "date": "2025-08-10T00:00:00Z",
+      "tag": ["award", "contract"],
+      "buyer": {
+        "id": "UG-PPDA-000003",
+        "name": "Example District Local Government"
+      },
+      "parties": [
+        {
+          "id": "UG-PPDA-000001",
+          "name": "Example Hardware Supplies Ltd",
+          "roles": ["supplier", "tenderer"]
+        },
+        {
+          "id": "UG-PPDA-000003",
+          "name": "Example District Local Government",
+          "roles": ["buyer", "procuringEntity"],
+          "contactPoint": {
+            "name": "Example Contact Person",
+            "telephone": "+256700000000",
+            "email": "contact@example.invalid"
+          }
+        }
+      ],
+      "tender": {
+        "id": "TENDER-000001",
+        "title": "Example hardware supply tender",
+        "tenderers": [
+          {
+            "id": "UG-PPDA-000001",
+            "name": "Example Hardware Supplies Ltd"
+          }
+        ]
+      },
+      "awards": [
+        {
+          "id": "AWARD-000001",
+          "date": "2025-08-10T00:00:00Z",
+          "suppliers": [
+            {
+              "id": "UG-PPDA-000001",
+              "name": "Example Hardware Supplies Ltd"
+            }
+          ]
+        }
+      ],
+      "contracts": [
+        {
+          "id": "CONTRACT-000001",
+          "awardID": "AWARD-000001",
+          "period": {
+            "startDate": "2025-09-01T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "ocid": "ocds-example-000002",
+      "id": "ocds-example-000002-2026-02-12",
+      "date": "2026-02-12T00:00:00Z",
+      "tag": ["award"],
+      "buyer": {
+        "id": "UG-PPDA-000004",
+        "name": "Example Municipal Council"
+      },
+      "parties": [
+        {
+          "id": "UG-PPDA-000001",
+          "name": "Example Hardware Supplies Ltd",
+          "roles": ["supplier", "tenderer"]
+        }
+      ],
+      "tender": {
+        "id": "TENDER-000002",
+        "title": "Example maintenance supplies tender",
+        "tenderers": [
+          {
+            "id": "UG-PPDA-000001",
+            "name": "Example Hardware Supplies Ltd"
+          }
+        ]
+      },
+      "awards": [
+        {
+          "id": "AWARD-000002",
+          "date": "2026-02-12T00:00:00Z",
+          "suppliers": [
+            {
+              "id": "UG-PPDA-000001",
+              "name": "Example Hardware Supplies Ltd"
+            }
+          ]
+        }
+      ],
+      "contracts": []
+    },
+    {
+      "ocid": "",
+      "id": "malformed-release",
+      "parties": "invalid"
+    }
+  ]
+}

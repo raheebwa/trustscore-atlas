@@ -1,0 +1,34 @@
+{
+  "years": ["2026-2027", "2025-2026"],
+  "rows": 3,
+  "rows_dropped": 1,
+  "entities": 3,
+  "identifier_statements": 3,
+  "company": "Example Hardware Supplies Ltd",
+  "company_record": {
+    "party_id": "UG-PPDA-000001",
+    "name": "Example Hardware Supplies Ltd",
+    "roles": "supplier;tenderer",
+    "is_buyer": "false",
+    "awards_count": "3",
+    "distinct_buyers": "2",
+    "first_award_date": "2025-08-10",
+    "last_award_date": "2026-07-05",
+    "contracts_count": "2",
+    "last_contract_date": "2026-07-15",
+    "tenders_count": "2",
+    "years_seen": "2025-2026;2026-2027"
+  },
+  "statements_for_company": {
+    "canonical_name": ["Example Hardware Supplies Ltd"],
+    "procurement.roles": ["supplier;tenderer"],
+    "procurement.awards_count": ["3"],
+    "procurement.distinct_buyers": ["2"],
+    "procurement.first_award_date": ["2025-08-10"],
+    "procurement.last_award_date": ["2026-07-05"],
+    "procurement.contracts_count": ["2"],
+    "procurement.last_contract_date": ["2026-07-15"],
+    "procurement.tenders_count": ["2"]
+  },
+  "raw_files": ["ppda-2025-2026.json", "ppda-2026-2027.json"]
+}
