@@ -147,8 +147,8 @@ def test_serving_statements_keep_country(tmp_path):
     _run(spec, tmp_path)
     out = _regen(tmp_path)
     db = sqlite3.connect(":memory:")
-    apply_batch(db, (out.directory / "stage.sql").read_text().splitlines())
-    apply_batch(db, (out.directory / "swap.sql").read_text().splitlines())
+    apply_batch(db, (out.directory / "statements-stage.sql").read_text().splitlines())
+    apply_batch(db, (out.directory / "statements-swap.sql").read_text().splitlines())
     assert db.execute("SELECT DISTINCT country FROM statements").fetchall() == [("UG",)]
 
 

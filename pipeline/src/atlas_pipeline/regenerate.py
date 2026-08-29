@@ -17,7 +17,7 @@ from .score import load_rubric, score
 
 PHASE0_RUBRICS = ("formality",)
 # Regenerated tables dropped before a load so the free-plan peak stays under the cap.
-PRELUDE_DROPS = ("statements", "scores", "businesses_fts")
+PRELUDE_DROPS = {"DB": ("scores", "businesses_fts"), "DB_STATEMENTS": ("statements",)}
 
 
 @dataclass
@@ -250,27 +250,39 @@ def regenerate(
         "finished_at": finished.isoformat().replace("+00:00", "Z"),
         "inputs": inputs,
     }
-    stage = regeneration_sql(
-        schema_path, regeneration, resolution.businesses, resolution.statements, scores, sources
-    )
     # Free-plan size discipline: staged tables sit beside live ones during an import, so the
     # loader first drops the largest live table. The previous regeneration's stage.sql and
     # swap.sql stay on disk as the rollback path; trace reads fail closed during the load.
-    (out / "prelude.sql").write_text(
-        "\n".join(f"DROP TABLE IF EXISTS {table};" for table in PRELUDE_DROPS) + "\n"
-    )
-    (out / "stage.sql").write_text("\n".join(stage) + "\n")
-    (out / "swap.sql").write_text("\n".join(swap_sql(schema_path, regeneration)) + "\n")
+    load_order: dict[str, list[str]] = {}
+    for database, prefix in (("DB", ""), ("DB_STATEMENTS", "statements-")):
+        sql = regeneration_sql(
+            schema_path,
+            regeneration,
+            resolution.businesses,
+            resolution.statements,
+            scores,
+            sources,
+            database=database,
+        )
+        (out / f"{prefix}prelude.sql").write_text(
+            "\n".join(f"DROP TABLE IF EXISTS {t};" for t in PRELUDE_DROPS[database]) + "\n"
+        )
+        (out / f"{prefix}stage.sql").write_text("\n".join(sql) + "\n")
+        (out / f"{prefix}swap.sql").write_text(
+            "\n".join(swap_sql(schema_path, regeneration, database=database)) + "\n"
+        )
+        load_order[database] = [f"{prefix}prelude.sql", f"{prefix}stage.sql", f"{prefix}swap.sql"]
     summary = regeneration | {
         "counts": {
             "businesses": len(resolution.businesses),
             "statements": len(resolution.statements),
             "scores": len(scores),
-            "stage_statements": len(stage),
+            "stage_statements": sum(1 for _ in open(out / "stage.sql"))
+            + sum(1 for _ in open(out / "statements-stage.sql")),
         },
         "sources": sources,
         "new_entities": len(resolution.new_entities),
-        "load_order": ["prelude.sql", "stage.sql", "swap.sql"],
+        "load_order": load_order,
     }
     (out / "regeneration.json").write_text(json.dumps(summary, indent=2) + "\n")
     return Regeneration(out, summary)

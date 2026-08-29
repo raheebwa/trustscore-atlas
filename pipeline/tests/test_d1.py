@@ -132,13 +132,22 @@ def test_regeneration_sql_loads_into_sqlite_and_swap_makes_it_live():
     assert db.execute("SELECT count(*) FROM businesses").fetchone()[0] == 0
     for s in swap:
         db.execute(s)
+    second = sqlite3.connect(":memory:")
+    second.executescript(SCHEMA.read_text())
+    stage_s = regeneration_sql(
+        SCHEMA, regeneration, businesses, statements, scores, sources, database="DB_STATEMENTS"
+    )
+    swap_s = swap_sql(SCHEMA, regeneration, database="DB_STATEMENTS")
+    assert all(len(s.encode()) <= STATEMENT_LIMIT for s in stage_s + swap_s)
+    for s in stage_s + swap_s:
+        second.execute(s)
     assert db.execute("SELECT value FROM meta WHERE key='live_regeneration'").fetchone()[0] == rid
     assert db.execute("SELECT canonical_name, division, scores FROM businesses").fetchone() == (
         "EXAMPLE BAKERY LTD",
         "Central Division",
         '{"formality":{"checkable":25,"max":100,"unknown":75,"value":25,"version":1}}',
     )
-    assert db.execute("SELECT count(*) FROM statements").fetchone()[0] == 1
+    assert second.execute("SELECT count(*) FROM statements").fetchone()[0] == 1
     assert db.execute("SELECT scheme, value FROM identifiers").fetchone() == (
         "ug:kcca_licence",
         "aaaa",
@@ -169,8 +178,10 @@ def test_statement_references_are_normalised_into_a_refs_table():
         },
         {**statements[0], "statement_id": "s3", "source_ref": "https://example.org/other"},
     ]
-    stage = regeneration_sql(SCHEMA, regeneration, businesses, statements, scores, sources)
-    swap = swap_sql(SCHEMA, regeneration)
+    stage = regeneration_sql(
+        SCHEMA, regeneration, businesses, statements, scores, sources, database="DB_STATEMENTS"
+    )
+    swap = swap_sql(SCHEMA, regeneration, database="DB_STATEMENTS")
     db = sqlite3.connect(":memory:")
     apply_batch(db, stage)
     apply_batch(db, swap)

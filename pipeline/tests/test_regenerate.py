@@ -86,10 +86,67 @@ def test_regenerate_writes_a_prelude_that_frees_the_largest_live_table(tmp_path:
         schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
     )
     prelude = (out.directory / "prelude.sql").read_text().splitlines()
-    assert prelude == [
-        "DROP TABLE IF EXISTS statements;",
-        "DROP TABLE IF EXISTS scores;",
-        "DROP TABLE IF EXISTS businesses_fts;",
-    ]
+    assert prelude == ["DROP TABLE IF EXISTS scores;", "DROP TABLE IF EXISTS businesses_fts;"]
+    statements_prelude = (out.directory / "statements-prelude.sql").read_text().splitlines()
+    assert statements_prelude == ["DROP TABLE IF EXISTS statements;"]
     order = json.loads((out.directory / "regeneration.json").read_text())["load_order"]
-    assert order == ["prelude.sql", "stage.sql", "swap.sql"]
+    assert order["DB"] == ["prelude.sql", "stage.sql", "swap.sql"]
+
+
+def test_regenerate_splits_statements_into_a_second_database(tmp_path: Path):
+    """On the free plan each database stays under 500 MB, so statements and refs load into a
+    second database bound as DB_STATEMENTS. The writer emits one prelude/stage/swap set per
+    database and the load order names both."""
+    import sqlite3
+
+    from atlas_pipeline.d1 import apply_batch
+
+    spec = load_adapter(ADAPTER)
+    pages = {
+        spec.module.query_url(n): (ADAPTER / "fixtures" / "raw" / f"{_slug(n)}.html").read_bytes()
+        for n in EXPECTED["natures"]
+    }
+    run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=lambda url, **_: pages[url],
+        salt=SALT,
+        params={"natures": EXPECTED["natures"]},
+    )
+    out = regenerate(
+        pack_dir=PACKS / "ug",
+        data_root=tmp_path,
+        regeneration_id="20260829T210000Z",
+        computed_at="2026-08-29T21:00:00Z",
+        rubrics_dir=PACKS.parent / "rubrics",
+        schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
+    )
+    order = json.loads((out.directory / "regeneration.json").read_text())["load_order"]
+    assert order == {
+        "DB": ["prelude.sql", "stage.sql", "swap.sql"],
+        "DB_STATEMENTS": [
+            "statements-prelude.sql",
+            "statements-stage.sql",
+            "statements-swap.sql",
+        ],
+    }
+    main = sqlite3.connect(":memory:")
+    for name in ("prelude.sql", "stage.sql", "swap.sql"):
+        apply_batch(main, (out.directory / name).read_text())
+    assert main.execute("SELECT count(*) FROM businesses").fetchone() == (EXPECTED["entities"],)
+    assert main.execute(
+        "SELECT count(*) FROM sqlite_master WHERE name IN ('statements', 'refs')"
+    ).fetchone() == (0,)
+    second = sqlite3.connect(":memory:")
+    for name in ("statements-prelude.sql", "statements-stage.sql", "statements-swap.sql"):
+        apply_batch(second, (out.directory / name).read_text())
+    assert second.execute("SELECT count(*) FROM statements").fetchone() == (EXPECTED["rows"] * 6,)
+    assert second.execute("SELECT count(*) FROM refs").fetchone()[0] >= 1
+    assert second.execute("SELECT value FROM meta WHERE key='live_regeneration'").fetchone() == (
+        "20260829T210000Z",
+    )
+    assert second.execute(
+        "SELECT count(*) FROM sqlite_master WHERE name = 'businesses'"
+    ).fetchone() == (0,)

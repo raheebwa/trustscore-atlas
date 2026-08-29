@@ -13,15 +13,14 @@ from pathlib import Path
 
 STATEMENT_LIMIT = 100_000
 _TARGET = 90_000
-STAGED_TABLES = (
-    "businesses",
-    "identifiers",
-    "statements",
-    "refs",
-    "scores",
-    "sources",
-    "businesses_fts",
-)
+# Two databases on the free plan: the main serving database and one holding statements and
+# their references. Each has its own regenerations and meta tables so the live pointer can be
+# read from either.
+DATABASES = {
+    "DB": ("businesses", "identifiers", "scores", "sources", "businesses_fts"),
+    "DB_STATEMENTS": ("statements", "refs"),
+}
+STAGED_TABLES = DATABASES["DB"] + DATABASES["DB_STATEMENTS"]
 PERSISTENT_TABLES = ("regenerations", "meta")
 
 BUSINESS_COLUMNS = [
@@ -97,6 +96,11 @@ def _staged(statement: str, rid: str) -> str:
         lambda m: f"CREATE {m.group(1) or ''}TABLE {m.group(2)}__{rid}",
         statement,
     )
+
+
+def _index_table(statement: str) -> str | None:
+    m = re.match(r"^CREATE INDEX \w+ ON (\w+)", statement)
+    return m.group(1) if m else None
 
 
 def _table_of(statement: str) -> str | None:
@@ -191,15 +195,32 @@ def regeneration_sql(
     statements: list[dict],
     scores: list[dict],
     sources: list[dict],
+    database: str = "DB",
 ) -> list[str]:
+    """Staged tables and inserts for one database (see DATABASES)."""
     rid = _check_regeneration_id(regeneration["id"])
+    tables = DATABASES[database]
     out: list[str] = []
     for stmt in _schema_statements(schema_path):
         table = _table_of(stmt)
-        if table in STAGED_TABLES:
+        if table in tables:
             out.append(_staged(stmt, rid))
         elif table in PERSISTENT_TABLES:
             out.append(stmt.replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS", 1))
+    if database == "DB_STATEMENTS":
+        refs = {s["source_ref"]: ref_id(s["source_ref"]) for s in statements}
+        out += insert_statements(
+            f"statements__{rid}",
+            STATEMENT_COLUMNS,
+            [{**s, "ref_id": refs[s["source_ref"]]} for s in statements],
+        )
+        out += insert_statements(
+            f"refs__{rid}",
+            ["ref_id", "source_ref"],
+            [{"ref_id": rid_, "source_ref": ref} for ref, rid_ in sorted(refs.items())],
+        )
+        out += _regeneration_row(regeneration)
+        return out
     out += insert_statements(
         f"businesses__{rid}", BUSINESS_COLUMNS, business_rows(businesses, scores)
     )
@@ -207,17 +228,6 @@ def regeneration_sql(
         f"identifiers__{rid}",
         ["atlas_id", "scheme", "value", "source"],
         [{"atlas_id": b["atlas_id"], **i} for b in businesses for i in b["identifiers"]],
-    )
-    refs = {s["source_ref"]: ref_id(s["source_ref"]) for s in statements}
-    out += insert_statements(
-        f"statements__{rid}",
-        STATEMENT_COLUMNS,
-        [{**s, "ref_id": refs[s["source_ref"]]} for s in statements],
-    )
-    out += insert_statements(
-        f"refs__{rid}",
-        ["ref_id", "source_ref"],
-        [{"ref_id": rid_, "source_ref": ref} for ref, rid_ in sorted(refs.items())],
     )
     out += insert_statements(
         f"scores__{rid}",
@@ -246,22 +256,27 @@ def regeneration_sql(
             for b in businesses
         ],
     )
-    out += insert_statements(
+    out += _regeneration_row(regeneration)
+    return out
+
+
+def _regeneration_row(regeneration: dict) -> list[str]:
+    return insert_statements(
         "regenerations",
         ["id", "started_at", "finished_at", "inputs", "status"],
         [{**regeneration, "inputs": _json(regeneration["inputs"]), "status": "staged"}],
     )
-    return out
 
 
-def swap_sql(schema_path: Path, regeneration: dict) -> list[str]:
+def swap_sql(schema_path: Path, regeneration: dict, database: str = "DB") -> list[str]:
     rid = _check_regeneration_id(regeneration["id"])
+    tables = DATABASES[database]
     out: list[str] = []
-    for table in STAGED_TABLES:
+    for table in tables:
         out.append(f"DROP TABLE IF EXISTS {table};")
         out.append(f"ALTER TABLE {table}__{rid} RENAME TO {table};")
     for stmt in _schema_statements(schema_path):
-        if stmt.startswith("CREATE INDEX"):
+        if stmt.startswith("CREATE INDEX") and _index_table(stmt) in tables:
             out.append(stmt)
     out.append(
         f"INSERT OR REPLACE INTO meta (key, value) VALUES ('live_regeneration', {quote(rid)});"
