@@ -40,8 +40,14 @@ def _source_status(
     """A snapshot run keeps the register honest: the source is stale, with the original pull
     date and, when known, the date the register started returning nothing."""
     snapshot = manifest.get("snapshot")
-    if not snapshot:
+    observation = manifest.get("observation")
+    if not snapshot and not observation:
         return "fresh", None
+    if observation:
+        note = observation["note"]
+        if slug in empty_since and empty_since[slug] not in note:
+            note += f"; register returning nothing since {empty_since[slug]}"
+        return "stale", note
     observed = snapshot["observed_at"][:10]
     note = f"last successful pull {observed}"
     if slug in empty_since:

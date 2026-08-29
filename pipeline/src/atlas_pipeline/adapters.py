@@ -176,6 +176,8 @@ def run_adapter(
     snapshot: Path | None = None,
     snapshot_at: datetime | None = None,
     snapshot_ref: str | None = None,
+    observed_at: datetime | None = None,
+    observation_note: str | None = None,
 ) -> RunResult:
     if replay_from is not None and started_at is None:
         # A replay re-derives records from the original observation; the assertion time is the
@@ -188,6 +190,10 @@ def run_adapter(
                 "a snapshot run needs snapshot_at (original pull time) and snapshot_ref"
             )
         started_at = snapshot_at
+    if observed_at is not None:
+        if not observation_note:
+            raise ValueError("observed_at needs an observation_note saying what was received when")
+        started_at = observed_at
     started_at = started_at or datetime.now(UTC)
     run_id = run_id or datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     salt = salt or os.environ.get("ATLAS_LINKAGE_SALT")
@@ -247,6 +253,11 @@ def run_adapter(
         "checksums": {"records_parquet": records_sha, "statements_parquet": statements_sha},
         "flags": flags,
     }
+    if observed_at is not None:
+        manifest["observation"] = {
+            "observed_at": started_at.isoformat().replace("+00:00", "Z"),
+            "note": observation_note,
+        }
     if snapshot is not None:
         manifest["snapshot"] = {
             "file": Path(snapshot).name,

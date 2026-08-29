@@ -130,6 +130,24 @@
         }
       },
       "description": "Present when the run loaded a dated typed table received earlier instead of pulling the register; observed_at is the original pull time and every statement's asserted_at."
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observed_at",
+        "note"
+      ],
+      "properties": {
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "description": "Present when the raw material was received on an earlier date than the run (mirrored packages, for example); observed_at is every statement's asserted_at."
     }
   }
 }

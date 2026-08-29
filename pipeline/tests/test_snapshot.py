@@ -112,3 +112,39 @@ def test_snapshot_source_is_reported_stale_with_the_dates(tmp_path):
         "last successful pull 2026-05-12; portal returning empty results since 2026-08-29"
     )
     assert "status_note" in (out.directory / "stage.sql").read_text()
+
+
+def test_received_earlier_run_sets_observation_time_on_every_statement(tmp_path):
+    """Raw material received on an earlier date (for example mirrored release packages) runs
+    through the adapter as raw, with asserted_at fixed to the date it was received."""
+    spec = load_adapter(PACKS / "ug" / "sources" / "ppda_ocds")
+    packages = PACKS / "ug" / "sources" / "ppda_ocds" / "fixtures" / "raw"
+
+    def refuse(url, **_):
+        raise AssertionError(f"network fetch attempted: {url}")
+
+    result = run_adapter(
+        spec,
+        data_root=tmp_path / "data",
+        run_id=RUN_ID,
+        fetcher=refuse,
+        salt=SALT,
+        params={"packages_dir": str(packages)},
+        observed_at=datetime(2026, 8, 28, tzinfo=UTC),
+        observation_note=(
+            "release packages received 2026-08-28; export API failing since 2026-08-29"
+        ),
+    )
+    manifest = result.manifest
+    assert manifest["started_at"] == "2026-08-28T00:00:00Z"
+    assert manifest["observation"] == {
+        "observed_at": "2026-08-28T00:00:00Z",
+        "note": "release packages received 2026-08-28; export API failing since 2026-08-29",
+    }
+    assert manifest["rows"] > 0
+    statements = pq.read_table(result.output_dir / "statements.parquet").to_pylist()
+    assert {s["asserted_at"] for s in statements} == {datetime(2026, 8, 28, tzinfo=UTC)}
+    assert {o["name"] for o in manifest["raw_objects"]} == {
+        "ppda-2025-2026.json",
+        "ppda-2026-2027.json",
+    }

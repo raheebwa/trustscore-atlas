@@ -27,6 +27,10 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--snapshot-at", help="original pull time of the snapshot, ISO 8601 UTC")
     run.add_argument("--snapshot-ref", help="source reference recorded on every snapshot statement")
     run.add_argument(
+        "--observed-at", help="when raw material given via params was received, ISO 8601 UTC"
+    )
+    run.add_argument("--observation-note", help="what was received when, shown on the sources page")
+    run.add_argument(
         "--replay-from", type=Path, help="manifest.json of a run whose raw objects to reuse"
     )
     regen = sub.add_parser("regenerate", help="resolve, score and write serving sql for a pack")
@@ -72,6 +76,12 @@ def main(argv: list[str] | None = None) -> int:
             else None
         ),
         snapshot_ref=args.snapshot_ref,
+        observed_at=(
+            datetime.fromisoformat(args.observed_at.replace("Z", "+00:00"))
+            if args.observed_at
+            else None
+        ),
+        observation_note=args.observation_note,
     )
     findings = check_run(args.adapter_dir, result.output_dir)
     print(json.dumps({"manifest": result.manifest, "conformance": findings}, indent=2))

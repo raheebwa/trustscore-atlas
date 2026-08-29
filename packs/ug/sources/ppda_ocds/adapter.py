@@ -3,6 +3,7 @@
 import json
 import re
 from datetime import date, datetime
+from pathlib import Path
 from urllib.parse import quote
 
 BASE = "https://cdn.ppda.go.ug/api/open-data/v2/ocds"
@@ -228,10 +229,30 @@ def _record(party_id: str, party: dict) -> dict:
     }
 
 
+def _packages_from_dir(directory: Path) -> list[tuple[str, bytes]]:
+    """Release packages received earlier, one file per fiscal year, named download-<fy>.json
+    or gpp_ocds_<yyyy>_<yyyy>.json."""
+    found = []
+    for path in sorted(directory.iterdir()):
+        match = re.fullmatch(r"(?:download-|gpp_ocds_)(\d{4})[-_](\d{4})\.json", path.name)
+        if match:
+            found.append((f"{match.group(1)}-{match.group(2)}", path.read_bytes()))
+    if not found:
+        raise RuntimeError(f"no release packages found in {directory}")
+    return found
+
+
+def _packages(ctx) -> list[tuple[str, bytes]]:
+    packages_dir = ctx.params.get("packages_dir")
+    if packages_dir:
+        value = packages_dir[0] if isinstance(packages_dir, list) else packages_dir
+        return _packages_from_dir(Path(value))
+    return [(year, _download_package(ctx, year)[0]) for year in _available_years(ctx)]
+
+
 def run(ctx) -> None:
     parties = {}
-    for year in _available_years(ctx):
-        body, _ = _download_package(ctx, year)
+    for year, body in _packages(ctx):
         ctx.raw.put(f"ppda-{year}.json", body)
         package = _json_object(body, f"release package for {year}")
         releases = package.get("releases")
