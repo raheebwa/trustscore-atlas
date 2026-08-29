@@ -1,0 +1,30 @@
+import { describe, expect, it } from 'vitest';
+import { formatCoverageSentence, formatScoreSentence } from './format';
+
+describe('formatCoverageSentence', () => {
+	it('uses checked and pending register counts', () => {
+		expect(
+			formatCoverageSentence({
+				checked: ['kcca.businesses', 'ura.tin'],
+				found_in: ['kcca.businesses'],
+				not_yet_checked: ['ura.vat_withholding_agents', 'ppda.ocds']
+			})
+		).toBe('found in 1 of 2 checked; 2 not yet checked');
+	});
+});
+
+describe('formatScoreSentence', () => {
+	it('shows value, checkable points, unknown points, and pending predicates', () => {
+		expect(
+			formatScoreSentence({
+				rubric: 'formality',
+				value: 25,
+				checkable: 55,
+				unknown: 45,
+				unknown_predicates: ['ura.vat_withholding_agents', 'ppda.ocds']
+			})
+		).toBe(
+			'Formality 25 of 55 checkable; 45 unknown (not yet checked: ura.vat_withholding_agents, ppda.ocds)'
+		);
+	});
+});

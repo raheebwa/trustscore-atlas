@@ -1,0 +1,23 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "trustscore-atlas",
+	"account_id": "53507fd9f24ec74c3e6bcc88ba25c816",
+	"compatibility_date": "2026-08-29",
+	"compatibility_flags": ["nodejs_als"],
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	},
+	"workers_dev": true,
+	"preview_urls": true,
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "atlas",
+			// Placeholder. The real database_id is set at deploy time (docs/ARCHITECTURE.md section 10);
+			// it is not committed for the production database.
+			"database_id": "00000000-0000-0000-0000-000000000000"
+		}
+	]
+}
