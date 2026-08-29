@@ -57,3 +57,35 @@ def test_regenerate_from_one_source(tmp_path: Path):
     assert summary["inputs"] == {"kcca.businesses": RUN_ID}
     assert summary["counts"]["businesses"] == EXPECTED["entities"]
     assert summary["sources"][0]["status"] == "fresh"
+
+
+def test_regenerate_writes_a_prelude_that_frees_the_largest_live_table(tmp_path: Path):
+    """On the free plan a database may not exceed 500 MB. Staged tables sit beside live ones
+    during an import, so the loader drops the largest live table (statements) before loading
+    and keeps the previous regeneration's SQL as the rollback path."""
+    spec = load_adapter(ADAPTER)
+    pages = {
+        spec.module.query_url(n): (ADAPTER / "fixtures" / "raw" / f"{_slug(n)}.html").read_bytes()
+        for n in EXPECTED["natures"]
+    }
+    run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=lambda url, **_: pages[url],
+        salt=SALT,
+        params={"natures": EXPECTED["natures"]},
+    )
+    out = regenerate(
+        pack_dir=PACKS / "ug",
+        data_root=tmp_path,
+        regeneration_id="20260829T210000Z",
+        computed_at="2026-08-29T21:00:00Z",
+        rubrics_dir=PACKS.parent / "rubrics",
+        schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
+    )
+    prelude = (out.directory / "prelude.sql").read_text().splitlines()
+    assert prelude == ["DROP TABLE IF EXISTS statements;"]
+    order = json.loads((out.directory / "regeneration.json").read_text())["load_order"]
+    assert order == ["prelude.sql", "stage.sql", "swap.sql"]

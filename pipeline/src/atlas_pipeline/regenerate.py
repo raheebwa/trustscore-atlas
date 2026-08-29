@@ -227,6 +227,10 @@ def regenerate(
     stage = regeneration_sql(
         schema_path, regeneration, resolution.businesses, resolution.statements, scores, sources
     )
+    # Free-plan size discipline: staged tables sit beside live ones during an import, so the
+    # loader first drops the largest live table. The previous regeneration's stage.sql and
+    # swap.sql stay on disk as the rollback path; trace reads fail closed during the load.
+    (out / "prelude.sql").write_text("DROP TABLE IF EXISTS statements;\n")
     (out / "stage.sql").write_text("\n".join(stage) + "\n")
     (out / "swap.sql").write_text("\n".join(swap_sql(schema_path, regeneration)) + "\n")
     summary = regeneration | {
@@ -237,6 +241,8 @@ def regenerate(
             "stage_statements": len(stage),
         },
         "sources": sources,
+        "new_entities": len(resolution.new_entities),
+        "load_order": ["prelude.sql", "stage.sql", "swap.sql"],
     }
     (out / "regeneration.json").write_text(json.dumps(summary, indent=2) + "\n")
     return Regeneration(out, summary)
