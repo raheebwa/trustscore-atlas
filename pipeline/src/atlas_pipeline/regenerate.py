@@ -11,7 +11,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
-from .adapters import STATEMENT_ARROW_SCHEMA, accepted_run
+from .adapters import FAILURE_FILE, STATEMENT_ARROW_SCHEMA, accepted_run
 from .d1 import regeneration_sql, segment_rows, swap_sql
 from .linkage import MODEL_VERSION as LINKAGE_MODEL_VERSION
 from .linkage import name_candidates
@@ -67,6 +67,34 @@ def _source_status(
     if slug in empty_since:
         note += f"; portal returning empty results since {empty_since[slug]}"
     return "stale", note
+
+
+def _failure_status(failure: dict | None, accepted_at: str | None) -> tuple[str, str] | None:
+    """How a source reads when its last run failed.
+
+    A register that stopped answering keeps serving the run that was accepted, because stale data
+    with a date on it beats no data. What it must not do is read as fresh: the page says failed,
+    with the day the run failed and the day the data it is still serving came from.
+    """
+    if not failure or not failure.get("failed_at"):
+        return None
+    failed_at = str(failure["failed_at"])
+    if accepted_at and failed_at <= str(accepted_at):
+        return None
+    note = f"last run failed {failed_at[:10]}"
+    if accepted_at:
+        note += f"; still serving the run accepted {str(accepted_at)[:10]}"
+    return "failed", note
+
+
+def _read_failure(source_dir: Path) -> dict | None:
+    path = source_dir / FAILURE_FILE
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError:
+        return None
 
 
 def _placeholder(key: str) -> str | None:
@@ -168,10 +196,17 @@ def _load_pack(pack_dir: Path, data_root: Path, empty_since: dict[str, str] | No
             )
         }
         source_dir = data_root / "sources" / iso2 / _source_dir(slug)
+        failure = _read_failure(source_dir)
         run_dir = accepted_run(source_dir) if state == "loaded" else None
         if run_dir is None:
+            failed = _failure_status(failure, None)
             sources.append(
-                row | {"adapter_version": source.get("adapter_version"), "status": state}
+                row
+                | {
+                    "adapter_version": source.get("adapter_version"),
+                    "status": failed[0] if failed else state,
+                    **({"status_note": failed[1]} if failed else {}),
+                }
             )
             continue
         manifest = json.loads((run_dir / "manifest.json").read_text())
@@ -179,6 +214,11 @@ def _load_pack(pack_dir: Path, data_root: Path, empty_since: dict[str, str] | No
         statements += pq.read_table(run_dir / "statements.parquet").to_pylist()
         inputs[slug] = manifest["run_id"]
         status, note = _source_status(slug, manifest, empty_since or {})
+        # A run that failed after the accepted one is what the page reports, whatever the accepted
+        # run would have said on its own.
+        failed = _failure_status(failure, manifest["started_at"])
+        if failed:
+            status, note = failed
         sources.append(
             row
             | {

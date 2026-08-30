@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
+import atlas_pipeline.regenerate as regenerate_module
 from atlas_pipeline.adapters import load_adapter, run_adapter
 from atlas_pipeline.regenerate import regenerate
 
@@ -594,3 +595,28 @@ def test_regenerate_describes_registers_without_adapters_from_the_pack(tmp_path:
     assert rows["cma.licensed_firms"]["cadence"] == "quarterly"
     assert rows["cma.licensed_firms"]["status"] == "not_loaded"
     assert "unknown" not in {s["title"] for s in out.summary["sources"]}
+
+
+def test_a_source_whose_run_failed_reads_as_failed_while_serving_its_accepted_run():
+    """Stale data with a date on it beats no data; reading as fresh while broken is the lie."""
+    accepted = "2026-08-24T03:00:00Z"
+
+    assert regenerate_module._failure_status(None, accepted) is None
+    # A failure older than the accepted run is history: the register answered after it.
+    assert (
+        regenerate_module._failure_status({"failed_at": "2026-08-01T03:00:00Z"}, accepted) is None
+    )
+
+    status, note = regenerate_module._failure_status(
+        {"failed_at": "2026-08-30T03:00:00Z"}, accepted
+    )
+    assert status == "failed"
+    assert "failed 2026-08-30" in note
+    assert "accepted 2026-08-24" in note
+
+
+def test_a_source_that_has_never_been_accepted_still_reports_its_failure():
+    status, note = regenerate_module._failure_status({"failed_at": "2026-08-30T03:00:00Z"}, None)
+
+    assert status == "failed"
+    assert note == "last run failed 2026-08-30"

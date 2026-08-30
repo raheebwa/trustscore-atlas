@@ -272,6 +272,34 @@ def run_adapter(
     return RunResult(output_dir=output_dir, raw_dir=raw_dir, manifest=manifest)
 
 
+FAILURE_FILE = "last_failure.json"
+
+
+def source_directory(spec: AdapterSpec, data_root: Path) -> Path:
+    """Where this source's runs, pointer and failure note live."""
+    return Path(data_root) / "sources" / spec.iso2 / spec.slug_dir
+
+
+def record_failure(source_dir: Path, *, reason: str, at: datetime | None = None) -> Path:
+    """Note that a run failed, beside the runs it failed to join.
+
+    A register whose export breaks keeps serving its last accepted run, which is right: stale data
+    with a date on it beats no data. But a page that says fresh while today's pull failed is a lie
+    of omission, so the failure is written down where the next regeneration will read it.
+    """
+    source_dir = Path(source_dir)
+    source_dir.mkdir(parents=True, exist_ok=True)
+    path = source_dir / FAILURE_FILE
+    moment = (at or datetime.now(UTC)).isoformat().replace("+00:00", "Z")
+    path.write_text(json.dumps({"failed_at": moment, "reason": reason}) + "\n")
+    return path
+
+
+def clear_failure(source_dir: Path) -> None:
+    """A run that was accepted ends the failure: the register is answering again."""
+    (Path(source_dir) / FAILURE_FILE).unlink(missing_ok=True)
+
+
 def accept_run(source_dir: Path, run_id: str, *, findings: list[str]) -> bool:
     """Move the accepted pointer to a complete run, only when the conformance findings are
     empty and the manifest carries no flags. The run stays on disk either way."""

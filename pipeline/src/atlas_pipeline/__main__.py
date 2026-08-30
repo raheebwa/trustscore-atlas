@@ -8,12 +8,25 @@ from datetime import datetime
 from pathlib import Path
 
 from . import boundaries
-from .adapters import accept_run, load_adapter, run_adapter
+from .adapters import (
+    accept_run,
+    clear_failure,
+    load_adapter,
+    record_failure,
+    run_adapter,
+    source_directory,
+)
 from .bundle import publish_bundle
 from .churn_guard import check_churn, compare_bundles, report_json
 from .conformance import check_run
 from .maintainer_labels import compile_maintainer_labels
-from .refresh import CADENCES, due_adapter_directories, restore_bundle
+from .refresh import (
+    CADENCES,
+    due_adapter_directories,
+    outcome_sentence,
+    restore_bundle,
+    run_outcome,
+)
 from .regenerate import regenerate
 from .regeneration_requests import (
     REQUEST_KINDS,
@@ -69,6 +82,15 @@ def main(argv: list[str] | None = None) -> int:
     due = sub.add_parser("due", help="list adapter directories due for a cadence")
     due.add_argument("--cadence", required=True, choices=CADENCES)
     due.add_argument("--packs-dir", type=Path, default=Path("packs"))
+    outcome = sub.add_parser(
+        "outcome", help="what a set of source runs adds up to, as JSON on stdout"
+    )
+    outcome.add_argument("--results", type=Path, required=True)
+    outcome.add_argument(
+        "--sentence",
+        action="store_true",
+        help="print one line for a run summary instead of the JSON",
+    )
     restore = sub.add_parser("restore", help="restore working state from a download bundle")
     restore.add_argument("--bundle", type=Path, required=True)
     restore.add_argument("--data-root", type=Path, required=True)
@@ -149,6 +171,11 @@ def main(argv: list[str] | None = None) -> int:
         for adapter_dir in due_adapter_directories(args.packs_dir, args.cadence):
             print(adapter_dir)
         return 0
+    if args.command == "outcome":
+        result = run_outcome(args.results)
+        print(outcome_sentence(result) if args.sentence else json.dumps(result))
+        # A refresh with nothing to publish stops here; one that lost a source carries on.
+        return 1 if result["state"] == "blocked" else 0
     if args.command == "restore":
         try:
             result = restore_bundle(
@@ -234,31 +261,42 @@ def main(argv: list[str] | None = None) -> int:
         params[key] = value.split(",")
     previous = json.loads(args.previous_manifest.read_text()) if args.previous_manifest else None
     spec = load_adapter(args.adapter_dir)
-    result = run_adapter(
-        spec,
-        data_root=args.data_root,
-        params=params,
-        previous_manifest=previous,
-        replay_from=args.replay_from,
-        snapshot=args.snapshot,
-        snapshot_at=(
-            datetime.fromisoformat(args.snapshot_at.replace("Z", "+00:00"))
-            if args.snapshot_at
-            else None
-        ),
-        snapshot_ref=args.snapshot_ref,
-        observed_at=(
-            datetime.fromisoformat(args.observed_at.replace("Z", "+00:00"))
-            if args.observed_at
-            else None
-        ),
-        observation_note=args.observation_note,
-        accept=False,
-    )
+    source_dir = source_directory(spec, args.data_root)
+    try:
+        result = run_adapter(
+            spec,
+            data_root=args.data_root,
+            params=params,
+            previous_manifest=previous,
+            replay_from=args.replay_from,
+            snapshot=args.snapshot,
+            snapshot_at=(
+                datetime.fromisoformat(args.snapshot_at.replace("Z", "+00:00"))
+                if args.snapshot_at
+                else None
+            ),
+            snapshot_ref=args.snapshot_ref,
+            observed_at=(
+                datetime.fromisoformat(args.observed_at.replace("Z", "+00:00"))
+                if args.observed_at
+                else None
+            ),
+            observation_note=args.observation_note,
+            accept=False,
+        )
+    except Exception:
+        # The register did not answer, or answered something the adapter could not read. The last
+        # accepted run stays exactly where it is; what changes is that the failure is on record.
+        record_failure(source_dir, reason="run_error")
+        raise
     findings = check_run(args.adapter_dir, result.output_dir)
     accepted = accept_run(
         result.output_dir.parents[1], result.manifest["run_id"], findings=findings
     )
+    if accepted:
+        clear_failure(source_dir)
+    else:
+        record_failure(source_dir, reason="conformance" if findings else "not_accepted")
     print(
         json.dumps(
             {"manifest": result.manifest, "conformance": findings, "accepted": accepted}, indent=2

@@ -12,7 +12,12 @@ import pytest
 import atlas_pipeline.__main__ as cli
 from atlas_pipeline.__main__ import main
 from atlas_pipeline.maintainer_labels import compile_maintainer_labels
-from atlas_pipeline.refresh import due_adapter_directories, restore_bundle
+from atlas_pipeline.refresh import (
+    due_adapter_directories,
+    outcome_sentence,
+    restore_bundle,
+    run_outcome,
+)
 from atlas_pipeline.regeneration_requests import mark_request, next_pending_request
 from atlas_pipeline.remote_d1 import RemoteD1, sql_text
 
@@ -228,7 +233,11 @@ def test_run_cli_returns_nonzero_and_does_not_accept_conformance_rejection(
         manifest={"run_id": "run-1", "source": "example.source", "rows": 1},
     )
     accepted_calls = []
-    monkeypatch.setattr(cli, "load_adapter", lambda _path: object())
+    # The stub stands in for a real adapter spec, which knows the pack it belongs to: that is
+    # what tells the command where this source's runs and its failure note live.
+    monkeypatch.setattr(
+        cli, "load_adapter", lambda _path: SimpleNamespace(iso2="ug", slug_dir="example")
+    )
     monkeypatch.setattr(cli, "run_adapter", lambda *_args, **_kwargs: result)
     monkeypatch.setattr(cli, "check_run", lambda *_args: ["identifier fails pattern"])
     monkeypatch.setattr(
@@ -242,6 +251,12 @@ def test_run_cli_returns_nonzero_and_does_not_accept_conformance_rejection(
     assert main(["run", str(adapter_dir), "--data-root", str(tmp_path / "data")]) == 1
     assert accepted_calls == [(output_dir.parents[1], "run-1", ["identifier fails pattern"])]
     assert json.loads(capsys.readouterr().out)["accepted"] is False
+    # A run that was not accepted is a run that failed, and the page has to be able to say so.
+    failure = json.loads(
+        (tmp_path / "data" / "sources" / "ug" / "example" / "last_failure.json").read_text()
+    )
+    assert failure["reason"] == "conformance"
+    assert failure["failed_at"].endswith("Z")
 
 
 def _maintainer_label(label_id: str, labelled_at: str, reason: str = "Reviewed") -> dict:
@@ -536,3 +551,71 @@ def test_restore_refuses_a_bundle_without_the_canonical_state_unless_allowed(tmp
     assert main(["restore", "--bundle", str(bundle), "--data-root", str(data_root)]) == 1
     result = restore_bundle(bundle=bundle, data_root=data_root, allow_fresh=True)
     assert result["canonical"] == []
+
+
+def _results(tmp_path, rows):
+    path = tmp_path / "source-results.tsv"
+    path.write_text("".join("\t".join(row) + "\n" for row in rows))
+    return path
+
+
+def test_a_run_where_every_source_succeeded_is_simply_ok(tmp_path):
+    outcome = run_outcome(
+        _results(tmp_path, [("packs/ug/sources/a", "10", "ok"), ("packs/ug/sources/b", "2", "ok")])
+    )
+
+    assert outcome == {"attempted": 2, "succeeded": 2, "failed": [], "state": "ok"}
+
+
+def test_one_publisher_failing_does_not_stop_the_others_from_being_published(tmp_path):
+    """A register that failed keeps its last accepted run; the rest of the refresh still lands.
+
+    The export job of one publisher failing on their side is an ordinary Tuesday. Refusing to
+    regenerate because of it means the whole country's data goes stale for a week over one file.
+    """
+    outcome = run_outcome(
+        _results(
+            tmp_path,
+            [
+                ("packs/ug/sources/a", "10", "ok"),
+                ("packs/ug/sources/ppda_ocds", "unknown", "failed"),
+            ],
+        )
+    )
+
+    assert outcome["state"] == "partial"
+    assert outcome["failed"] == ["packs/ug/sources/ppda_ocds"]
+    assert outcome["succeeded"] == 1
+
+
+def test_a_run_where_nothing_succeeded_is_blocked(tmp_path):
+    """Nothing new arrived, so regenerating would only rewrite what is already published."""
+    outcome = run_outcome(_results(tmp_path, [("packs/ug/sources/a", "unknown", "failed")]))
+
+    assert outcome["state"] == "blocked"
+    assert outcome["failed"] == ["packs/ug/sources/a"]
+
+
+def test_a_run_with_nothing_due_is_neither_partial_nor_blocked(tmp_path):
+    assert run_outcome(_results(tmp_path, []))["state"] == "none"
+    assert run_outcome(tmp_path / "absent.tsv")["state"] == "none"
+
+
+def test_the_summary_line_names_what_failed_and_what_it_means(tmp_path):
+    partial = run_outcome(
+        _results(
+            tmp_path,
+            [
+                ("packs/ug/sources/a", "10", "ok"),
+                ("packs/ug/sources/ppda_ocds", "unknown", "failed"),
+            ],
+        )
+    )
+
+    assert outcome_sentence(partial) == (
+        "Partial refresh: `packs/ug/sources/ppda_ocds` failed and kept the last accepted run."
+    )
+    assert outcome_sentence(run_outcome(_results(tmp_path, []))) == "No source was due."
+    assert "nothing was regenerated" in outcome_sentence(
+        run_outcome(_results(tmp_path, [("packs/ug/sources/a", "unknown", "failed")]))
+    )

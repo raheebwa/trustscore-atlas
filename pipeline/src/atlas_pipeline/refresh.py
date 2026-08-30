@@ -34,6 +34,49 @@ def _safe_manifest_value(value: object, *, field: str, pattern: re.Pattern[str])
     return value
 
 
+def run_outcome(results_path: Path) -> dict:
+    """What a set of source runs adds up to.
+
+    One publisher's export failing is an ordinary Tuesday, and refusing to regenerate over it
+    would leave a whole country's data stale for a week. A source that failed keeps its last
+    accepted run and is named here; the refresh goes on as long as something succeeded. Only a
+    run where nothing succeeded has nothing to publish.
+    """
+    rows = []
+    if results_path.exists():
+        for line in results_path.read_text().splitlines():
+            if not line.strip():
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 3:
+                rows.append((parts[0], parts[2]))
+
+    failed = [adapter for adapter, status in rows if status != "ok"]
+    succeeded = len(rows) - len(failed)
+    if not rows:
+        state = "none"
+    elif succeeded == 0:
+        state = "blocked"
+    elif failed:
+        state = "partial"
+    else:
+        state = "ok"
+    return {"attempted": len(rows), "succeeded": succeeded, "failed": failed, "state": state}
+
+
+def outcome_sentence(outcome: dict) -> str:
+    """One line for the run summary, in the words a reader of the run needs."""
+    state = outcome["state"]
+    if state == "partial":
+        names = ", ".join(f"`{name}`" for name in outcome["failed"])
+        return f"Partial refresh: {names} failed and kept the last accepted run."
+    if state == "blocked":
+        return "No due source succeeded, so nothing was regenerated."
+    if state == "none":
+        return "No source was due."
+    return "Every due source succeeded."
+
+
 def restore_bundle(*, bundle: Path, data_root: Path, allow_fresh: bool = False) -> dict:
     """Restore accepted source runs and durable canonical state from a bundle."""
     bundle = Path(bundle)

@@ -204,7 +204,6 @@ jobs:
             pipeline/.venv/bin/python -m atlas_pipeline due \
               --cadence "$CADENCE" --packs-dir packs >data/refresh/due-sources.txt
           fi
-          failures=0
           while IFS= read -r adapter_dir; do
             [[ -n $adapter_dir ]] || continue
             log_name=${adapter_dir//\//_}
@@ -214,7 +213,6 @@ jobs:
               status=ok
             else
               status=failed
-              failures=$((failures + 1))
             fi
             cat "$run_log"
             if rows=$(pipeline/.venv/bin/python -c \
@@ -234,10 +232,11 @@ jobs:
             cp "$manifest" "$destination"
           done < <(find "$GITHUB_WORKSPACE/data/sources" -path '*/runs/*/manifest.json' \
             -newer data/refresh/run-marker -print0)
-          if [[ $failures -ne 0 ]]; then
-            echo "$failures source run(s) failed" >&2
-            exit 1
-          fi
+          # A source that failed keeps its last accepted run and is named in the summary. The
+          # refresh goes on as long as something succeeded; only a run with nothing to publish
+          # stops here, and the command's own exit status is what decides that.
+          pipeline/.venv/bin/python -m atlas_pipeline outcome \
+            --results data/refresh/source-results.tsv | tee data/refresh/outcome.json
 
       - name: Regenerate serving data
         if: ${{ !inputs.smoke }}
@@ -345,6 +344,11 @@ jobs:
             echo
             echo "### Sources run"
             echo
+            if [[ -f data/refresh/source-results.tsv ]]; then
+              pipeline/.venv/bin/python -m atlas_pipeline outcome \
+                --results data/refresh/source-results.tsv --sentence
+              echo
+            fi
             echo "| Adapter | Rows | Status |"
             echo "| --- | ---: | --- |"
             if [[ -s data/refresh/source-results.tsv ]]; then
