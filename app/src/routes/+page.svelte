@@ -13,8 +13,8 @@
 <section class="flex flex-col gap-4 text-center">
 	<h1 class="text-3xl font-semibold tracking-tight text-stone-900">TrustScore Atlas</h1>
 	<p class="mx-auto max-w-xl text-stone-600">
-		Public business records from Uganda's government registers, harmonised into one record per
-		business with field-level provenance and deterministic scores.
+		Public business records from the government registers of Uganda and Kenya, harmonised into one
+		record per business with field-level provenance and deterministic scores.
 	</p>
 
 	<form method="get" action="/search" class="mx-auto flex w-full max-w-lg gap-2 pt-2">
