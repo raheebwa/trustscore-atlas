@@ -93,6 +93,18 @@ The site also exposes ordinary HTML forms as declarative tools. Each form uses `
 | `claim_business_form` | `/claim/<atlas_id>` | Record a confirmed claim request for the business on this page. Submitting this form asserts the claimant's role; verification happens afterwards through the listed routes. | `atlas_id`: opaque ID of the business on this page. `claimant_role`: owner or director, authorised employee, or authorised representative. |
 | `report_issue_form` | `/b/<atlas_id>` | Report a problem with the business record on this page. The report is recorded as unconfirmed and a confirmation page follows; maintainers review confirmed reports. | `atlas_id`: opaque ID of the business on this page. `description`: what is wrong in plain words, 10 to 2,000 characters. |
 
+## Tested in ChatGPT
+
+ChatGPT's desktop browser discovers the same tools. On the home page its site-tools control lists the four tools this route registers, counted there as three reads and one write.
+
+![The ChatGPT site-tools control listing search_businesses, get_business, find_segment and report_issue on the Atlas home page](docs/assets/chatgpt-site-tools.png)
+
+Asked "Using the tools on this page, look up Roofings Limited and tell me which registers cite it, with each identifier and the date it last confirmed it", GPT-5.6 Sol worked for 3 minutes 55 seconds and answered from the record rather than from the page text. It picked ROOFINGS LIMITED in Nakawa Division, Kampala over the similarly named Nile Roofings Limited, gave the Atlas ID, and then listed each register with its identifiers and the date that register last confirmed them: KCCA trading licences and the standards bureau on 29 August 2026, URA customs agents and URA VAT withholding agents on 12 May 2026.
+
+![ChatGPT answering with one register per line, its identifiers and its confirmation date, beside the Atlas record](docs/assets/chatgpt-answer.png)
+
+It closed on the sentence the record itself carries: the company is found in 4 of the 8 registers checked, with another 4 not yet checked. That line is the point of the exercise. A model reading this site reports what has not been checked as plainly as what has.
+
 ## Chrome WebMCP evals
 
 The captured production run used Chrome 152 with `--enable-features=WebMCP`, driven over the Chrome DevTools Protocol. Discovery called `document.modelContext.getTools()` and execution called `document.modelContext.executeTool()`. The table reports a saved capture from a local Chrome session against the live site; it is not rerun at build time. Reproduce with the runner in [app/scripts/webmcp-evals.mjs](app/scripts/webmcp-evals.mjs): start Chrome with `--enable-features=WebMCP --remote-debugging-port=9333`, open the site in a tab, then run `node app/scripts/webmcp-evals.mjs https://atlas.trustscorehq.com evals.md`.
