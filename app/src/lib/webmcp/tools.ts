@@ -10,6 +10,17 @@ import type {
 } from '$lib/types';
 import { CURSOR_MAX_OFFSET, buildSearchCursor } from '$lib/pagination';
 import { buildClaimConfirmationText } from '$lib/claims';
+import {
+	CORRECTABLE_FIELDS,
+	FIELD_AUTHORITY_MESSAGE,
+	buildCorrectionConfirmationText,
+	buildIssueConfirmationText,
+	buildLinkageConfirmationText,
+	isCorrectableField,
+	type CorrectionInput,
+	type IssueInput,
+	type LinkageLabelInput
+} from '$lib/write-requests';
 
 export const MAX_TOOL_RESULT_CHARS = 1500;
 
@@ -30,6 +41,9 @@ export interface StartClaimDependencies {
 	confirm: (message: string) => boolean;
 	signal?: AbortSignal;
 }
+
+export type WriteExecutionContext = StartClaimExecutionContext;
+export type WriteExecutionDependencies = StartClaimDependencies;
 
 export const SEARCH_BUSINESSES_TOOL = {
 	name: 'search_businesses',
@@ -212,6 +226,96 @@ export const START_CLAIM_TOOL = {
 			}
 		},
 		required: ['atlas_id', 'claimant_role']
+	},
+	annotations: { readOnlyHint: false }
+} as const;
+
+export const SUBMIT_CORRECTION_TOOL = {
+	name: 'submit_correction',
+	description:
+		'Record a field correction request with supporting evidence. Confirms in the page when supported, otherwise returns a 24-hour page-confirmation URL. Published records do not change until review.',
+	inputSchema: {
+		type: 'object',
+		properties: {
+			atlas_id: {
+				type: 'string',
+				maxLength: 200,
+				description: 'Opaque atlas_id of the business record.'
+			},
+			field: {
+				type: 'string',
+				enum: CORRECTABLE_FIELDS,
+				description: 'Published field to correct.'
+			},
+			value: {
+				type: 'string',
+				maxLength: 2000,
+				description: 'Proposed replacement value.'
+			},
+			evidence_url: {
+				type: 'string',
+				format: 'uri',
+				maxLength: 1000,
+				description: 'Public evidence URL supporting the correction.'
+			}
+		},
+		required: ['atlas_id', 'field', 'value', 'evidence_url']
+	},
+	annotations: { readOnlyHint: false }
+} as const;
+
+export const LABEL_LINKAGE_TOOL = {
+	name: 'label_linkage',
+	description:
+		'Record whether an existing linkage candidate pair is a match or non-match. Confirms in the page when supported, otherwise returns a 24-hour page-confirmation URL. It never merges records directly.',
+	inputSchema: {
+		type: 'object',
+		properties: {
+			atlas_id: {
+				type: 'string',
+				maxLength: 200,
+				description: 'Opaque atlas_id of the first business record.'
+			},
+			candidate_atlas_id: {
+				type: 'string',
+				maxLength: 200,
+				description: 'Opaque atlas_id of the candidate business record.'
+			},
+			verdict: {
+				type: 'string',
+				enum: ['match', 'non_match'],
+				description: 'Whether the candidate pair is a match or non-match.'
+			}
+		},
+		required: ['atlas_id', 'candidate_atlas_id', 'verdict']
+	},
+	annotations: { readOnlyHint: false }
+} as const;
+
+export const REPORT_ISSUE_TOOL = {
+	name: 'report_issue',
+	description:
+		'Record an issue for review, optionally scoped to a business or source. Confirms in the page when supported, otherwise returns a 24-hour page-confirmation URL. It does not change published records.',
+	inputSchema: {
+		type: 'object',
+		properties: {
+			atlas_id: {
+				type: 'string',
+				maxLength: 200,
+				description: 'Optional opaque atlas_id related to the issue.'
+			},
+			source: {
+				type: 'string',
+				maxLength: 200,
+				description: 'Optional register source slug related to the issue.'
+			},
+			description: {
+				type: 'string',
+				maxLength: 2000,
+				description: 'Clear description of the issue to review.'
+			}
+		},
+		required: ['description']
 	},
 	annotations: { readOnlyHint: false }
 } as const;
@@ -434,6 +538,130 @@ export async function executeStartClaim(
 				verification_steps: confirmationResult.data.verification_steps
 			})
 		: shapeToolError('claim_confirmation_failed');
+}
+
+interface PendingWriteResponse {
+	status: string;
+	confirm_url: string;
+	expires_at: string;
+	[key: string]: unknown;
+}
+
+interface ConfirmedWriteResponse {
+	status: string;
+	[key: string]: unknown;
+}
+
+interface WriteExecutionSpec<TInput extends object> {
+	createPath: string;
+	idKey: 'correction_id' | 'label_id' | 'issue_id';
+	confirmationText: (input: TInput) => string;
+}
+
+async function executeWriteRequest<TInput extends object>(
+	input: TInput,
+	context: WriteExecutionContext | undefined,
+	dependencies: WriteExecutionDependencies,
+	spec: WriteExecutionSpec<TInput>
+): Promise<ToolTextResult> {
+	const signal = context?.signal ?? dependencies.signal;
+	const createRequest = () =>
+		dependencies.fetchJson<PendingWriteResponse>(spec.createPath, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(input),
+			signal
+		});
+
+	if (typeof context?.requestUserInteraction !== 'function') {
+		const result = await createRequest();
+		const requestId = result.data?.[spec.idKey];
+		if (!result.data || result.data.status !== 'unconfirmed' || typeof requestId !== 'string') {
+			return shapeToolError('request_failed');
+		}
+		return textResult({
+			status: 'confirmation_required',
+			[spec.idKey]: requestId,
+			confirm_url: result.data.confirm_url,
+			expires_at: result.data.expires_at,
+			message: 'Open confirm_url in this browser to confirm the request; it expires in 24 hours.'
+		});
+	}
+
+	let confirmed: boolean;
+	try {
+		confirmed = await context.requestUserInteraction(async () =>
+			dependencies.confirm(spec.confirmationText(input))
+		);
+	} catch {
+		return shapeToolError('confirmation_failed');
+	}
+	if (!confirmed) return shapeToolError('request_cancelled');
+
+	const created = await createRequest();
+	const requestId = created.data?.[spec.idKey];
+	if (!created.data || created.data.status !== 'unconfirmed' || typeof requestId !== 'string') {
+		return shapeToolError('request_failed');
+	}
+	const token = new URL(created.data.confirm_url, 'https://atlas.example.invalid').searchParams.get(
+		'token'
+	);
+	if (!token) return shapeToolError('confirmation_failed');
+
+	const confirmation = await dependencies.fetchJson<ConfirmedWriteResponse>(
+		`${spec.createPath}/${encodeURIComponent(requestId)}/confirm`,
+		{
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ token }),
+			signal
+		}
+	);
+	return confirmation.data?.status === 'confirmed'
+		? textResult({ status: 'confirmed', [spec.idKey]: requestId })
+		: shapeToolError('confirmation_failed');
+}
+
+export async function executeSubmitCorrection(
+	input: CorrectionInput,
+	context: WriteExecutionContext | undefined,
+	dependencies: WriteExecutionDependencies
+): Promise<ToolTextResult> {
+	if (!isCorrectableField(input.field)) {
+		return textResult({
+			error: 'field_not_correctable',
+			message: FIELD_AUTHORITY_MESSAGE
+		});
+	}
+	return executeWriteRequest(input, context, dependencies, {
+		createPath: '/api/v1/corrections',
+		idKey: 'correction_id',
+		confirmationText: buildCorrectionConfirmationText
+	});
+}
+
+export async function executeLabelLinkage(
+	input: LinkageLabelInput,
+	context: WriteExecutionContext | undefined,
+	dependencies: WriteExecutionDependencies
+): Promise<ToolTextResult> {
+	return executeWriteRequest(input, context, dependencies, {
+		createPath: '/api/v1/linkage-labels',
+		idKey: 'label_id',
+		confirmationText: buildLinkageConfirmationText
+	});
+}
+
+export async function executeReportIssue(
+	input: IssueInput,
+	context: WriteExecutionContext | undefined,
+	dependencies: WriteExecutionDependencies
+): Promise<ToolTextResult> {
+	return executeWriteRequest(input, context, dependencies, {
+		createPath: '/api/v1/issues',
+		idKey: 'issue_id',
+		confirmationText: buildIssueConfirmationText
+	});
 }
 
 export function shapeSearchResults(response: SearchResponse): ToolTextResult {

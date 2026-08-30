@@ -8,10 +8,16 @@
 		FIND_SEGMENT_TOOL,
 		GET_BUSINESS_TOOL,
 		GET_EVIDENCE_TOOL,
+		LABEL_LINKAGE_TOOL,
+		REPORT_ISSUE_TOOL,
 		SCORE_BUSINESS_TOOL,
 		SEARCH_BUSINESSES_TOOL,
 		START_CLAIM_TOOL,
+		SUBMIT_CORRECTION_TOOL,
+		executeLabelLinkage,
+		executeReportIssue,
 		executeStartClaim,
+		executeSubmitCorrection,
 		shapeBusinessRecord,
 		shapeEvidenceResults,
 		shapeExplanationResult,
@@ -30,6 +36,7 @@
 		SearchResponse,
 		SegmentResponse
 	} from '$lib/types';
+	import type { CorrectionInput, IssueInput, LinkageLabelInput } from '$lib/write-requests';
 
 	interface ModelContextLike {
 		registerTool: (
@@ -237,6 +244,57 @@
 						context?: ToolExecutionContext
 					): Promise<ToolTextResult> {
 						return executeStartClaim(input, context, {
+							fetchJson,
+							confirm: (message) => window.confirm(message),
+							signal
+						});
+					}
+				},
+				{ signal }
+			);
+
+			await mc.registerTool(
+				{
+					...SUBMIT_CORRECTION_TOOL,
+					async execute(
+						input: CorrectionInput,
+						context?: ToolExecutionContext
+					): Promise<ToolTextResult> {
+						return executeSubmitCorrection(input, context, {
+							fetchJson,
+							confirm: (message) => window.confirm(message),
+							signal
+						});
+					}
+				},
+				{ signal }
+			);
+
+			await mc.registerTool(
+				{
+					...LABEL_LINKAGE_TOOL,
+					async execute(
+						input: LinkageLabelInput,
+						context?: ToolExecutionContext
+					): Promise<ToolTextResult> {
+						return executeLabelLinkage(input, context, {
+							fetchJson,
+							confirm: (message) => window.confirm(message),
+							signal
+						});
+					}
+				},
+				{ signal }
+			);
+
+			await mc.registerTool(
+				{
+					...REPORT_ISSUE_TOOL,
+					async execute(
+						input: IssueInput,
+						context?: ToolExecutionContext
+					): Promise<ToolTextResult> {
+						return executeReportIssue(input, context, {
 							fetchJson,
 							confirm: (message) => window.confirm(message),
 							signal

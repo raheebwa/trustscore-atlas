@@ -20,8 +20,9 @@ Worker configuration, including the `DB`, `DB_STATEMENTS`, and `DB_SCORES` D1 bi
 
 ## Local database
 
-The app reads three Cloudflare D1 (SQLite) databases. Claim requests write only to the
-append-only operations tables in the main database. To set up local copies from the repository root:
+The app reads three Cloudflare D1 (SQLite) databases. Claim, correction, linkage-label, and issue
+requests write only to the append-only operations tables in the main database. To set up local
+copies from the repository root:
 
 ```sh
 cd app
@@ -33,6 +34,7 @@ pnpm exec wrangler d1 execute atlas-scores --local --file ../infra/d1/schema.sql
 pnpm exec wrangler d1 execute atlas-scores --local --file seed/dev-scores.sql
 pnpm exec wrangler d1 execute atlas --local --file migrations/0001_ops_tables.sql
 pnpm exec wrangler d1 execute atlas --local --file migrations/0002_claim_confirmation.sql
+pnpm exec wrangler d1 execute atlas --local --file migrations/0003_write_tools.sql
 ```
 
 Apply the operations migration to the remote main database with:
@@ -40,7 +42,15 @@ Apply the operations migration to the remote main database with:
 ```sh
 pnpm exec wrangler d1 execute atlas --remote --file migrations/0001_ops_tables.sql
 pnpm exec wrangler d1 execute atlas --remote --file migrations/0002_claim_confirmation.sql
+pnpm exec wrangler d1 execute atlas --remote --file migrations/0003_write_tools.sql
 ```
+
+## Request rate limit
+
+`wrangler.jsonc` binds `API_LIMITER` to Workers rate limit namespace `1001`. The application calls
+it before every `/api/v1` request and before claim, correction, linkage-label, and issue-confirmation
+pages can reach D1. The shared allowance is 60 requests per 60 seconds for each
+`CF-Connecting-IP`. A request beyond the allowance receives a compact JSON `429` response.
 
 ## Claim confirmation
 
@@ -52,6 +62,12 @@ form. A request started directly from the claim page is confirmed when submitted
 The current WebMCP draft temporarily omits the client object that carries
 `requestUserInteraction`, as tracked in WebMCP PR 205. Chrome 152 therefore takes the page
 confirmation path.
+
+The `submit_correction`, `label_linkage`, and `report_issue` actions use the same confirmation
+contract. Each first stores an unconfirmed request with a hashed token and a 24-hour expiry.
+In-page confirmation confirms it immediately when available. Otherwise, `/correct/<id>`,
+`/label/<id>`, or `/report/<id>` shows the exact stored request and a plain HTML form. Unconfirmed
+and rejected requests are not read by published business pages or results.
 
 The three seed files form one small, entirely fictional dataset: five businesses across
 three Kampala divisions, a `kcca.businesses` source row, one Formality score per
@@ -72,4 +88,4 @@ root by the `wrangler d1 execute --local` commands above, so seed once and eithe
 sees the data.
 
 To reset the local databases, delete `.wrangler/state/v3/d1` from the repository root
-and re-run the eight `wrangler d1 execute` commands above.
+and re-run the nine `wrangler d1 execute` commands above.

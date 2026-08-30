@@ -4,11 +4,17 @@ import {
 	FIND_SEGMENT_TOOL,
 	GET_EVIDENCE_TOOL,
 	GET_BUSINESS_TOOL,
+	LABEL_LINKAGE_TOOL,
 	MAX_TOOL_RESULT_CHARS,
+	REPORT_ISSUE_TOOL,
 	SCORE_BUSINESS_TOOL,
 	SEARCH_BUSINESSES_TOOL,
 	START_CLAIM_TOOL,
+	SUBMIT_CORRECTION_TOOL,
+	executeLabelLinkage,
+	executeReportIssue,
 	executeStartClaim,
+	executeSubmitCorrection,
 	shapeBusinessRecord,
 	shapeEvidenceResults,
 	shapeExplanationResult,
@@ -151,7 +157,17 @@ describe('definitions', () => {
 		expect(START_CLAIM_TOOL.annotations).toEqual({ readOnlyHint: false });
 	});
 
-	it('exports the seven expected page tool names', () => {
+	for (const definition of [SUBMIT_CORRECTION_TOOL, LABEL_LINKAGE_TOOL, REPORT_ISSUE_TOOL]) {
+		it(`${definition.name}: is a bounded write definition`, () => {
+			expect(definition.description.length).toBeLessThan(500);
+			for (const property of Object.values(definition.inputSchema.properties)) {
+				expect(property.description.length).toBeLessThan(150);
+			}
+			expect(definition.annotations).toEqual({ readOnlyHint: false });
+		});
+	}
+
+	it('exports the ten expected page tool names', () => {
 		expect([
 			SEARCH_BUSINESSES_TOOL.name,
 			GET_BUSINESS_TOOL.name,
@@ -159,7 +175,10 @@ describe('definitions', () => {
 			SCORE_BUSINESS_TOOL.name,
 			EXPLAIN_SCORE_TOOL.name,
 			FIND_SEGMENT_TOOL.name,
-			START_CLAIM_TOOL.name
+			START_CLAIM_TOOL.name,
+			SUBMIT_CORRECTION_TOOL.name,
+			LABEL_LINKAGE_TOOL.name,
+			REPORT_ISSUE_TOOL.name
 		]).toEqual([
 			'search_businesses',
 			'get_business',
@@ -167,8 +186,158 @@ describe('definitions', () => {
 			'score_business',
 			'explain_score',
 			'find_segment',
-			'start_claim'
+			'start_claim',
+			'submit_correction',
+			'label_linkage',
+			'report_issue'
 		]);
+	});
+});
+
+describe('additional write execution', () => {
+	it('returns a confirmation URL without storing a confirmed correction', async () => {
+		const calls: string[] = [];
+		const result = await executeSubmitCorrection(
+			{
+				atlas_id: 'atlas-example-1',
+				field: 'canonical_name',
+				value: 'Example Workshop Limited',
+				evidence_url: 'https://example.org/evidence/example-workshop'
+			},
+			undefined,
+			{
+				fetchJson: async <T>(input: RequestInfo) => {
+					calls.push(String(input));
+					return {
+						data: {
+							correction_id: 'correction_example_1',
+							status: 'unconfirmed',
+							confirm_url: '/correct/correction_example_1?token=plain-example-token',
+							expires_at: '2026-08-31T12:00:00.000Z'
+						} as T,
+						status: 201
+					};
+				},
+				confirm: () => true
+			}
+		);
+
+		expect(parsed(result)).toEqual({
+			status: 'confirmation_required',
+			correction_id: 'correction_example_1',
+			confirm_url: '/correct/correction_example_1?token=plain-example-token',
+			expires_at: '2026-08-31T12:00:00.000Z',
+			message: 'Open confirm_url in this browser to confirm the request; it expires in 24 hours.'
+		});
+		expect(calls).toEqual(['/api/v1/corrections']);
+	});
+
+	it('refuses fields outside correction authority before making a request', async () => {
+		let called = false;
+		const result = await executeSubmitCorrection(
+			{
+				atlas_id: 'atlas-example-1',
+				field: 'identifiers',
+				value: 'example-value',
+				evidence_url: 'https://example.org/evidence/example-identifier'
+			},
+			undefined,
+			{
+				fetchJson: async () => {
+					called = true;
+					return { data: null, status: 500 };
+				},
+				confirm: () => true
+			}
+		);
+
+		expect(parsed(result)).toEqual({
+			error: 'field_not_correctable',
+			message:
+				'Identifiers, register statuses and licence standing can only be disputed through report_issue.'
+		});
+		expect(called).toBe(false);
+	});
+
+	it('confirms a linkage label in place after showing the exact pair', async () => {
+		const calls: { input: string; init?: RequestInit }[] = [];
+		let confirmationText = '';
+		const result = await executeLabelLinkage(
+			{
+				atlas_id: 'atlas-example-1',
+				candidate_atlas_id: 'atlas-example-2',
+				verdict: 'non_match'
+			},
+			{
+				requestUserInteraction: async <T>(callback: () => T | Promise<T>) => callback()
+			},
+			{
+				fetchJson: async <T>(input: RequestInfo, init?: RequestInit) => {
+					const url = String(input);
+					calls.push({ input: url, init });
+					return url.endsWith('/confirm')
+						? ({
+								data: { label_id: 'label_example_1', status: 'confirmed' } as T,
+								status: 200
+							} as const)
+						: ({
+								data: {
+									label_id: 'label_example_1',
+									status: 'unconfirmed',
+									confirm_url: '/label/label_example_1?token=plain-example-token',
+									expires_at: '2026-08-31T12:00:00.000Z'
+								} as T,
+								status: 201
+							} as const);
+				},
+				confirm: (message) => {
+					confirmationText = message;
+					return true;
+				}
+			}
+		);
+
+		expect(parsed(result)).toEqual({
+			status: 'confirmed',
+			label_id: 'label_example_1'
+		});
+		expect(confirmationText).toContain('atlas_id: atlas-example-1');
+		expect(confirmationText).toContain('candidate atlas_id: atlas-example-2');
+		expect(confirmationText).toContain('verdict: non_match');
+		expect(calls.map((call) => call.input)).toEqual([
+			'/api/v1/linkage-labels',
+			'/api/v1/linkage-labels/label_example_1/confirm'
+		]);
+		expect(JSON.parse(String(calls[1].init?.body))).toEqual({ token: 'plain-example-token' });
+	});
+
+	it('does not create an issue when the visitor cancels the exact prompt', async () => {
+		let called = false;
+		let confirmationText = '';
+		const result = await executeReportIssue(
+			{
+				source: 'example.register',
+				description: 'The example source date appears incomplete.'
+			},
+			{
+				requestUserInteraction: async <T>(callback: () => T | Promise<T>) => callback()
+			},
+			{
+				fetchJson: async () => {
+					called = true;
+					return { data: null, status: 500 };
+				},
+				confirm: (message) => {
+					confirmationText = message;
+					return false;
+				}
+			}
+		);
+
+		expect(parsed(result)).toEqual({ error: 'request_cancelled' });
+		expect(confirmationText).toContain('source: example.register');
+		expect(confirmationText).toContain('description: The example source date appears incomplete.');
+		expect(called).toBe(false);
 	});
 });
 
