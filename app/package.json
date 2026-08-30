@@ -18,6 +18,7 @@
 		"test": "npm run test:unit -- --run",
 		"screenshots": "node scripts/screenshots.mjs",
 		"contrast": "node scripts/contrast.mjs",
+		"a11y": "node scripts/a11y.mjs",
 		"gen": "wrangler types"
 	},
 	"devDependencies": {

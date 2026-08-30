@@ -75,7 +75,21 @@ export const POST: RequestHandler = async ({ fetch, platform, request }) => {
 				fetchImpl: fetch
 			});
 			if (!passed.ok) {
-				return apiBadRequest('the check on this form did not pass; reload the page and try again');
+				// A form ends on the page it came from, never on a body a reader cannot read. The
+				// answers they typed travel back with it so the form is not retyped from scratch.
+				const query = new URLSearchParams({ challenge: 'failed' });
+				for (const [key, value] of [
+					['claimant_role', input.claimant_role],
+					['website_url', input.website_url]
+				] as const) {
+					if (typeof value === 'string' && value.trim()) query.set(key, value.trim());
+				}
+				return new Response(null, {
+					status: 303,
+					headers: {
+						Location: `/claim/${encodeURIComponent(String(input.atlas_id ?? '').trim())}?${query}`
+					}
+				});
 			}
 		}
 		if (!validText(input.atlas_id, 200) || !validText(input.claimant_role, 100)) {

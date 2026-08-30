@@ -152,7 +152,14 @@
 	-->
 	<section class="flex flex-col gap-3">
 		<h2 class="text-xl font-semibold text-ink">Country packs</h2>
-		<ul class="flex gap-3 overflow-x-auto pb-2">
+		<!--
+			The list scrolls sideways on a narrow screen, so it takes focus and a name: a region that
+			scrolls but cannot be reached by keyboard is content a keyboard user cannot see. That is
+			the one case where a list carries a tab stop, which is why the rule is waived here and
+			nowhere else.
+		-->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<ul class="flex gap-3 overflow-x-auto pb-2" tabindex="0" aria-label="Country packs">
 			{#each data.packs as pack (pack.code)}
 				{@const freshness = packFreshness(stats.sources, pack.code)}
 				<li

@@ -388,6 +388,14 @@ export async function createIssueEndpoint({
 		const value = await readObject(request);
 		const input = value as Partial<IssueInput> | null;
 		if (!(await passesChallenge(platform, request, value, fetchImpl))) {
+			// A page form ends on the page it came from, never on a body a reader cannot read.
+			const atlasId = typeof input?.atlas_id === 'string' ? input.atlas_id.trim() : '';
+			if (isPageForm(request) && atlasId) {
+				return new Response(null, {
+					status: 303,
+					headers: { Location: `/b/${encodeURIComponent(atlasId)}?report=challenge_failed` }
+				});
+			}
 			return apiBadRequest('the check on this form did not pass; reload the page and try again');
 		}
 		if (

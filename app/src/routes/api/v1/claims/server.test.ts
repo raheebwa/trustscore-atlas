@@ -203,11 +203,17 @@ describe('claims API', () => {
 	 * The challenge is only on the door a stranger can walk through. A deployment that sets no
 	 * secret is not gated at all, which is what keeps a fork and a local checkout working.
 	 */
-	it('refuses a page form when the deployment sets a secret and the challenge is unsolved', async () => {
+	/**
+	 * A form ends on the page it came from. Landing a person on a JSON body is the same defect as
+	 * landing them on one after a successful submission, and it is worse here because they are
+	 * being told something went wrong.
+	 */
+	it('sends a refused page form back to its page, with what was typed', async () => {
 		const { db, batches } = database();
 		const form = new FormData();
 		form.set('atlas_id', 'atlas-example-1');
 		form.set('claimant_role', 'owner or director');
+		form.set('website_url', 'https://example.co.ug');
 		const response = await POST({
 			platform: { env: { DB: db, TURNSTILE_SECRET_KEY: 'a-secret' } },
 			request: new Request('https://atlas.example.invalid/api/v1/claims', {
@@ -217,8 +223,36 @@ describe('claims API', () => {
 			fetch: async () => new Response(JSON.stringify({ success: true }), { status: 200 })
 		} as never);
 
-		expect(response.status).toBe(400);
+		expect(response.status).toBe(303);
+		const location = new URL(
+			response.headers.get('location') ?? '',
+			'https://atlas.example.invalid'
+		);
+		expect(location.pathname).toBe('/claim/atlas-example-1');
+		expect(location.searchParams.get('challenge')).toBe('failed');
+		expect(location.searchParams.get('claimant_role')).toBe('owner or director');
+		expect(location.searchParams.get('website_url')).toBe('https://example.co.ug');
 		expect(batches).toHaveLength(0);
+	});
+
+	it('keeps the JSON answer for a JSON caller that fails the same check', async () => {
+		const { db, batches } = database();
+		const response = await POST({
+			platform: { env: { DB: db, TURNSTILE_SECRET_KEY: 'a-secret' } },
+			request: new Request('https://atlas.example.invalid/api/v1/claims', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					atlas_id: 'atlas-example-1',
+					claimant_role: 'owner or director'
+				})
+			}),
+			fetch: async () => new Response(JSON.stringify({ success: false }), { status: 200 })
+		} as never);
+
+		// A JSON caller is not challenged at all, so it is recorded rather than refused.
+		expect(response.status).toBe(201);
+		expect(batches).toHaveLength(1);
 	});
 
 	it('records the claim when the challenge was solved', async () => {

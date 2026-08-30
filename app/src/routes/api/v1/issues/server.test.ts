@@ -77,4 +77,51 @@ describe('issues API from a page form', () => {
 			'The website on this record points at the wrong company.'
 		);
 	});
+
+	/**
+	 * The report form is the other door a stranger can walk through, so it carries the same check
+	 * and the same rule about where a refusal lands: back on the record, not on a body.
+	 */
+	it('sends a refused report back to the record it was about', async () => {
+		const { db, batches } = database();
+		const body = new URLSearchParams({
+			atlas_id: 'atlas-example-1',
+			description: 'The website on this record points at the wrong company.'
+		});
+		const response = await POST({
+			platform: { env: { DB: db, TURNSTILE_SECRET_KEY: 'a-secret' } },
+			request: new Request('https://atlas.example.invalid/api/v1/issues', {
+				method: 'POST',
+				headers: { 'content-type': 'application/x-www-form-urlencoded' },
+				body
+			}),
+			fetch: async () => new Response(JSON.stringify({ success: true }), { status: 200 })
+		} as never);
+
+		expect(response.status).toBe(303);
+		expect(response.headers.get('location')).toBe('/b/atlas-example-1?report=challenge_failed');
+		expect(batches).toHaveLength(0);
+	});
+
+	it('records a report whose challenge was solved', async () => {
+		const { db, batches } = database();
+		const body = new URLSearchParams({
+			atlas_id: 'atlas-example-1',
+			description: 'The website on this record points at the wrong company.',
+			'cf-turnstile-response': 'a-solved-token'
+		});
+		const response = await POST({
+			platform: { env: { DB: db, TURNSTILE_SECRET_KEY: 'a-secret' } },
+			request: new Request('https://atlas.example.invalid/api/v1/issues', {
+				method: 'POST',
+				headers: { 'content-type': 'application/x-www-form-urlencoded' },
+				body
+			}),
+			fetch: async () => new Response(JSON.stringify({ success: true }), { status: 200 })
+		} as never);
+
+		expect(response.status).toBe(303);
+		expect(response.headers.get('location')).toMatch(/^\/report\/issue_/);
+		expect(batches).toHaveLength(1);
+	});
 });

@@ -376,6 +376,12 @@
 							class="w-full rounded-md border border-border bg-surface px-3 py-2 text-base text-ink transition-colors duration-120 hover:border-border-strong"
 						></textarea>
 					</label>
+					{#if page.url.searchParams.get('report') === 'challenge_failed'}
+						<Callout tone="warning" title="That did not go through">
+							The check in front of this form did not pass. Reload the page and send the report
+							again.
+						</Callout>
+					{/if}
 					<Turnstile />
 					<button
 						type="submit"

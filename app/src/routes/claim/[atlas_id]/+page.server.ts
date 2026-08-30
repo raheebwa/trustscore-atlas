@@ -189,6 +189,13 @@ export const load: PageServerLoad = async ({ platform, params, url }) => {
 
 	return {
 		business,
+		// A form that was refused comes back here rather than ending on a body: the page says why,
+		// and carries back what was typed.
+		challengeFailed: url.searchParams.get('challenge') === 'failed',
+		typed: {
+			claimant_role: url.searchParams.get('claimant_role') ?? '',
+			website_url: url.searchParams.get('website_url') ?? ''
+		},
 		confirmation: null,
 		confirmationComplete: url.searchParams.get('confirmation') === 'complete',
 		verification: await loadVerification(db, platform, params.atlas_id, claimId, token)

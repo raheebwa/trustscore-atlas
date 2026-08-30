@@ -97,6 +97,13 @@
 			meta={[data.business.canonical_name, data.business.atlas_id]}
 		/>
 
+		{#if data.challengeFailed}
+			<Callout tone="warning" title="That did not go through">
+				The check in front of this form did not pass. Reload the page and send it again. If it keeps
+				failing, the claim can also be recorded through the API, which the tools page documents.
+			</Callout>
+		{/if}
+
 		{#if data.confirmationComplete}
 			<Callout tone="success" title="Request recorded">
 				It is confirmed and waiting for verification.
@@ -336,6 +343,7 @@
 				<input
 					name="website_url"
 					type="url"
+					value={data.typed?.website_url ?? ''}
 					placeholder="https://example.co.ug"
 					toolparamdescription="Optional public https address of the claimed business. Giving one issues a string to publish on that site; leaving it empty records the claim without a website challenge."
 					class="h-10 rounded-md border border-border bg-surface px-3 text-base text-ink transition-colors duration-120 hover:border-border-strong"
@@ -345,6 +353,7 @@
 				<span class="text-xs font-medium text-ink-muted">Your role</span>
 				<select
 					name="claimant_role"
+					value={data.typed?.claimant_role ?? ''}
 					required
 					toolparamdescription="The claimant's relation to the business: owner or director, authorised employee, or authorised representative."
 					class="h-10 rounded-md border border-border bg-surface px-3 text-base text-ink transition-colors duration-120 hover:border-border-strong"
