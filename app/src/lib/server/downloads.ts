@@ -3,6 +3,9 @@
  * `bundles/<id>/datapackage.json` describes every file (docs/PRD.md section 10.5).
  */
 
+import { resolve } from '$app/paths';
+import type { ResolvedPathname } from '$app/types';
+
 export interface DataPackageResource {
 	name: string;
 	path: string;
@@ -24,7 +27,7 @@ export interface DataPackage {
 }
 
 export interface DownloadItem extends DataPackageResource {
-	href: string;
+	href: ResolvedPathname;
 	licence: string;
 }
 
@@ -33,7 +36,7 @@ export interface Downloads {
 	created: string | null;
 	canonical: DownloadItem[];
 	sources: DownloadItem[];
-	extras: { path: string; href: string }[];
+	extras: { path: string; href: ResolvedPathname }[];
 	total_bytes: number;
 	licenses: { name?: string; path?: string }[];
 }
@@ -49,8 +52,8 @@ export function resolveDownloadKey(regenerationId: string, path: string): string
 	return `bundles/${regenerationId}/${path}`;
 }
 
-function downloadHref(regenerationId: string, path: string): string {
-	return `/downloads/${regenerationId}/${path}`;
+function downloadHref(regenerationId: string, path: string): ResolvedPathname {
+	return resolve('/downloads/[regeneration]/[...path]', { regeneration: regenerationId, path });
 }
 
 export async function getDownloads(data: R2Bucket): Promise<Downloads | null> {
