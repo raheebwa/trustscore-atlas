@@ -122,7 +122,15 @@ jobs:
           if manifest["regeneration_id"] != sys.argv[2]:
               raise ValueError("bundle regeneration id does not match latest pointer")
           # Only what restore needs: per-source runs and the canonical state, not the CSV twins.
-          wanted = ("sources/", "canonical/crosswalk.parquet", "canonical/labels.jsonl", "datapackage.json")
+          # The guard compares against the previous businesses and aliases, so those come too.
+          wanted = (
+              "sources/",
+              "canonical/crosswalk.parquet",
+              "canonical/labels.jsonl",
+              "canonical/businesses.parquet",
+              "canonical/aliases.parquet",
+              "datapackage.json",
+          )
           for entry in manifest["files"]:
               path = pathlib.PurePosixPath(entry["path"])
               if path.is_absolute() or ".." in path.parts or "." in path.parts:
