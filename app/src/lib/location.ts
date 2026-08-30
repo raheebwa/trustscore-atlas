@@ -57,3 +57,20 @@ export function displayLocation(
 	}
 	return 'Location not published';
 }
+
+/**
+ * A place name as a reader would write it, when the register wrote it in capitals.
+ *
+ * Registers publish KAMPALA, Wakiso and Lira in the same column, and the raw value is what every
+ * filter and API call is keyed on, so only the reading changes: a value that carries any lower
+ * case at all is left exactly as its register wrote it.
+ */
+export function titleCasePlace(value: string): string {
+	if (/[a-z]/.test(value)) return value;
+	return value
+		.toLowerCase()
+		.replace(
+			/(^|[\s(/-])([a-z])/g,
+			(_match, before: string, letter: string) => before + letter.toUpperCase()
+		);
+}

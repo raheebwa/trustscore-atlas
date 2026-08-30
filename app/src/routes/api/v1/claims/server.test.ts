@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
-import { hashClaimConfirmationToken } from '$lib/claims';
+import { CLAIM_VERIFICATION_STEPS, hashClaimConfirmationToken } from '$lib/claims';
 import { POST } from './+server';
 
 interface FakeStatement {
@@ -58,11 +58,8 @@ describe('claims API', () => {
 			claim_id: expect.stringMatching(/^claim_/),
 			status: 'unconfirmed',
 			confirm_url: expect.stringMatching(/^\/claim\/claim_.+\?token=[a-f0-9]{64}$/),
-			verification_steps: [
-				'Place a verification string on the registered website or official social profile.',
-				'Reply from an email address on the domain named in a register.',
-				'Start a per-record confirmation with URSB or URA when available.'
-			]
+			// The routes a claimant can actually take, and nothing that only sounds available.
+			verification_steps: [...CLAIM_VERIFICATION_STEPS]
 		});
 		expect(Date.parse(body.expires_at) - before).toBeGreaterThanOrEqual(24 * 60 * 60 * 1000);
 		expect(Date.parse(body.expires_at) - before).toBeLessThan(24 * 60 * 60 * 1000 + 1000);

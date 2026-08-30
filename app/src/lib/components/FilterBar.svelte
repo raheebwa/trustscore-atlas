@@ -16,7 +16,7 @@
 	export interface FilterField {
 		name: string;
 		label: string;
-		options: { value: string; count?: number }[];
+		options: { value: string; count?: number; label?: string }[];
 	}
 
 	let {
@@ -96,7 +96,11 @@
 	<div class="flex flex-wrap items-center gap-2">
 		{#each applied as entry (entry.field.name)}
 			<a href={without(entry.field.name)} class="rounded-md">
-				<Chip label={entry.field.label} value={entry.value} />
+				<Chip
+					label={entry.field.label}
+					value={entry.field.options.find((option) => option.value === entry.value)?.label ??
+						entry.value}
+				/>
 			</a>
 		{/each}
 		<a

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
-import { hashClaimConfirmationToken } from '$lib/claims';
+import { CLAIM_VERIFICATION_STEPS, hashClaimConfirmationToken } from '$lib/claims';
 import { POST } from './+server';
 
 interface ClaimState {
@@ -78,11 +78,7 @@ describe('claim confirmation API', () => {
 		expect(await response.json()).toEqual({
 			claim_id: 'claim_example',
 			status: 'confirmed',
-			verification_steps: [
-				'Place a verification string on the registered website or official social profile.',
-				'Reply from an email address on the domain named in a register.',
-				'Start a per-record confirmation with URSB or URA when available.'
-			]
+			verification_steps: [...CLAIM_VERIFICATION_STEPS]
 		});
 		expect(claim.status).toBe('confirmed');
 		expect(batches).toHaveLength(1);

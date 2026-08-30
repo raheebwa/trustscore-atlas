@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
-import { displayDistrict, displayLocation } from './location';
+import { displayDistrict, titleCasePlace, displayLocation } from './location';
 
 describe('displayDistrict', () => {
 	it('reads a KCCA division as Kampala whatever district another register won', () => {
@@ -38,5 +38,21 @@ describe('displayLocation', () => {
 	it('assumes a location is publishable when nothing says otherwise, and never invents one', () => {
 		expect(displayLocation(null, null, 'UG')).toBe('Location not published');
 		expect(displayLocation(null, null, null)).toBe('Location not published');
+	});
+});
+
+describe('titleCasePlace', () => {
+	it.each([
+		['KAMPALA', 'Kampala'],
+		['NAKAWA DIVISION', 'Nakawa Division'],
+		['FORT PORTAL', 'Fort Portal'],
+		['KAGADI-KIBAALE', 'Kagadi-Kibaale']
+	])('reads %s as %s', (raw, expected) => {
+		expect(titleCasePlace(raw)).toBe(expected);
+	});
+
+	// A register that already writes mixed case knows how its own places are spelled.
+	it.each(['Lira', 'Wakiso', 'Kira Municipality', 'McCarthy Island'])('leaves %s alone', (raw) => {
+		expect(titleCasePlace(raw)).toBe(raw);
 	});
 });

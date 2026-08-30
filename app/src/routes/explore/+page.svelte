@@ -7,6 +7,7 @@
 	import Callout from '$lib/components/Callout.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import FilterBar from '$lib/components/FilterBar.svelte';
+	import { titleCasePlace } from '$lib/location';
 	import MapChoropleth from '$lib/components/MapChoropleth.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import StatTile from '$lib/components/StatTile.svelte';
@@ -19,9 +20,13 @@
 	const explore = $derived(data.explore);
 	const filters = $derived(explore.filters);
 
+	/** Place names as a reader writes them, filtering on the value the register published. */
+	const places = (values: { value: string; count?: number }[]) =>
+		values.map((option) => ({ ...option, label: titleCasePlace(option.value) }));
+
 	const FILTER_FIELDS = $derived([
-		{ name: 'district', label: 'District', options: data.facets.district },
-		{ name: 'division', label: 'Division or subcounty', options: data.facets.division },
+		{ name: 'district', label: 'District', options: places(data.facets.district) },
+		{ name: 'division', label: 'Division or subcounty', options: places(data.facets.division) },
 		{ name: 'category', label: 'Sector category', options: data.facets.sector_category },
 		{ name: 'nature', label: 'Sector nature', options: data.facets.sector_nature },
 		{ name: 'present_in', label: 'Present in register', options: data.facets.register }

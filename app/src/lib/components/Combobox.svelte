@@ -20,7 +20,7 @@
 	}: {
 		id: string;
 		name?: string;
-		options: { value: string; count?: number }[];
+		options: { value: string; count?: number; label?: string }[];
 		value?: string;
 		placeholder?: string;
 		describedBy?: string;
@@ -31,9 +31,17 @@
 	const filtered = $derived(
 		search.trim() === ''
 			? options
-			: options.filter((option) => option.value.toLowerCase().includes(search.trim().toLowerCase()))
+			: options.filter((option) =>
+					`${option.label ?? ''} ${option.value}`
+						.toLowerCase()
+						.includes(search.trim().toLowerCase())
+				)
 	);
-	const label = $derived(value || placeholder);
+	// The reading of the chosen value, which is the label when the caller gave one: registers
+	// publish KAMPALA and the filter is keyed on that, but nobody reads in capitals.
+	const label = $derived(
+		options.find((option) => option.value === value)?.label || value || placeholder
+	);
 </script>
 
 <Combobox.Root
@@ -77,11 +85,11 @@
 				{#each filtered as option (option.value)}
 					<Combobox.Item
 						value={option.value}
-						label={option.value}
+						label={option.label ?? option.value}
 						class="flex h-9 w-full items-center gap-2 rounded-sm px-2 text-base text-ink data-highlighted:bg-panel data-selected:bg-accent-tint"
 					>
 						{#snippet children({ selected })}
-							<span class="truncate">{option.value}</span>
+							<span class="truncate">{option.label ?? option.value}</span>
 							{#if option.count !== undefined}
 								<span class="ml-auto tnum text-xs text-ink-muted"
 									>{option.count.toLocaleString()}</span
