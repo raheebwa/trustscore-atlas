@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
-import { RegenerationInProgressError, getBusinessDetail } from '$lib/server/atlas';
+import { RegenerationInProgressError } from '$lib/server/atlas';
+import { cachedBusinessDetail } from '$lib/server/business-cache';
 import { requireDatabases } from '$lib/server/platform';
 import type { PageServerLoad } from './$types';
 
@@ -7,7 +8,7 @@ export const load: PageServerLoad = async ({ platform, params }) => {
 	const databases = requireDatabases(platform);
 	let detail;
 	try {
-		detail = await getBusinessDetail(databases, params.atlas_id);
+		detail = await cachedBusinessDetail(databases, platform?.env?.CACHE, params.atlas_id);
 	} catch (cause) {
 		if (cause instanceof RegenerationInProgressError) {
 			error(503, 'Data is being refreshed, try again in a minute.');
