@@ -99,6 +99,8 @@ def _fail(row: dict, reason: str, rows: list[dict]) -> dict:
 
 
 def _identifier_evidence(row, predicate, binding, statements):
+    """Presence in a bound register: an identifier row from it, or, for registers that publish
+    no identifier, the register's own status row named in the binding's status_fields."""
     sources = binding.get("sources", [])
     schemes = set(binding.get("identifier_schemes", []))
     proof = []
@@ -111,6 +113,7 @@ def _identifier_evidence(row, predicate, binding, statements):
                 proof.append(s)
         elif s["source"] in sources:
             proof.append(s)
+    proof += _rows(statements, binding.get("status_fields", []))
     return _proof(row, predicate, proof) if proof else row | {"reason": NO_EVIDENCE}
 
 

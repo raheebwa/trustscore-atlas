@@ -7,7 +7,7 @@ formality:
   local_trading_licence:
     sources: []            # a central-bank licence is a regulator licence, not a trading licence
   sector_regulator_licence:
-    sources: [cbk.licensed_banks]
+    status_fields: [cbk.licensed_banks.status.cbk_licensed]   # the directory publishes no licence number
 activity:
   recent_statement:
     sources: [cbk.licensed_banks]
