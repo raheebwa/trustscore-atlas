@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import Download from '@lucide/svelte/icons/download';
 	import Search from '@lucide/svelte/icons/search';
-	import BarList from '$lib/components/BarList.svelte';
+	import Breakdown from '$lib/components/Breakdown.svelte';
 	import Callout from '$lib/components/Callout.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import FilterBar from '$lib/components/FilterBar.svelte';
@@ -151,64 +151,46 @@
 			</section>
 
 			<div class="flex flex-col gap-6 lg:col-span-5">
-				<section class="flex flex-col gap-2">
-					<h2 class="text-lg font-semibold text-ink">By district</h2>
-					<BarList
-						rows={districtRows}
-						unit="districts"
-						hrefFor={(key) => withFilter('district', key)}
-					/>
-				</section>
+				<Breakdown
+					title="By district"
+					rows={districtRows}
+					unit="districts"
+					hrefFor={(key) => withFilter('district', key)}
+				/>
 
-				{#if explore.counts_by_division.length > 0}
-					<section class="flex flex-col gap-2">
-						<h2 class="text-lg font-semibold text-ink">By division</h2>
-						<BarList
-							rows={explore.counts_by_division
-								.filter((row) => row.division !== null)
-								.map((row) => ({ key: row.division as string, count: row.count }))}
-							unit="divisions"
-							hrefFor={(key) => withFilter('division', key)}
-						/>
-					</section>
-				{/if}
+				<Breakdown
+					title="By division"
+					rows={divisionRows}
+					unit="divisions"
+					hrefFor={(key) => withFilter('division', key)}
+				/>
 
-				<section class="flex flex-col gap-2">
-					<h2 class="text-lg font-semibold text-ink">By register</h2>
-					<BarList
-						rows={explore.counts_by_register.map((row) => ({
-							key: describeRegister(row.register).short,
-							count: row.count
-						}))}
-						unit="registers"
-					/>
-				</section>
+				<Breakdown
+					title="By register"
+					rows={explore.counts_by_register.map((row) => ({
+						key: describeRegister(row.register).short,
+						count: row.count
+					}))}
+					unit="registers"
+				/>
 
-				{#if explore.counts_by_category}
-					<section class="flex flex-col gap-2">
-						<h2 class="text-lg font-semibold text-ink">By sector category</h2>
-						<BarList
-							rows={explore.counts_by_category
-								.filter((row) => row.key !== null)
-								.map((row) => ({ key: humaniseValue(row.key), count: row.count }))}
-							unit="categories"
-							hrefFor={(key) => withFilter('category', key)}
-						/>
-					</section>
-				{/if}
+				<Breakdown
+					title="By sector category"
+					rows={(explore.counts_by_category ?? [])
+						.filter((row) => row.key !== null)
+						.map((row) => ({ key: humaniseValue(row.key), count: row.count }))}
+					unit="categories"
+					hrefFor={(key) => withFilter('category', key)}
+				/>
 
-				{#if explore.counts_by_nature}
-					<section class="flex flex-col gap-2">
-						<h2 class="text-lg font-semibold text-ink">By sector nature</h2>
-						<BarList
-							rows={explore.counts_by_nature
-								.filter((row) => row.key !== null)
-								.map((row) => ({ key: humaniseValue(row.key), count: row.count }))}
-							unit="natures"
-							hrefFor={(key) => withFilter('nature', key)}
-						/>
-					</section>
-				{/if}
+				<Breakdown
+					title="By sector nature"
+					rows={(explore.counts_by_nature ?? [])
+						.filter((row) => row.key !== null)
+						.map((row) => ({ key: humaniseValue(row.key), count: row.count }))}
+					unit="natures"
+					hrefFor={(key) => withFilter('nature', key)}
+				/>
 			</div>
 		</div>
 	{/if}

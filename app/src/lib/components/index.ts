@@ -25,5 +25,6 @@ export { default as CoverageBar } from './CoverageBar.svelte';
 export { default as CoverageArithmetic } from './CoverageArithmetic.svelte';
 export { default as StatTile } from './StatTile.svelte';
 export { default as BarList } from './BarList.svelte';
+export { default as Breakdown } from './Breakdown.svelte';
 export { default as PrecedenceLadder } from './PrecedenceLadder.svelte';
 export { default as EvidenceRow } from './EvidenceRow.svelte';

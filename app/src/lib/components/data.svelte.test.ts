@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import Breakdown from './Breakdown.svelte';
 import DataTable from './DataTable.svelte';
 import FreshnessBadge from './FreshnessBadge.svelte';
 import Pagination from './Pagination.svelte';
@@ -123,5 +124,24 @@ describe('IdentifierChips', () => {
 	it('renders nothing at all when a record carries no identifier', () => {
 		const { container } = render(IdentifierChips, { identifiers: [] });
 		expect(container.querySelector('ul')).toBeNull();
+	});
+});
+
+describe('Breakdown', () => {
+	it('names the breakdown above its bars', () => {
+		render(Breakdown, {
+			title: 'By district',
+			rows: [{ key: 'Kampala', count: 61 }],
+			unit: 'districts'
+		});
+
+		expect(screen.getByRole('heading', { name: 'By district' })).toBeInTheDocument();
+		expect(screen.getByText('61')).toBeInTheDocument();
+	});
+
+	it('says nothing at all when the segment has no rows to break down', () => {
+		render(Breakdown, { title: 'By district', rows: [], unit: 'districts' });
+
+		expect(screen.queryByRole('heading', { name: 'By district' })).not.toBeInTheDocument();
 	});
 });
