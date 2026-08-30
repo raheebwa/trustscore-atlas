@@ -1,0 +1,122 @@
+# SPDX-License-Identifier: Apache-2.0
+# The gate that has to be green before anything merges, and the reason the data workflows can be
+# trusted: a change to the toolchain, a manifest or a lockfile is proven here within minutes
+# rather than discovered the next time a regeneration is dispatched.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: app
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install pnpm
+        # The version comes from packageManager in the root manifest; naming it here as well
+        # makes the action refuse to install.
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          run_install: false
+
+      - name: Install Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install app dependencies
+        run: pnpm --dir app install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm --dir app run check
+
+      - name: Test
+        run: pnpm --dir app run test
+
+      - name: Build
+        run: pnpm --dir app run build
+
+  pipeline:
+    name: pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+
+      - name: Install Python and pipeline dependencies
+        working-directory: pipeline
+        run: |
+          set -euo pipefail
+          uv python install 3.13
+          uv sync
+
+      - name: Lint
+        run: uv --directory pipeline run ruff check .
+
+      - name: Test
+        # The coverage floor lives in pyproject addopts, so this command and the one in
+        # CONTRIBUTING enforce the same bar.
+        run: uv --directory pipeline run pytest
+
+  leak-sweep:
+    name: leak-sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Refuse tracked secrets
+        # Scoped to what git actually tracks: a public repository's danger is a committed key,
+        # not a local file. The private vocabulary list is deliberately not here, since
+        # publishing the guard would publish what it guards.
+        run: |
+          set -euo pipefail
+          fail=0
+          report() {
+            echo "$1" >&2
+            fail=1
+          }
+
+          while IFS= read -r file; do
+            case $file in
+              *.env.example) continue ;;
+              *.env | *.env.*) report "tracked environment file: $file" ;;
+            esac
+          done < <(git ls-files -- '*.env' '*.env.*')
+
+          while IFS= read -r file; do
+            [[ -n $file ]] && report "tracked key material: $file"
+          done < <(git ls-files -- '*.pem' '*.key' '*.p12' '*.pfx')
+
+          patterns='-----BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{36,}|xox[baprs]-[A-Za-z0-9-]{10,}'
+          while IFS= read -r file; do
+            if grep -InE "$patterns" -- "$file" >/dev/null 2>&1; then
+              report "possible credential in $file"
+            fi
+          done < <(git ls-files)
+
+          if [[ $fail -ne 0 ]]; then
+            echo "leak sweep failed" >&2
+            exit 1
+          fi
+          echo "no tracked secrets found"
