@@ -1,9 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { SvelteURLSearchParams } from 'svelte/reactivity';
+	import { SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
 	import { resolve } from '$app/paths';
 	import type { ResolvedPathname } from '$app/types';
-	import { boundsOf, decodeTopology, projectRing, type BoundaryFeature } from '$lib/topojson';
+	import {
+		boundsOf,
+		decodeTopology,
+		districtKey,
+		projectRing,
+		type BoundaryFeature
+	} from '$lib/topojson';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -23,33 +29,36 @@
 	});
 
 	const filters = $derived(data.explore.filters);
-	const countsByDistrict = $derived(
-		new Map(
-			data.explore.counts_by_district
-				.filter((row) => row.district !== null)
-				.map((row) => [row.district!.toLowerCase(), row.count])
-		)
-	);
+	const countsByDistrict = $derived.by(() => {
+		const map = new SvelteMap<string, number>();
+		for (const row of data.explore.counts_by_district) {
+			if (row.district === null) continue;
+			const key = districtKey(row.district);
+			map.set(key, (map.get(key) ?? 0) + row.count);
+		}
+		return map;
+	});
 	const unknownDistrict = $derived(
 		data.explore.counts_by_district.find((row) => row.district === null)?.count ?? 0
 	);
 	const maxCount = $derived(Math.max(1, ...countsByDistrict.values()));
 	const bounds = $derived(features.length > 0 ? boundsOf(features) : null);
 
+	const BUCKETS = [78, 66, 54, 42, 30];
 	function shade(count: number | undefined): string {
-		if (!count) return '#f5f5f4';
+		if (!count) return 'url(#no-businesses)';
 		const level = Math.min(1, Math.log10(count + 1) / Math.log10(maxCount + 1));
-		const lightness = 88 - Math.round(level * 60);
+		const lightness = BUCKETS[Math.min(BUCKETS.length - 1, Math.floor(level * BUCKETS.length))];
 		return `hsl(24 60% ${lightness}%)`;
 	}
 
-	const allKeys = ['category', 'nature', 'district', 'division', 'present_in'];
+	const allKeys = ['country', 'category', 'nature', 'district', 'division', 'present_in'];
 
 	/** A resolved path with the current filters (and any extra pairs) as its query string. */
 	function withQuery(
 		path: ResolvedPathname,
 		extra: Record<string, string>,
-		keys = ['category', 'nature', 'present_in']
+		keys = ['country', 'category', 'nature', 'present_in']
 	): ResolvedPathname {
 		const params = new SvelteURLSearchParams();
 		for (const key of keys as (keyof typeof filters)[]) {
@@ -73,6 +82,16 @@
 </p>
 
 <form method="get" class="mt-4 flex flex-wrap gap-2">
+	<label class="sr-only" for="country">Country</label>
+	<select
+		id="country"
+		name="country"
+		class="rounded-md border border-stone-300 px-3 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
+	>
+		{#each data.explore.countries as code (code)}
+			<option value={code} selected={code === filters.country}>{code}</option>
+		{/each}
+	</select>
 	<label class="sr-only" for="category">Sector category</label>
 	<input
 		id="category"
@@ -147,20 +166,30 @@
 			<svg
 				viewBox="0 0 {MAP_SIZE} {MAP_SIZE}"
 				class="mt-3 w-full max-w-xl"
-				role="img"
-				aria-label="Uganda districts shaded by business count"
+				role="group"
+				aria-label="Map of Uganda's districts; each district is a link shaded by business count"
 			>
+				<defs>
+					<pattern id="no-businesses" width="6" height="6" patternUnits="userSpaceOnUse">
+						<rect width="6" height="6" fill="#fafaf9" />
+						<path d="M0,6 L6,0" stroke="#d6d3d1" stroke-width="1" />
+					</pattern>
+				</defs>
 				{#each features as feature (feature.pcode ?? feature.name)}
-					{@const count = countsByDistrict.get((feature.name ?? '').toLowerCase())}
+					{@const count = countsByDistrict.get(districtKey(feature.name))}
 					{@const selected =
-						!!filters.district &&
-						filters.district.toLowerCase() === (feature.name ?? '').toLowerCase()}
-					<a href={withQuery(resolve('/explore'), { district: feature.name ?? '' })}>
+						!!filters.district && districtKey(filters.district) === districtKey(feature.name)}
+					<a
+						href={withQuery(resolve('/explore'), { district: feature.name ?? '' })}
+						aria-label="{feature.name}: {(count ?? 0).toLocaleString()} businesses"
+						class="outline-none focus-visible:[&>path]:stroke-sky-600 focus-visible:[&>path]:stroke-[3]"
+					>
 						<path
 							d={feature.rings.map((ring) => projectRing(ring, bounds, MAP_SIZE)).join('')}
 							fill={shade(count)}
-							stroke={selected ? '#1c1917' : '#a8a29e'}
-							stroke-width={selected ? 2 : 0.6}
+							fill-rule="evenodd"
+							stroke={selected ? '#1c1917' : '#78716c'}
+							stroke-width={selected ? 2.5 : 0.7}
 						>
 							<title>{feature.name}: {(count ?? 0).toLocaleString()}</title>
 						</path>
@@ -169,13 +198,15 @@
 			</svg>
 			<p class="mt-2 text-xs text-stone-500">
 				Boundaries: OCHA common operational datasets for Uganda (COD-AB), CC BY-IGO, simplified.
-				Darker means more businesses; grey means none matched.
+				Darker means more businesses; hatched means none matched. The dataset draws Kampala as one
+				polygon, so its divisions appear in the list below rather than on the map. The full list
+				below carries every count.
 			</p>
 		{:else}
 			<p class="mt-2 text-sm text-stone-500">Loading the district map...</p>
 		{/if}
 		<ul class="mt-3 flex flex-wrap gap-2 text-sm text-stone-600">
-			{#each data.explore.counts_by_district.slice(0, 20) as row (row.district ?? 'unknown')}
+			{#each data.explore.counts_by_district as row (row.district ?? 'unknown')}
 				<li class="rounded-full bg-stone-100 px-3 py-1">
 					{#if row.district}
 						<a

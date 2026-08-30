@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeTopology, projectRing, type Topology } from './topojson';
+import { decodeTopology, districtKey, projectRing, type Topology } from './topojson';
 
 const topology: Topology = {
 	type: 'Topology',
@@ -60,5 +60,28 @@ describe('projectRing', () => {
 				100
 			)
 		).toBe('M0,100L100,0Z');
+	});
+});
+
+describe('the committed district boundaries', () => {
+	it('decode into one named ring set per district', async () => {
+		const { readFile } = await import('node:fs/promises');
+		const raw = await readFile(
+			new URL('../../static/boundaries/ug-adm2.topojson', import.meta.url),
+			'utf8'
+		);
+		const features = decodeTopology(JSON.parse(raw), 'adm2');
+		expect(features.length).toBe(135);
+		expect(features.every((f) => f.name && f.rings.length > 0 && f.rings[0].length > 3)).toBe(true);
+		expect(features.map((f) => f.name)).toContain('Kampala');
+	});
+});
+
+describe('districtKey', () => {
+	it('ignores case, spacing, punctuation and a trailing district word', () => {
+		expect(districtKey(' Arua District ')).toBe('arua');
+		expect(districtKey('Mukono.')).toBe('mukono');
+		expect(districtKey('KAMPALA')).toBe(districtKey('Kampala'));
+		expect(districtKey(null)).toBe('');
 	});
 });

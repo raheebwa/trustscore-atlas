@@ -1,28 +1,36 @@
 import { describe, expect, it } from 'vitest';
-import { buildExploreFilter, exploreSegments, exploreCsv } from './explore';
+import { RegenerationInProgressError } from './atlas';
+import { buildExploreFilter, exploreCsv, exploreSegments } from './explore';
 import type { AtlasDatabases } from './platform';
 
 describe('buildExploreFilter', () => {
-	it('uses the rollup rows for nature and register when they are not filtered', () => {
+	it('always scopes to one country and uses the rollup rows for nature and register', () => {
 		const filter = buildExploreFilter({ category: 'GENERAL', district: 'Kampala' });
+		expect(filter.whereClause).toContain('country = ?');
 		expect(filter.whereClause).toContain('sector_category = ? COLLATE NOCASE');
 		expect(filter.whereClause).toContain('district = ? COLLATE NOCASE');
 		expect(filter.whereClause).toContain('sector_nature IS NULL');
 		expect(filter.whereClause).toContain('register IS NULL');
 		expect(filter.whereClause).not.toContain('GENERAL');
-		expect(filter.bindings).toEqual(['GENERAL', 'Kampala']);
+		expect(filter.bindings).toEqual(['UG', 'GENERAL', 'Kampala']);
 	});
 
-	it('binds nature and register when they are filtered', () => {
-		const filter = buildExploreFilter({ nature: 'Hardware', present_in: 'kcca.businesses' });
+	it('binds nature, register and an explicit country when they are filtered', () => {
+		const filter = buildExploreFilter({
+			country: 'ke',
+			nature: 'Hardware',
+			present_in: 'cbk.licensed_banks'
+		});
 		expect(filter.whereClause).toContain('sector_nature = ? COLLATE NOCASE');
 		expect(filter.whereClause).toContain('register = ?');
-		expect(filter.bindings).toEqual(['Hardware', 'kcca.businesses']);
+		expect(filter.bindings).toEqual(['KE', 'Hardware', 'cbk.licensed_banks']);
 	});
 });
 
-function fakeDatabases(calls: string[]): AtlasDatabases {
+function fakeDatabases(calls: string[], liveIds = ['regen-example-1']): AtlasDatabases {
+	let metaReads = 0;
 	const rowsFor = (sql: string) => {
+		if (sql.includes('DISTINCT country')) return [{ country: 'UG' }, { country: 'KE' }];
 		if (sql.includes('GROUP BY district')) {
 			return [
 				{ key: 'Kampala', count: 3 },
@@ -40,7 +48,14 @@ function fakeDatabases(calls: string[]): AtlasDatabases {
 			calls.push(sql);
 			return {
 				bind: () => ({
-					first: async () => (sql.includes('FROM meta') ? { value: 'regen-example-1' } : { n: 4 }),
+					first: async () => {
+						if (sql.includes('FROM meta')) {
+							const value = liveIds[Math.min(metaReads, liveIds.length - 1)];
+							metaReads += 1;
+							return { value };
+						}
+						return { n: 4 };
+					},
 					all: async () => ({ results: rowsFor(sql) })
 				})
 			};
@@ -50,12 +65,13 @@ function fakeDatabases(calls: string[]): AtlasDatabases {
 }
 
 describe('exploreSegments', () => {
-	it('returns totals and breakdowns from the segments table only', async () => {
+	it('returns totals and breakdowns for one country from the segments table only', async () => {
 		const calls: string[] = [];
 		const response = await exploreSegments(fakeDatabases(calls), { category: 'GENERAL ' });
 		expect(calls.filter((sql) => sql.includes('FROM businesses'))).toEqual([]);
 		expect(response).toMatchObject({
-			filters: { category: 'GENERAL' },
+			filters: { country: 'UG', category: 'GENERAL' },
+			countries: ['UG', 'KE'],
 			total_count: 4,
 			counts_by_district: [
 				{ district: 'Kampala', count: 3 },
@@ -65,8 +81,19 @@ describe('exploreSegments', () => {
 			counts_by_register: [{ register: 'kcca.businesses', count: 4 }],
 			counts_by_nature: [{ key: 'Hardware', count: 4 }],
 			search_link: '/search?category=GENERAL',
-			export_link: '/api/v1/explore?category=GENERAL&format=csv'
+			export_link: '/api/v1/explore?country=UG&category=GENERAL&format=csv'
 		});
+	});
+
+	it('groups case variants together and caps every breakdown', async () => {
+		const calls: string[] = [];
+		await exploreSegments(fakeDatabases(calls), {});
+		const grouped = calls.filter((sql) => sql.includes('GROUP BY'));
+		expect(grouped.length).toBeGreaterThan(0);
+		for (const sql of grouped) {
+			expect(sql).toMatch(/GROUP BY \w+ COLLATE NOCASE/);
+			expect(sql).toMatch(/LIMIT \d+/);
+		}
 	});
 
 	it('breaks a chosen district down by division and lists categories when none is chosen', async () => {
@@ -75,22 +102,30 @@ describe('exploreSegments', () => {
 		expect(response.counts_by_category).toEqual([{ key: 'GENERAL', count: 4 }]);
 		expect(response.counts_by_nature).toBeUndefined();
 	});
+
+	it('refuses to answer when the live regeneration changed while it was reading', async () => {
+		await expect(
+			exploreSegments(fakeDatabases([], ['regen-a', 'regen-b']), {})
+		).rejects.toBeInstanceOf(RegenerationInProgressError);
+	});
 });
 
 describe('exploreCsv', () => {
-	it('writes one line per district with quoting and an unknown label for null', () => {
+	it('writes one line per district, quoting and neutralising spreadsheet formulas', () => {
 		const csv = exploreCsv({
-			filters: {},
-			total_count: 4,
+			filters: { country: 'UG' },
+			countries: ['UG'],
+			total_count: 5,
 			counts_by_district: [
 				{ district: 'Kampala', count: 3 },
-				{ district: null, count: 1 }
+				{ district: null, count: 1 },
+				{ district: '=1+1', count: 1 }
 			],
 			counts_by_division: [],
 			counts_by_register: [],
 			search_link: '/search',
-			export_link: '/api/v1/explore?format=csv'
+			export_link: '/api/v1/explore?country=UG&format=csv'
 		});
-		expect(csv).toBe('district,business_count\r\nKampala,3\r\n(unknown),1\r\n');
+		expect(csv).toBe('district,business_count\r\nKampala,3\r\n(unknown),1\r\n"\'=1+1",1\r\n');
 	});
 });

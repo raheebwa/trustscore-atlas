@@ -1,20 +1,29 @@
 /**
  * Segment explorer over the precomputed `segments` table (one row per
- * category, nature-or-any, district, division, register-or-any). Nature and
- * register have rollup rows (NULL) that count each business once; category,
- * district and division do not, so unfiltered dimensions are summed.
+ * country, category, nature-or-any, district, division, register-or-any).
+ * Nature and register have rollup rows (NULL) that count each business once;
+ * category, district and division do not, so unfiltered dimensions are summed.
+ * Every query is scoped to exactly one country; breakdowns never mix countries.
  */
 
 import type { SegmentFilters } from '$lib/types';
+import { getLiveRegenerationId, RegenerationInProgressError } from './atlas';
 import type { AtlasDatabases } from './platform';
+
+export const DEFAULT_COUNTRY = 'UG';
 
 export type DistrictCount = { district: string | null; count: number };
 export type DivisionCount = { division: string | null; count: number };
 export type RegisterCount = { register: string; count: number };
 export type KeyCount = { key: string | null; count: number };
 
+export interface ExploreFilters extends SegmentFilters {
+	country?: string | null;
+}
+
 export interface ExploreResponse {
-	filters: SegmentFilters;
+	filters: ExploreFilters;
+	countries: string[];
 	total_count: number;
 	counts_by_district: DistrictCount[];
 	counts_by_division: DivisionCount[];
@@ -39,8 +48,19 @@ interface FilterOptions {
 
 const FILTER_KEYS = ['category', 'nature', 'district', 'division', 'present_in'] as const;
 
-function cleanFilters(filters: SegmentFilters): SegmentFilters {
-	const cleaned: SegmentFilters = {};
+/** Rows returned per breakdown; the page shows fewer, the API never more. */
+const GROUP_LIMITS: Record<string, number> = {
+	district: 200,
+	division: 200,
+	register: 50,
+	sector_category: 100,
+	sector_nature: 100
+};
+
+function cleanFilters(filters: ExploreFilters): ExploreFilters {
+	const cleaned: ExploreFilters = {
+		country: filters.country?.trim().toUpperCase() || DEFAULT_COUNTRY
+	};
 	for (const key of FILTER_KEYS) {
 		const value = filters[key]?.trim();
 		if (value) cleaned[key] = value;
@@ -48,9 +68,9 @@ function cleanFilters(filters: SegmentFilters): SegmentFilters {
 	return cleaned;
 }
 
-function buildClauses(filters: SegmentFilters, options: FilterOptions = {}): ExploreFilterSql {
-	const clauses: string[] = [];
-	const bindings: string[] = [];
+function buildClauses(filters: ExploreFilters, options: FilterOptions = {}): ExploreFilterSql {
+	const clauses: string[] = ['country = ?'];
+	const bindings: string[] = [filters.country ?? DEFAULT_COUNTRY];
 	const exact = (column: string, value: string | null | undefined, collate = true) => {
 		if (!value) return false;
 		clauses.push(`${column} = ?${collate ? ' COLLATE NOCASE' : ''}`);
@@ -69,17 +89,22 @@ function buildClauses(filters: SegmentFilters, options: FilterOptions = {}): Exp
 	return { whereClause: ` WHERE ${clauses.join(' AND ')}`, bindings };
 }
 
-export function buildExploreFilter(filters: SegmentFilters): ExploreFilterSql {
+export function buildExploreFilter(filters: ExploreFilters): ExploreFilterSql {
 	return buildClauses(cleanFilters(filters));
 }
 
-function buildLink(path: string, filters: SegmentFilters, extra?: Record<string, string>): string {
+function buildLink(
+	path: string,
+	filters: ExploreFilters,
+	options: { country?: boolean; extra?: Record<string, string> } = {}
+): string {
 	const params = new URLSearchParams();
+	if (options.country && filters.country) params.set('country', filters.country);
 	for (const key of FILTER_KEYS) {
 		const value = filters[key];
 		if (value) params.set(key, value);
 	}
-	for (const [key, value] of Object.entries(extra ?? {})) params.set(key, value);
+	for (const [key, value] of Object.entries(options.extra ?? {})) params.set(key, value);
 	const query = params.toString();
 	return query ? `${path}?${query}` : path;
 }
@@ -87,14 +112,15 @@ function buildLink(path: string, filters: SegmentFilters, extra?: Record<string,
 async function groupCounts(
 	db: D1Database,
 	column: string,
-	filters: SegmentFilters,
+	filters: ExploreFilters,
 	options: FilterOptions = {}
 ): Promise<KeyCount[]> {
 	const { whereClause, bindings } = buildClauses(filters, options);
+	const limit = GROUP_LIMITS[column] ?? 100;
 	const { results } = await db
 		.prepare(
 			`SELECT ${column} AS key, SUM(business_count) AS count FROM segments${whereClause}
-			 GROUP BY ${column} ORDER BY count DESC, ${column} ASC`
+			 GROUP BY ${column} COLLATE NOCASE ORDER BY count DESC, key ASC LIMIT ${limit}`
 		)
 		.bind(...bindings)
 		.all<KeyCount>();
@@ -103,24 +129,32 @@ async function groupCounts(
 
 export async function exploreSegments(
 	{ db }: AtlasDatabases,
-	inputFilters: SegmentFilters
+	inputFilters: ExploreFilters
 ): Promise<ExploreResponse> {
 	const filters = cleanFilters(inputFilters);
 	const { whereClause, bindings } = buildClauses(filters);
-	const [totalRow, districts, divisions, registers, categoriesOrNatures] = await Promise.all([
-		db
-			.prepare(`SELECT COALESCE(SUM(business_count), 0) AS n FROM segments${whereClause}`)
-			.bind(...bindings)
-			.first<{ n: number }>(),
-		groupCounts(db, 'district', filters),
-		filters.district ? groupCounts(db, 'division', filters) : Promise.resolve([]),
-		groupCounts(db, 'register', filters, { register: 'each' }),
-		filters.category
-			? groupCounts(db, 'sector_nature', filters, { nature: 'each' })
-			: groupCounts(db, 'sector_category', filters)
-	]);
+	const liveBefore = await getLiveRegenerationId(db);
+	const [countriesResult, totalRow, districts, divisions, registers, categoriesOrNatures] =
+		await Promise.all([
+			db.prepare('SELECT DISTINCT country FROM segments').bind().all<{ country: string }>(),
+			db
+				.prepare(`SELECT COALESCE(SUM(business_count), 0) AS n FROM segments${whereClause}`)
+				.bind(...bindings)
+				.first<{ n: number }>(),
+			groupCounts(db, 'district', filters),
+			filters.district ? groupCounts(db, 'division', filters) : Promise.resolve([]),
+			groupCounts(db, 'register', filters, { register: 'each' }),
+			filters.category
+				? groupCounts(db, 'sector_nature', filters, { nature: 'each' })
+				: groupCounts(db, 'sector_category', filters)
+		]);
+	// The table swap is atomic per database, but these reads are not one snapshot; a swap in
+	// between would mix two regenerations, so the caller retries instead (503).
+	if ((await getLiveRegenerationId(db)) !== liveBefore) throw new RegenerationInProgressError();
+
 	const response: ExploreResponse = {
 		filters,
+		countries: (countriesResult.results ?? []).map((row) => row.country),
 		total_count: totalRow?.n ?? 0,
 		counts_by_district: districts.map(({ key, count }) => ({ district: key, count })),
 		counts_by_division: divisions.map(({ key, count }) => ({ division: key, count })),
@@ -128,7 +162,7 @@ export async function exploreSegments(
 			.filter((row): row is { key: string; count: number } => row.key !== null)
 			.map(({ key, count }) => ({ register: key, count })),
 		search_link: buildLink('/search', filters),
-		export_link: buildLink('/api/v1/explore', filters, { format: 'csv' })
+		export_link: buildLink('/api/v1/explore', filters, { country: true, extra: { format: 'csv' } })
 	};
 	if (filters.category) response.counts_by_nature = categoriesOrNatures;
 	else response.counts_by_category = categoriesOrNatures;
@@ -136,8 +170,11 @@ export async function exploreSegments(
 }
 
 function csvCell(value: string | null): string {
-	const text = value ?? '(unknown)';
-	return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+	let text = value ?? '(unknown)';
+	// A leading formula character would run in a spreadsheet; a quote prefix keeps it text.
+	const formula = /^[=+\-@\t\r]/.test(text);
+	if (formula) text = `'${text}`;
+	return formula || /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
 /** District breakdown as CSV, the explorer's export (docs/PRD.md section 10.1). */

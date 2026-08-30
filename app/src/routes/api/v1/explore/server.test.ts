@@ -7,20 +7,22 @@ function database(): D1Database {
 			bind: () => ({
 				first: async () => (sql.includes('FROM meta') ? { value: 'regen-example-1' } : { n: 5 }),
 				all: async () => ({
-					results: sql.includes('GROUP BY district')
-						? [
-								{ key: 'Kampala', count: 4 },
-								{ key: null, count: 1 }
-							]
-						: []
+					results: sql.includes('DISTINCT country')
+						? [{ country: 'UG' }]
+						: sql.includes('GROUP BY district')
+							? [
+									{ key: 'Kampala', count: 4 },
+									{ key: null, count: 1 }
+								]
+							: []
 				})
 			})
 		})
 	} as unknown as D1Database;
 }
 
-function call(query: string) {
-	const request = new Request(`https://atlas.example.invalid/api/v1/explore${query}`);
+function call(query: string, headers: Record<string, string> = {}) {
+	const request = new Request(`https://atlas.example.invalid/api/v1/explore${query}`, { headers });
 	const db = database();
 	return GET({
 		platform: { env: { DB: db, DB_STATEMENTS: db, DB_SCORES: db } },
@@ -39,17 +41,22 @@ describe('explore API', () => {
 				{ district: 'Kampala', count: 4 },
 				{ district: null, count: 1 }
 			],
-			export_link: '/api/v1/explore?district=Kampala&format=csv'
+			export_link: '/api/v1/explore?country=UG&district=Kampala&format=csv'
 		});
 	});
 
-	it('exports the district breakdown as CSV', async () => {
+	it('exports the district breakdown as CSV with an ETag and answers 304 on a match', async () => {
 		const response = await call('?format=csv');
 		expect(response.headers.get('content-type')).toContain('text/csv');
+		const etag = response.headers.get('etag');
+		expect(etag).not.toBeNull();
 		expect(await response.text()).toBe('district,business_count\r\nKampala,4\r\n(unknown),1\r\n');
+		const again = await call('?format=csv', { 'if-none-match': etag! });
+		expect(again.status).toBe(304);
 	});
 
-	it('rejects an unknown format', async () => {
+	it('rejects an unknown format and an unknown country code', async () => {
 		expect((await call('?format=xml')).status).toBe(400);
+		expect((await call('?country=Uganda')).status).toBe(400);
 	});
 });

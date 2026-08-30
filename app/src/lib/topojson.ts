@@ -61,7 +61,19 @@ function ringFromArcs(arcRefs: number[], arcs: Point[][]): Point[] {
 
 function propertyString(properties: Record<string, unknown> | undefined, key: string) {
 	const value = properties?.[key];
-	return typeof value === 'string' && value.trim() ? value : null;
+	const trimmed = typeof value === 'string' ? value.trim() : '';
+	return trimmed || null;
+}
+
+/**
+ * Key for matching a register's district spelling to a boundary name: case, spacing,
+ * punctuation and a trailing "district" are ignored. Genuine misspellings are not.
+ */
+export function districtKey(name: string | null | undefined): string {
+	return (name ?? '')
+		.toLowerCase()
+		.replace(/\bdistrict\b/g, '')
+		.replace(/[^a-z]/g, '');
 }
 
 export function decodeTopology(topology: Topology, objectName: string): BoundaryFeature[] {
