@@ -4,6 +4,8 @@
 	import Copy from '@lucide/svelte/icons/copy';
 	import Flag from '@lucide/svelte/icons/flag';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+	import { organizationJsonLd } from '$lib/structured-data';
 	import {
 		displayFieldValue,
 		formatFieldLabel,
@@ -71,6 +73,12 @@
 		formatWhen(record.scores[0]?.evaluation_as_of ?? null, { showTime: false })?.text
 	);
 
+	// The closing tag is split so this string cannot end the block that renders it.
+	const organizationTag = $derived(
+		`<script type="application/ld+json">${organizationJsonLd(record, page.url.origin)}</` +
+			`script>`
+	);
+
 	const rubricLabel = (rubric: string) =>
 		rubric.replace(/[_-]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
 
@@ -90,6 +98,10 @@
 		name="description"
 		content={`${record.canonical_name}: ${record.coverage_summary}. Every value on this record cites the register that published it.`}
 	/>
+	<!-- What this record says about itself to a reader that is not a person: the same name,
+	     identifiers and location the page shows, and nothing the registers did not publish. -->
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+	{@html organizationTag}
 </svelte:head>
 
 <div class="flex flex-col gap-8 xl:grid xl:grid-cols-12 xl:gap-8">

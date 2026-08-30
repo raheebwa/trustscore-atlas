@@ -5,6 +5,7 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import Search from '@lucide/svelte/icons/search';
+	import CountrySwitch from './CountrySwitch.svelte';
 	import type { Pack } from '$lib/server/packs';
 
 	/**
@@ -47,18 +48,13 @@
 			searchInput ?? (document.getElementById('home-search') as HTMLInputElement | null);
 		field?.focus();
 	}
-
-	// Every other query parameter travels with the switch so a scoped page keeps its filters.
-	const carried = $derived(
-		[...page.url.searchParams.entries()].filter(([key]) => key !== 'country' && key !== 'cursor')
-	);
 </script>
 
 <svelte:window onkeydown={onKeydown} />
 
 <header class="border-b border-border bg-panel">
 	<div
-		class="flex w-full flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 lg:px-6 xl:px-8 2xl:px-10"
+		class="flex w-full flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 md:gap-x-6 lg:px-6 xl:px-8 2xl:px-10"
 	>
 		<a
 			href={resolve('/')}
@@ -72,7 +68,7 @@
 			<form
 				method="get"
 				action={resolve('/search')}
-				class="order-last flex min-w-0 grow basis-full items-center gap-2 md:order-none md:basis-64"
+				class="flex min-w-0 grow basis-40 items-center gap-2 md:basis-64"
 				role="search"
 			>
 				<label class="sr-only" for="site-search">Search businesses</label>
@@ -120,16 +116,19 @@
 		</nav>
 
 		<Popover.Root>
+			<!-- One button on a phone: the sections and the country switch live behind it, so the
+			     header is a single row and the page starts at the top of the screen. -->
 			<Popover.Trigger
-				class="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm font-medium text-ink transition-colors duration-120 hover:border-border-strong md:hidden"
+				aria-label="Sections and country"
+				class="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm font-medium text-ink transition-colors duration-120 hover:border-border-strong md:hidden"
 			>
 				<Menu size={20} strokeWidth={1.5} aria-hidden="true" />
-				Sections
+				<span class="sr-only sm:not-sr-only">Sections</span>
 			</Popover.Trigger>
 			<Popover.Portal>
 				<Popover.Content
 					sideOffset={6}
-					class="z-30 flex w-56 flex-col rounded-md border border-border-strong bg-surface p-1 shadow-lg"
+					class="z-30 flex w-56 flex-col gap-1 rounded-md border border-border-strong bg-surface p-1 shadow-lg"
 				>
 					{#each NAV as item (item.href)}
 						<a
@@ -140,29 +139,20 @@
 							{item.label}
 						</a>
 					{/each}
+					{#if packs.length > 1}
+						<!-- The switch that scopes the site travels with the sections on a phone. -->
+						<div class="border-t border-border px-3 py-2">
+							<CountrySwitch {packs} {country} />
+						</div>
+					{/if}
 				</Popover.Content>
 			</Popover.Portal>
 		</Popover.Root>
 
 		{#if packs.length > 1}
-			<form method="get" class="flex shrink-0 items-center gap-2">
-				{#each carried as [key, value], index (`${key}-${index}`)}
-					<input type="hidden" name={key} {value} />
-				{/each}
-				<label class="sr-only" for="country-switch">Country pack</label>
-				<select
-					id="country-switch"
-					name="country"
-					class="h-8 rounded-md border border-border bg-surface px-2 text-xs text-ink transition-colors duration-120 hover:border-border-strong"
-					value={country}
-					onchange={(event) => event.currentTarget.form?.requestSubmit()}
-				>
-					{#each packs as pack (pack.code)}
-						<option value={pack.code}>{pack.code} · {pack.name}</option>
-					{/each}
-				</select>
-				<noscript><button type="submit" class="text-xs underline">Switch</button></noscript>
-			</form>
+			<div class="hidden md:block">
+				<CountrySwitch {packs} {country} />
+			</div>
 		{/if}
 	</div>
 </header>

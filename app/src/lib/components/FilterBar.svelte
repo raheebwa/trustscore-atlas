@@ -39,6 +39,10 @@
 			.filter((entry) => entry.value !== '')
 	);
 
+	// Five selects before the first result is a phone screen spent on chrome, so the panel opens on
+	// a press below md and is simply there above it.
+	let open = $state(false);
+
 	function dropEmptyControls(event: SubmitEvent) {
 		const form = event.currentTarget as HTMLFormElement;
 		for (const control of form.elements) {
@@ -67,25 +71,39 @@
 	{/each}
 
 	<div class="flex flex-wrap items-end gap-3 rounded-md border border-border bg-panel p-3">
-		<span class="flex items-center gap-2 text-xs font-medium text-ink-muted">
+		<button
+			type="button"
+			onclick={() => (open = !open)}
+			aria-expanded={open}
+			aria-controls="filter-fields"
+			class="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs font-medium text-ink transition-colors duration-120 hover:border-border-strong md:pointer-events-none md:border-transparent md:bg-transparent md:px-0 md:py-0 md:text-ink-muted"
+		>
 			<SlidersHorizontal size={20} strokeWidth={1.5} aria-hidden="true" />
 			Refine
-		</span>
-		{#each fields as field (field.name)}
-			<div class="flex min-w-48 flex-col gap-1">
-				<label class="text-xs text-ink-muted" for={`filter-${field.name}`}>{field.label}</label>
-				<Combobox
-					id={`filter-${field.name}`}
-					name={field.name}
-					options={field.options}
-					value={values[field.name] ?? ''}
-					placeholder="Any"
-				/>
-			</div>
-		{/each}
+			<span class="md:hidden">{open ? '' : `(${fields.length})`}</span>
+		</button>
+		<div
+			id="filter-fields"
+			class="{open ? 'flex' : 'hidden'} w-full flex-wrap items-end gap-3 md:flex md:w-auto"
+		>
+			{#each fields as field (field.name)}
+				<div class="flex min-w-48 grow flex-col gap-1 md:grow-0">
+					<label class="text-xs text-ink-muted" for={`filter-${field.name}`}>{field.label}</label>
+					<Combobox
+						id={`filter-${field.name}`}
+						name={field.name}
+						options={field.options}
+						value={values[field.name] ?? ''}
+						placeholder="Any"
+					/>
+				</div>
+			{/each}
+		</div>
 		<button
 			type="submit"
-			class="h-10 rounded-md border border-accent bg-accent px-4 text-base font-medium text-ink transition-colors duration-120 hover:border-accent-ink hover:bg-accent-ink hover:text-canvas"
+			class="{open
+				? 'block'
+				: 'hidden'} h-10 rounded-md border border-accent bg-accent px-4 text-base font-medium text-ink transition-colors duration-120 hover:border-accent-ink hover:bg-accent-ink hover:text-canvas md:block"
 		>
 			{submitLabel}
 		</button>
