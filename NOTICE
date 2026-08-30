@@ -1,9 +1,18 @@
-TrustScore Atlas
+Project name: TrustScore Atlas
 
-Brand assets under app/static/brand (the TrustScore mark, wordmark and favicons) are the
-TrustScore brand assets, copied unchanged from the TrustScore design tokens package
-(packages/design-tokens/assets). Atlas is a TrustScore sub-brand. These assets are not covered
-by the code licence of this repository and may not be reused to represent other products.
+Code licence: Apache-2.0 (see LICENSE)
 
-Boundaries under app/static/boundaries derive from the OCHA common operational datasets for
-Uganda (COD-AB), CC BY-IGO, simplified with the pipeline's boundaries command.
+Data licence: CC-BY-4.0 (see LICENSE-DATA), applying to TrustScore Atlas's own compilation: statements, canonical records, scores, crosswalk, rubrics, and data packages
+
+Per-register attributions:
+Kampala Capital City Authority: Licensed businesses, public register.
+Uganda Revenue Authority: VAT withholding agents, licensed customs agents, WHT exemption list, public register.
+Public Procurement and Disposal of Public Assets Authority: Open Contracting Data Standard releases, CC-BY-4.0.
+Uganda National Bureau of Standards: Certified products, public register.
+Bank of Uganda: Supervised institutions, public register.
+National Lotteries and Gaming Regulatory Board: Licensed operators, public register.
+Humanitarian Data Exchange / Uganda Bureau of Statistics: Administrative boundaries, CC-BY-IGO.
+Central Bank of Kenya: Directories of licensed commercial banks, mortgage finance institutions, bank holding companies and microfinance banks, public register.
+
+Brand assets:
+The TrustScore mark, wordmark and favicons under app/static/brand are copied unchanged from the TrustScore design tokens package (packages/design-tokens/assets). Atlas is a TrustScore sub-brand. These assets are not covered by the code or data licences of this repository and may not be reused to represent other products.
