@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { InvalidCursorError } from '$lib/pagination';
-import { RegenerationInProgressError, searchBusinesses } from '$lib/server/atlas';
+import { RegenerationInProgressError } from '$lib/server/atlas';
+import { searchBusinessesCached } from '$lib/server/search-cache';
 import { FTS_MIN_QUERY_LENGTH, normalizeQuery } from '$lib/server/search';
 import { requireDatabases } from '$lib/server/platform';
 import { findSegment } from '$lib/server/segments';
@@ -33,7 +34,7 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 			};
 		}
 
-		const response = await searchBusinesses(databases, {
+		const response = await searchBusinessesCached(databases, platform?.env?.CACHE, {
 			q: query,
 			district,
 			cursor: url.searchParams.get('cursor')

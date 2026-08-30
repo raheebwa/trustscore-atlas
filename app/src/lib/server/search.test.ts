@@ -109,3 +109,33 @@ describe('clampLimit', () => {
 		expect(clampLimit(5.9)).toBe(5);
 	});
 });
+
+describe('searchBusinessesCached', () => {
+	it('answers a repeated query from KV within one regeneration and keys on every option', async () => {
+		const { searchBusinessesCached } = await import('./search-cache');
+		const store = new Map<string, string>();
+		const cache = {
+			get: async (key: string) => store.get(key) ?? null,
+			put: async (key: string, value: string) => {
+				store.set(key, value);
+			}
+		} as unknown as KVNamespace;
+		const db = {
+			prepare: () => ({ bind: () => ({ first: async () => ({ value: 'regen-1' }) }) })
+		} as unknown as D1Database;
+		const databases = { db, statementsDb: db, scoresDb: db };
+		let searches = 0;
+		const search = async () => {
+			searches += 1;
+			return { query: 'example', total_count: 1, results: [] } as never;
+		};
+		const options = { q: ' Example ', district: 'Kampala', limit: '5', cursor: null };
+		const first = await searchBusinessesCached(databases, cache, options, search);
+		const second = await searchBusinessesCached(databases, cache, options, search);
+		expect(second).toEqual(first);
+		expect(searches).toBe(1);
+		expect([...store.keys()]).toEqual(['search:regen-1:example|kampala|5|']);
+		await searchBusinessesCached(databases, cache, { ...options, cursor: 'c1' }, search);
+		expect(searches).toBe(2);
+	});
+});
