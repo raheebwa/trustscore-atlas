@@ -99,8 +99,7 @@
 
 		{#if data.challengeFailed}
 			<Callout tone="warning" title="That did not go through">
-				The check in front of this form did not pass. Reload the page and send it again. If it keeps
-				failing, the claim can also be recorded through the API, which the tools page documents.
+				The check in front of this form did not pass. Reload the page and send it again.
 			</Callout>
 		{/if}
 

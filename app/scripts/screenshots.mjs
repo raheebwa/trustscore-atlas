@@ -65,6 +65,23 @@ const viewports = [
 	{ width: 390, height: 844 }
 ];
 const baseOrigin = baseUrl.origin;
+
+/**
+ * Whether a console line came from a script this site does not serve. A message with no location
+ * is treated as ours, because an unattributed error is more likely to be the page's own.
+ *
+ * Console attribution only works against a built page. Under the dev server, Vite's client wraps
+ * console messages, so every one of them reports Vite's own URL as its location and nothing is
+ * excluded. Run the sweep against a preview or a deployment when the exclusion matters.
+ */
+function isThirdParty(url) {
+	if (!url) return false;
+	try {
+		return new URL(url).origin !== baseOrigin;
+	} catch {
+		return false;
+	}
+}
 const results = new Map(
 	routes.map((route) => [
 		route,
@@ -115,9 +132,13 @@ try {
 				const text = message.text();
 				const echoesExpectedStatus =
 					allowedStatus !== undefined && text.includes(`status of ${allowedStatus}`);
-				if (message.type() === 'error' && !echoesExpectedStatus) {
-					result.consoleErrors.push(`${label}: ${text}`);
-				}
+				if (message.type() !== 'error' || echoesExpectedStatus) return;
+				// Only this site's own errors fail the sweep. The bot-check widget logs a line of its
+				// own on every page that renders it, and counting somebody else's script as our
+				// failure would make a zero here mean nothing: a real error would arrive in a count
+				// that was never zero to begin with.
+				if (isThirdParty(message.location()?.url)) return;
+				result.consoleErrors.push(`${label}: ${text}`);
 			});
 			page.on('pageerror', (error) => {
 				result.pageErrors.push(`${label}: ${error.message}`);
