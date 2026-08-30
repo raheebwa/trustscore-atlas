@@ -126,38 +126,40 @@
 					<p class="mt-1 text-sm text-stone-500">
 						Score coverage: {score.coverage_summary}.
 					</p>
-					<table class="mt-3 w-full text-left text-sm">
-						<thead class="text-stone-500">
-							<tr>
-								<th class="py-1 pr-3 font-medium">Predicate</th>
-								<th class="py-1 pr-3 font-medium">Points</th>
-								<th class="py-1 pr-3 font-medium">As of</th>
-								<th class="py-1 font-medium">Trace</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each score.evidence as row (row.predicate)}
-								<tr class="border-t border-stone-100">
-									<td class="py-1.5 pr-3 text-stone-800">{row.predicate}</td>
-									<td class="py-1.5 pr-3 text-stone-800">{row.points}</td>
-									<td class="py-1.5 pr-3 text-stone-600">{row.as_of ?? row.reason ?? '-'}</td>
-									<td class="py-1.5">
-										{#if row.field}
-											<a
-												href={resolve('/b/[atlas_id]/trace/[field]', {
-													atlas_id: record.atlas_id,
-													field: row.field
-												})}
-												class="text-stone-600 underline">view trace</a
-											>
-										{:else}
-											<span class="text-stone-400">-</span>
-										{/if}
-									</td>
+					<div class="mt-3 overflow-x-auto">
+						<table class="w-full text-left text-sm">
+							<thead class="text-stone-500">
+								<tr>
+									<th class="py-1 pr-3 font-medium">Predicate</th>
+									<th class="py-1 pr-3 font-medium">Points</th>
+									<th class="py-1 pr-3 font-medium">As of</th>
+									<th class="py-1 font-medium">Trace</th>
 								</tr>
-							{/each}
-						</tbody>
-					</table>
+							</thead>
+							<tbody>
+								{#each score.evidence as row (row.predicate)}
+									<tr class="border-t border-stone-100">
+										<td class="py-1.5 pr-3 text-stone-800">{row.predicate}</td>
+										<td class="py-1.5 pr-3 text-stone-800">{row.points}</td>
+										<td class="py-1.5 pr-3 text-stone-600">{row.as_of ?? row.reason ?? '-'}</td>
+										<td class="py-1.5">
+											{#if row.field}
+												<a
+													href={resolve('/b/[atlas_id]/trace/[field]', {
+														atlas_id: record.atlas_id,
+														field: row.field
+													})}
+													class="text-stone-600 underline">view trace</a
+												>
+											{:else}
+												<span class="text-stone-400">-</span>
+											{/if}
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
 					<p class="mt-2 text-xs text-stone-400">Evaluated {score.evaluation_as_of}</p>
 				</div>
 			{/each}
