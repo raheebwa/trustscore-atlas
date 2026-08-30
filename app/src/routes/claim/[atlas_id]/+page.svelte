@@ -102,10 +102,23 @@
 			<section class="flex flex-col gap-3 rounded-md border border-border bg-surface p-4">
 				<h2 class="text-xl font-semibold text-ink">Verify this claim</h2>
 				{#if data.verification.state === 'verified'}
-					<Callout tone="success" title="Website control proved">
-						Atlas found the string on {data.verification.verified_domain}. That proves you control
-						that website. A maintainer reviews the claim itself before anything about the record
-						changes.
+					{#if data.verification.verification_method === 'domain_email'}
+						<Callout tone="success" title="Mailbox confirmed">
+							A link Atlas mailed to {data.verification.verified_domain} was opened and confirmed. That
+							proves control of the domain, not that the business is yours, so a maintainer reviews the
+							claim before anything about the record changes.
+						</Callout>
+					{:else}
+						<Callout tone="success" title="Website control proved">
+							Atlas found the string on {data.verification.verified_domain}. That proves you control
+							that website. A maintainer reviews the claim itself before anything about the record
+							changes.
+						</Callout>
+					{/if}
+				{:else if data.verification.state === 'live' && data.verification.challenge?.method === 'domain_email'}
+					<Callout tone="info" title="Check the address you gave">
+						A confirmation link is on its way to it. The link lasts 30 minutes and works once.
+						Opening it finishes this step.
 					</Callout>
 				{:else if data.verification.state === 'live' && data.verification.challenge}
 					{@const challenge = data.verification.challenge}

@@ -8,7 +8,14 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { prepareWebsiteChallenge, runWebsiteAttempt } from './claim-verification';
+import { hashClaimConfirmationToken } from '$lib/claims';
+import {
+	consumeEmailChallenge,
+	emailDomainAllowed,
+	prepareEmailChallenge,
+	prepareWebsiteChallenge,
+	runWebsiteAttempt
+} from './claim-verification';
 
 interface Recorded {
 	sql: string;
@@ -277,5 +284,232 @@ describe('runWebsiteAttempt', () => {
 
 		const outcome = recorded.find((entry) => entry.sql.includes('outcome ='));
 		expect(outcome?.bindings).toContain('expired');
+	});
+});
+
+/**
+ * The email shape proves the claimant reads mail at a domain. It is only offered for a domain the
+ * claim has already earned, so it can never be the first step: a stranger cannot pick a domain and
+ * be mailed a verification link for someone else's business.
+ */
+describe('prepareEmailChallenge', () => {
+	it('stores the hash of the link token and never the token itself', async () => {
+		const recorded: Recorded[] = [];
+		const { issued, statement } = await prepareEmailChallenge(
+			fakeDatabase({}, recorded),
+			'claim_1',
+			'Owner@Example.co.ug',
+			() => new Date('2026-08-30T00:00:00Z')
+		);
+		void statement;
+
+		expect(issued.target).toBe('example.co.ug');
+		expect(issued.link_token).toMatch(/^[a-z0-9]{16,}$/);
+		expect(issued.expires_at).toBe('2026-08-30T00:30:00.000Z');
+		const insert = recorded.find((entry) => entry.sql.includes('INSERT INTO claim_challenges'));
+		expect(insert?.bindings).not.toContain(issued.link_token);
+		expect(insert?.bindings).toContain(await hashClaimConfirmationToken(issued.link_token));
+		// The address itself is never stored: the domain is what the challenge is about.
+		expect(JSON.stringify(insert?.bindings)).not.toContain('Owner@');
+		expect(JSON.stringify(insert?.bindings)).not.toContain('owner@');
+	});
+
+	it.each(['not-an-address', 'owner@', '@example.co.ug', 'owner@localhost', 'owner@example'])(
+		'refuses %s before anything is stored',
+		async (address) => {
+			const recorded: Recorded[] = [];
+			await expect(
+				prepareEmailChallenge(fakeDatabase({}, recorded), 'claim_1', address)
+			).rejects.toThrow();
+			expect(recorded.some((entry) => entry.sql.includes('INSERT'))).toBe(false);
+		}
+	);
+});
+
+describe('emailDomainAllowed', () => {
+	/**
+	 * The fake answers from what it was bound with. A fake that ignored its bindings would pass
+	 * even if the query stopped constraining the record or the field, which is the whole of what
+	 * this check does: decide whether a stranger may be mailed a link about someone else's record.
+	 */
+	function statementsDatabase(rows: { atlas_id: string; field: string; value: string }[]) {
+		return {
+			prepare: (sql: string) => ({
+				bind: (...bindings: unknown[]) => ({
+					all: async () => ({
+						results: rows.filter(
+							(row) =>
+								sql.includes('FROM statements') &&
+								row.atlas_id === bindings[0] &&
+								sql.includes(`field = '${row.field}'`)
+						)
+					})
+				})
+			})
+		} as unknown as D1Database;
+	}
+
+	const published = (value: string, atlas_id = 'atlas-example-1', field = 'website') => ({
+		atlas_id,
+		field,
+		value
+	});
+
+	it('allows a domain a register published as this record website', async () => {
+		const db = statementsDatabase([published('https://example.co.ug/about')]);
+
+		expect(await emailDomainAllowed(db, 'atlas-example-1', 'example.co.ug')).toBe(true);
+	});
+
+	it.each([
+		['https://www.example.co.ug', 'example.co.ug'],
+		['https://example.co.ug', 'www.example.co.ug'],
+		['Example.CO.UG', 'example.co.ug'],
+		['example.co.ug/contact', 'example.co.ug']
+	])('reads %s and %s as one domain', async (value, domain) => {
+		const db = statementsDatabase([published(value)]);
+
+		expect(await emailDomainAllowed(db, 'atlas-example-1', domain)).toBe(true);
+	});
+
+	it('refuses a domain published for a different record', async () => {
+		const db = statementsDatabase([published('https://example.co.ug', 'atlas-someone-else')]);
+
+		expect(await emailDomainAllowed(db, 'atlas-example-1', 'example.co.ug')).toBe(false);
+	});
+
+	it('refuses a value a register published as something other than a website', async () => {
+		const db = statementsDatabase([
+			published('https://example.co.ug', 'atlas-example-1', 'description')
+		]);
+
+		expect(await emailDomainAllowed(db, 'atlas-example-1', 'example.co.ug')).toBe(false);
+	});
+
+	it('refuses a domain no register published at all', async () => {
+		const db = statementsDatabase([published('https://somewhere-else.example')]);
+
+		expect(await emailDomainAllowed(db, 'atlas-example-1', 'example.co.ug')).toBe(false);
+	});
+});
+
+describe('consumeEmailChallenge', () => {
+	function emailDatabase(rows: Record<string, unknown>, recorded: Recorded[]): D1Database {
+		return {
+			prepare: (sql: string) => ({
+				bind: (...bindings: unknown[]) => {
+					recorded.push({ sql, bindings });
+					return {
+						first: async () => rows.challenge ?? null,
+						run: async () => ({
+							meta: {
+								changes: sql.includes('SET consumed_at')
+									? ((rows.consumeChanges as number | undefined) ?? 1)
+									: ((rows.claimWriteChanges as number | undefined) ?? 1)
+							}
+						})
+					};
+				}
+			}),
+			batch: async (statements: unknown[]) => statements.map(() => ({ meta: { changes: 1 } }))
+		} as unknown as D1Database;
+	}
+
+	const emailChallenge = {
+		challenge_id: 'chal_email',
+		claim_id: 'claim_1',
+		method: 'domain_email',
+		target: 'example.co.ug',
+		expires_at: '2099-01-01T00:00:00Z',
+		consumed_at: null
+	};
+
+	it('consumes the link before it writes anything, and verifies the claim once', async () => {
+		const recorded: Recorded[] = [];
+		const result = await consumeEmailChallenge(
+			emailDatabase({ challenge: emailChallenge }, recorded),
+			'chal_email',
+			'link-token'
+		);
+
+		expect(result).toMatchObject({ verified: true, outcome: 'verified:email' });
+		const order = recorded.map((entry) => entry.sql);
+		const consume = order.findIndex((sql) => sql.includes('SET consumed_at'));
+		const write = order.findIndex((sql) => sql.includes('UPDATE claims'));
+		expect(consume).toBeGreaterThanOrEqual(0);
+		expect(consume).toBeLessThan(write);
+		expect(recorded.some((entry) => entry.sql.includes('INSERT INTO claim_events'))).toBe(true);
+	});
+
+	it('refuses a link that was already used, without touching the claim', async () => {
+		const recorded: Recorded[] = [];
+		const result = await consumeEmailChallenge(
+			emailDatabase(
+				{
+					challenge: { ...emailChallenge, consumed_at: '2026-08-30T00:00:00Z' },
+					consumeChanges: 0
+				},
+				recorded
+			),
+			'chal_email',
+			'link-token'
+		);
+
+		expect(result).toEqual({ verified: false, outcome: 'already_used' });
+		expect(recorded.some((entry) => entry.sql.includes('UPDATE claims'))).toBe(false);
+	});
+
+	it('refuses an expired link', async () => {
+		const result = await consumeEmailChallenge(
+			emailDatabase(
+				{ challenge: { ...emailChallenge, expires_at: '2000-01-01T00:00:00Z' }, consumeChanges: 0 },
+				[]
+			),
+			'chal_email',
+			'link-token'
+		);
+
+		expect(result).toEqual({ verified: false, outcome: 'expired' });
+	});
+
+	it('says nothing about a link that never existed', async () => {
+		const result = await consumeEmailChallenge(
+			emailDatabase({ challenge: null, consumeChanges: 0 }, []),
+			'chal_missing',
+			'link-token'
+		);
+
+		expect(result).toEqual({ verified: false, outcome: 'not_found' });
+	});
+
+	/**
+	 * A link that outlived the claim it belongs to verifies nothing. The bound the endpoints hold
+	 * is held here as well, in the statement, so a link cannot walk around it.
+	 */
+	it('refuses to verify a claim that is not open, and does not call it verified', async () => {
+		const recorded: Recorded[] = [];
+		const result = await consumeEmailChallenge(
+			emailDatabase({ challenge: emailChallenge, claimWriteChanges: 0 }, recorded),
+			'chal_email',
+			'link-token'
+		);
+
+		expect(result).toEqual({ verified: false, outcome: 'claim_not_verifiable' });
+		expect(JSON.stringify(recorded)).not.toContain('verified:email');
+		expect(recorded.some((entry) => entry.sql.includes('INSERT INTO claim_events'))).toBe(false);
+	});
+
+	it('holds the claim to being confirmed and open in the statement itself', async () => {
+		const recorded: Recorded[] = [];
+		await consumeEmailChallenge(
+			emailDatabase({ challenge: emailChallenge }, recorded),
+			'chal_email',
+			'link-token'
+		);
+
+		const write = recorded.find((entry) => entry.sql.includes('UPDATE claims'));
+		expect(write?.sql).toContain('verified_at IS NULL');
+		expect(write?.sql).toContain("status = 'confirmed'");
+		expect(write?.sql).toContain('expires_at >');
 	});
 });

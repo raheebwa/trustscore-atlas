@@ -44,6 +44,7 @@ const routeSpecs = [
 	{ route: '/b/atl_does_not_exist', expect: 404 },
 	'/claim/atl_11bf115c93cd7870',
 	'/claim/atl_11bf115c93cd7870?token=not-a-real-token',
+	'/claim/verify/chal_does_not_exist?token=not-a-real-token',
 	'/report/issue_does_not_exist?token=not-a-real-token',
 	'/correct/correction_does_not_exist?token=not-a-real-token',
 	'/label/label_does_not_exist?token=not-a-real-token',

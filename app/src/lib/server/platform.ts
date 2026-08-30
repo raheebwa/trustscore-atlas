@@ -55,3 +55,12 @@ export function requireBucket(platform: App.Platform | undefined): R2Bucket {
 	if (!bucket) error(500, 'Data bucket is not configured.');
 	return bucket;
 }
+
+/**
+ * A plain string from the environment: worker vars and secrets are not part of the generated
+ * bindings type, so they are read by name and treated as absent when unset.
+ */
+export function envValue(platform: App.Platform | undefined, name: string): string | undefined {
+	const value = (platform?.env as Record<string, unknown> | undefined)?.[name];
+	return typeof value === 'string' && value.trim() ? value : undefined;
+}

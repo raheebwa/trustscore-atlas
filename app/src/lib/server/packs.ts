@@ -106,8 +106,11 @@ export async function resolveCountry(
  * addressed by the record itself, so they are the ones where the record can outrank the switch.
  */
 function recordAtlasId(pathname: string): string | null {
-	const [, section, id] = pathname.split('/');
+	const [, section, id, ...rest] = pathname.split('/');
 	if (!id || (section !== 'b' && section !== 'claim')) return null;
+	// /claim/verify/<challenge_id> is about a link, not a record, and its own page says which
+	// country it is in.
+	if (section === 'claim' && (id === 'verify' || rest.length > 0)) return null;
 	try {
 		return decodeURIComponent(id);
 	} catch {

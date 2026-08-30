@@ -43,8 +43,8 @@ async function loadVerification(
 	const tokenHash = await hashClaimConfirmationToken(token);
 	const claim = await db
 		.prepare(
-			`SELECT claim_id, atlas_id, expires_at, verified_at, verified_domain FROM claims
-			 WHERE claim_id = ? AND confirmation_token = ?`
+			`SELECT claim_id, atlas_id, expires_at, verified_at, verified_domain, verification_method
+			 FROM claims WHERE claim_id = ? AND confirmation_token = ?`
 		)
 		.bind(claimId, tokenHash)
 		.first<{
@@ -53,6 +53,7 @@ async function loadVerification(
 			expires_at: string | null;
 			verified_at: string | null;
 			verified_domain: string | null;
+			verification_method: string | null;
 		}>();
 	if (!claim || claim.atlas_id !== atlasId) return null;
 
@@ -78,7 +79,8 @@ async function loadVerification(
 		claim_id: claim.claim_id,
 		token,
 		verified_at: claim.verified_at,
-		verified_domain: claim.verified_domain
+		verified_domain: claim.verified_domain,
+		verification_method: claim.verification_method
 	};
 	if (claim.verified_at) return { ...base, state: 'verified' as const, challenge: null };
 	if (!challenge) return { ...base, state: 'none' as const, challenge: null };

@@ -12,7 +12,7 @@
  * automatically, so it may support a review but never advances the verification state.
  */
 
-import { CLAIM_WINDOW_DAYS } from '$lib/claims';
+import { CLAIM_WINDOW_DAYS, hashClaimConfirmationToken } from '$lib/claims';
 import { hasValidHost, verifyWebsiteString } from './website-verify';
 
 export interface IssuedChallenge {
@@ -100,8 +100,8 @@ export function prepareWebsiteChallenge(
 		expires_at: expiresAt.toISOString(),
 		instructions: [
 			`Publish ${value} at ${target}/.well-known/atlas-claim.txt, as the whole file.`,
-			`Or add <meta name="atlas-claim" content="${value}"> to the page you named.`,
-			'Then come back and ask Atlas to check. Either placement proves you control the site.'
+			`Or add <meta name="atlas-claim" content="${value}"> to the head of ${target}.`,
+			'Then come back and ask Atlas to check. Either placement proves you control the site. Only the address above is fetched, so a path you gave is not part of the check.'
 		]
 	};
 	return { issued, statement };
@@ -125,6 +125,196 @@ async function consume(
 		.prepare('UPDATE claim_challenges SET outcome = ?, consumed_at = ? WHERE challenge_id = ?')
 		.bind(outcome, at, challengeId)
 		.run();
+}
+
+/** Minutes a mailed link stays usable. Short, because a link in a mailbox is a standing key. */
+const EMAIL_MINUTES = 30;
+
+export interface IssuedEmailChallenge {
+	challenge_id: string;
+	method: 'domain_email';
+	/** The domain the address belongs to. The address itself is never stored. */
+	target: string;
+	expires_at: string;
+	/** Handed to the mail once and never written down: only its hash is stored. */
+	link_token: string;
+}
+
+/** The domain half of an address, refusing anything that could not receive public mail. */
+function domainOf(email: string): string {
+	const [local, domain, ...rest] = email.trim().toLowerCase().split('@');
+	if (!local || !domain || rest.length > 0) throw new Error('That is not an email address.');
+	if (!domain.includes('.') || domain.startsWith('.') || domain.endsWith('.')) {
+		throw new Error('That address is not at a public domain.');
+	}
+	if (!hasValidHost(new URL(`https://${domain}`))) {
+		throw new Error('That address is not at a public domain.');
+	}
+	return domain;
+}
+
+/**
+ * A mailed link for a domain the claim has already earned. Like the website challenge it is
+ * prepared as a statement so it lands in the same batch as whatever asked for it, and like the
+ * claim token only its hash is stored: the link in the mailbox is the only copy.
+ */
+export async function prepareEmailChallenge(
+	db: D1Database,
+	claimId: string,
+	email: string,
+	now: () => Date = () => new Date()
+): Promise<{ issued: IssuedEmailChallenge; statement: D1PreparedStatement }> {
+	const target = domainOf(email);
+	const linkToken = `${randomToken()}${randomToken()}`;
+	const tokenHash = await hashClaimConfirmationToken(linkToken);
+	const challengeId = newId('chal');
+	const issuedAt = now();
+	const expiresAt = new Date(issuedAt.getTime() + EMAIL_MINUTES * 60 * 1000);
+
+	const statement = db
+		.prepare(
+			`INSERT INTO claim_challenges
+			 (challenge_id, claim_id, method, target, token_hash, created_at, expires_at, attempts)
+			 VALUES (?, ?, 'domain_email', ?, ?, ?, ?, 0)`
+		)
+		.bind(challengeId, claimId, target, tokenHash, issuedAt.toISOString(), expiresAt.toISOString());
+
+	return {
+		issued: {
+			challenge_id: challengeId,
+			method: 'domain_email',
+			target,
+			expires_at: expiresAt.toISOString(),
+			link_token: linkToken
+		},
+		statement
+	};
+}
+
+/**
+ * Whether this record may be mailed at this domain.
+ *
+ * Reading mail at a domain proves the domain, never the business, so the domain has to be one the
+ * record itself points at: a website a register published for it. A claim that proved a domain by
+ * publishing a string on it is already verified and never needs mail, so there is no second rule
+ * here; this is the whole of it.
+ */
+export async function emailDomainAllowed(
+	statementsDb: D1Database,
+	atlasId: string,
+	domain: string
+): Promise<boolean> {
+	const wanted = bareHost(domain);
+	if (!wanted) return false;
+	const published = await statementsDb
+		.prepare("SELECT value FROM statements WHERE atlas_id = ? AND field = 'website'")
+		.bind(atlasId)
+		.all<{ value: string }>();
+	return (published.results ?? []).some((row) => bareHost(row.value) === wanted);
+}
+
+/**
+ * The host a published website value names, without the www a register may or may not have
+ * written, so one spelling of a domain is one domain.
+ */
+function bareHost(value: string): string | null {
+	const trimmed = value?.trim().toLowerCase();
+	if (!trimmed) return null;
+	try {
+		const url = new URL(/^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`);
+		return url.hostname.replace(/^www\./, '') || null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Spend a mailed link. The consume is the guard: one statement that only matches an unused,
+ * unexpired link with the right token, so a link forwarded twice verifies once. The claim is
+ * written only after that statement reports it moved a row.
+ */
+export async function consumeEmailChallenge(
+	db: D1Database,
+	challengeId: string,
+	token: string,
+	now: () => Date = () => new Date()
+): Promise<AttemptResult> {
+	const at = now().toISOString();
+	const tokenHash = await hashClaimConfirmationToken(token.trim());
+
+	// The consume is the guard: one statement that matches only an unused, unexpired link with the
+	// right token, so a link forwarded to a group verifies once. It records that the link was spent
+	// and says nothing yet about the claim, which has still to be written.
+	const consumed = await db
+		.prepare(
+			`UPDATE claim_challenges SET consumed_at = ?
+			 WHERE challenge_id = ? AND token_hash = ? AND method = 'domain_email'
+			   AND consumed_at IS NULL AND expires_at > ?`
+		)
+		.bind(at, challengeId, tokenHash, at)
+		.run();
+
+	// Only after the link is spent is it worth saying why it could not be: reading first would be
+	// a window in which the same link could be spent twice.
+	if (consumed.meta.changes !== 1) {
+		const challenge = await db
+			.prepare(
+				'SELECT expires_at, consumed_at FROM claim_challenges WHERE challenge_id = ? AND token_hash = ?'
+			)
+			.bind(challengeId, tokenHash)
+			.first<{ expires_at: string; consumed_at: string | null }>();
+		if (!challenge) return { verified: false, outcome: 'not_found' };
+		if (challenge.consumed_at) return { verified: false, outcome: 'already_used' };
+		return { verified: false, outcome: 'expired' };
+	}
+
+	const challenge = await db
+		.prepare('SELECT claim_id, target FROM claim_challenges WHERE challenge_id = ?')
+		.bind(challengeId)
+		.first<{ claim_id: string; target: string }>();
+	if (!challenge) return { verified: false, outcome: 'not_found' };
+
+	// The same bounds the endpoints hold: a claim nobody confirmed, or one whose window has closed,
+	// is not verifiable by a link that outlived it.
+	const written = await db
+		.prepare(
+			`UPDATE claims SET verified_at = ?, verified_domain = ?,
+			 verification_method = 'domain_email'
+			 WHERE claim_id = ? AND verified_at IS NULL AND status = 'confirmed' AND expires_at > ?`
+		)
+		.bind(at, challenge.target, challenge.claim_id, at)
+		.run();
+
+	if (written.meta.changes !== 1) {
+		const claim = await db
+			.prepare('SELECT verified_at FROM claims WHERE claim_id = ?')
+			.bind(challenge.claim_id)
+			.first<{ verified_at: string | null }>();
+		const outcome = claim?.verified_at ? 'already_verified' : 'claim_not_verifiable';
+		await recordOutcome(db, challengeId, outcome);
+		return { verified: false, outcome };
+	}
+
+	// The outcome is stamped with the audit row, after the claim moved, so a spent link never
+	// claims a verification the claim did not take.
+	await db.batch([
+		db
+			.prepare(
+				`INSERT INTO claim_events (event_id, claim_id, event_type, occurred_at, payload)
+				 VALUES (?, ?, 'email_verified', ?, ?)`
+			)
+			.bind(
+				newId('claim_event'),
+				challenge.claim_id,
+				at,
+				JSON.stringify({ method: 'domain_email', verified_domain: challenge.target })
+			),
+		db
+			.prepare('UPDATE claim_challenges SET outcome = ? WHERE challenge_id = ?')
+			.bind('verified:email', challengeId)
+	]);
+
+	return { verified: true, outcome: 'verified:email' };
 }
 
 interface ChallengeRow {

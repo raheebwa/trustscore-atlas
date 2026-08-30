@@ -32,11 +32,18 @@
 		data.record as { canonical_name?: string; atlas_id?: string } | undefined
 	);
 	const trace = $derived(data.trace as { field?: string } | undefined);
+	// A page about one record says which country that record is in, and the switch follows it: a
+	// record is addressed by its own id, so it cannot be filed under whatever was last chosen.
+	const recordPack = $derived(
+		packs.find((pack) => pack.code === (data.recordCountry as string | undefined))
+	);
+	const scopedCountry = $derived(recordPack?.code ?? country);
+	const scopedCountryName = $derived(recordPack?.name ?? countryName ?? country);
 	const crumbs = $derived(
 		buildCrumbs({
 			pathname: page.url.pathname,
-			country,
-			countryName: countryName ?? country,
+			country: scopedCountry,
+			countryName: scopedCountryName,
 			recordId: record?.atlas_id ?? (page.params.atlas_id as string | undefined) ?? null,
 			recordName:
 				record?.canonical_name ??
@@ -71,7 +78,7 @@
 </svelte:head>
 
 <div class="flex min-h-screen flex-col bg-canvas text-ink">
-	<AppHeader {packs} {country} />
+	<AppHeader {packs} country={scopedCountry} />
 	<main
 		class="mx-auto flex w-full flex-1 flex-col gap-4 px-4 py-6 {width === 'reading'
 			? 'max-w-reading'

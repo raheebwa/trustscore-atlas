@@ -134,6 +134,16 @@ describe('resolveScopeCountry', () => {
 		expect(scope).toEqual({ country: 'KE', fromRecord: false });
 	});
 
+	it('leaves the switch alone on a mailed link, which is about a link and not a record', async () => {
+		const scope = await resolveScopeCountry(fakeRecordDatabases('UG'), undefined, {
+			pathname: '/claim/verify/chal_example',
+			requested: 'KE',
+			remembered: null
+		});
+
+		expect(scope).toEqual({ country: 'KE', fromRecord: false });
+	});
+
 	it.each(['/search', '/explore', '/sources', '/downloads', '/'])(
 		'keeps the switch as the authority on %s',
 		async (pathname) => {

@@ -8,7 +8,7 @@ interface FakeStatement {
 	bindings: unknown[];
 }
 
-function database(): { db: D1Database; batches: FakeStatement[][] } {
+function database(published: string[] = []): { db: D1Database; batches: FakeStatement[][] } {
 	const batches: FakeStatement[][] = [];
 	const db = {
 		prepare: (sql: string) => ({
@@ -18,7 +18,10 @@ function database(): { db: D1Database; batches: FakeStatement[][] } {
 				first: async () =>
 					sql.includes('canonical_name')
 						? { canonical_name: 'Example Hardware Supplies Ltd' }
-						: null
+						: null,
+				all: async () => ({
+					results: sql.includes('FROM statements') ? published.map((value) => ({ value })) : []
+				})
 			})
 		}),
 		batch: async (batched: FakeStatement[]) => {
@@ -171,5 +174,31 @@ describe('claims API', () => {
 			entry.sql.includes('INSERT INTO claim_challenges')
 		);
 		expect(challenge?.bindings).toContain('https://example.co.ug');
+	});
+
+	/**
+	 * A mailed link lasts thirty minutes and is only allowed on a confirmed claim, so it cannot be
+	 * issued with the claim itself. The refusal says where to ask for one instead.
+	 */
+	it('refuses to issue a mailed link with the claim, and says where to ask for one', async () => {
+		const { db, batches } = database();
+		const response = await POST({
+			platform: { env: { DB: db } },
+			request: new Request('https://atlas.example.invalid/api/v1/claims', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					atlas_id: 'atlas-example-1',
+					claimant_role: 'owner or director',
+					verification_method: 'domain_email',
+					email: 'owner@example.co.ug'
+				})
+			})
+		} as never);
+		const body = (await response.json()) as { error: string };
+
+		expect(response.status).toBe(400);
+		expect(body.error).toContain('verify/email');
+		expect(batches).toHaveLength(0);
 	});
 });

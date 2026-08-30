@@ -19,9 +19,10 @@ import type { RequestHandler } from './$types';
 interface ClaimInput {
 	atlas_id?: unknown;
 	claimant_role?: unknown;
-	/** Optional: ask for a website-string challenge with the claim itself. */
+	/** Optional: ask for a challenge with the claim itself. */
 	verification_method?: unknown;
 	website_url?: unknown;
+	email?: unknown;
 }
 
 interface ParsedClaimInput {
@@ -43,7 +44,8 @@ async function readInput(request: Request): Promise<ParsedClaimInput> {
 			atlas_id: form.get('atlas_id'),
 			claimant_role: form.get('claimant_role'),
 			verification_method: form.get('verification_method'),
-			website_url: form.get('website_url')
+			website_url: form.get('website_url'),
+			email: form.get('email')
 		},
 		isPageForm: true
 	};
@@ -75,13 +77,21 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 		// A website challenge is decided before anything is written. A claim row is durable and its
 		// event cannot be deleted, so an address that can never be checked is refused here rather
 		// than leaving a claim nobody holds the link to.
+		// Only the website challenge is issued with the claim. A mailed link lasts thirty minutes and
+		// is only allowed once a claim is confirmed, so issuing one here would hand out a link that
+		// expired before it could be used: mail is asked for from the verify endpoint instead.
 		const wantsChallenge =
-			validText(input.website_url, 300) || validText(input.verification_method, 40);
+			validText(input.website_url, 300) ||
+			validText(input.email, 320) ||
+			validText(input.verification_method, 40);
+		if (wantsChallenge && input.verification_method !== 'website_string') {
+			return apiBadRequest(
+				'claims are created with verification_method website_string; ask for a mailed link from /api/v1/claims/{claim_id}/verify/email once the claim is confirmed'
+			);
+		}
+
 		let challengeTarget: string | null = null;
 		if (wantsChallenge) {
-			if (input.verification_method !== 'website_string') {
-				return apiBadRequest('the only verification method offered here is website_string');
-			}
 			if (!validText(input.website_url, 300)) {
 				return apiBadRequest('a website challenge needs a website address');
 			}

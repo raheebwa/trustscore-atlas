@@ -279,6 +279,8 @@ Successful scheduled loads also publish the nine prelude, stage and swap SQL fil
 
 The deployed Worker also binds static assets, R2 `DATA` to `atlas-data`, KV `CACHE`, `API_LIMITER`, and the three D1 databases. Downloads read R2; the site and tools read the same serving tables as the HTTP API.
 
+Mail is optional. A deployment that sets the `RESEND_API_KEY` secret and a `MAIL_FROM` address can send a claimant a verification link at a domain their record already publishes; a deployment that sets neither still records claims and still verifies websites, and simply sends nothing. Set them with `pnpm exec wrangler secret put RESEND_API_KEY` and `pnpm exec wrangler secret put MAIL_FROM`, and put the same two names in `app/.dev.vars` to exercise the path locally.
+
 ## Comparables
 
 | Project or source | What it does, and what Atlas does differently |

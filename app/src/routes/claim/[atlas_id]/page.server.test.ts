@@ -101,6 +101,7 @@ interface StoredClaim {
 	expires_at: string | null;
 	verified_at: string | null;
 	verified_domain: string | null;
+	verification_method: string | null;
 }
 
 interface StoredChallenge {
@@ -120,7 +121,8 @@ const storedClaim: StoredClaim = {
 	status: 'confirmed',
 	expires_at: '2999-01-01T00:00:00.000Z',
 	verified_at: null,
-	verified_domain: null
+	verified_domain: null,
+	verification_method: null
 };
 
 const storedChallenge: StoredChallenge = {
@@ -233,6 +235,23 @@ describe('claim verification panel loader', () => {
 
 		expect(data.verification?.state).toBe('verified');
 		expect(data.verification?.challenge).toBeNull();
+	});
+
+	// The page says what was proved, so it has to know which proof it was: a claim verified by a
+	// mailed link must not be captioned as a website whose string Atlas found.
+	it('carries the method a verified claim was proved by', async () => {
+		const data = await loadVerificationLink({
+			claim: {
+				verified_at: '2026-08-30T10:00:00.000Z',
+				verified_domain: 'example.co.ug',
+				verification_method: 'domain_email'
+			}
+		});
+
+		expect(data.verification).toMatchObject({
+			state: 'verified',
+			verification_method: 'domain_email'
+		});
 	});
 
 	it.each([
