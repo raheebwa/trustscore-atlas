@@ -6,6 +6,7 @@ import type {
 	ScoreExplanationResponse,
 	ScoreSummary,
 	SearchResponse,
+	SearchResultItem,
 	SegmentResponse
 } from '$lib/types';
 import { CURSOR_MAX_OFFSET, buildSearchCursor } from '$lib/pagination';
@@ -664,20 +665,33 @@ export async function executeReportIssue(
 	});
 }
 
-export function shapeSearchResults(response: SearchResponse): ToolTextResult {
-	const mappedResults = response.results.map((item) => ({
+/**
+ * One search hit for a model: the register lists that are derivable from the pack stay out
+ * (the coverage sentence carries their counts), found_in stays in because it is the linkage
+ * evidence. A hit that still does not fit the budget alone is reduced to its identity line.
+ */
+function shapeSearchHit(item: SearchResultItem, minimal = false) {
+	const identity = {
 		atlas_id: item.atlas_id,
 		canonical_name: item.canonical_name,
 		district: item.district,
 		division: item.division,
 		sector_category: item.sector_category,
 		sector_nature: item.sector_nature,
+		coverage: { found_in: item.coverage.found_in, summary: item.coverage_summary }
+	};
+	if (minimal) return identity;
+	return {
+		...identity,
 		identifiers: item.identifiers,
-		coverage: { ...item.coverage, summary: item.coverage_summary },
 		scores: item.formality ? [item.formality] : []
-	}));
+	};
+}
 
-	for (let count = mappedResults.length; count >= 0; count -= 1) {
+export function shapeSearchResults(response: SearchResponse): ToolTextResult {
+	const mappedResults = response.results.map((item) => shapeSearchHit(item));
+
+	for (let count = mappedResults.length; count >= 1; count -= 1) {
 		const resumesInsidePage = count < mappedResults.length;
 		const continuationOffset = response.offset + count;
 		const nextCursor = resumesInsidePage
@@ -701,6 +715,27 @@ export function shapeSearchResults(response: SearchResponse): ToolTextResult {
 		};
 		const result = textResult(payload);
 		if (result.content[0].text.length <= MAX_TOOL_RESULT_CHARS) return result;
+	}
+
+	if (response.results.length > 0) {
+		const minimal = textResult({
+			query: response.query,
+			total_count: response.total_count,
+			returned: 1,
+			page_returned: response.page_returned,
+			next_cursor:
+				response.results.length > 1 && response.offset + 1 <= CURSOR_MAX_OFFSET
+					? buildSearchCursor(
+							response.offset + 1,
+							response.query,
+							response.district,
+							response.regeneration_id
+						)
+					: response.next_cursor,
+			results: [shapeSearchHit(response.results[0], true)],
+			truncated: true
+		});
+		if (minimal.content[0].text.length <= MAX_TOOL_RESULT_CHARS) return minimal;
 	}
 
 	return textResult({

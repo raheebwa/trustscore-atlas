@@ -437,6 +437,45 @@ describe('start_claim execution', () => {
 });
 
 describe('shapeSearchResults', () => {
+	it('always returns at least one result, compacting a heavily linked business to fit', () => {
+		const registers = Array.from({ length: 12 }, (_, i) => `example.register-${i}`);
+		const linked: SearchResultItem = {
+			...makeResult(1),
+			canonical_name: 'Example Bank Limited',
+			identifiers: Array.from({ length: 6 }, (_, i) => ({
+				scheme: `example:scheme-${i}`,
+				value: `value-${i}-0123456789abcdef`,
+				source: registers[i]
+			})),
+			coverage: {
+				applicable: registers,
+				checked: registers.slice(0, 8),
+				found_in: registers.slice(0, 3),
+				not_yet_checked: registers.slice(8)
+			},
+			coverage_summary: 'found in 3 of 8 checked; 4 not yet checked'
+		};
+		const result = shapeSearchResults({
+			query: 'example bank',
+			district: '',
+			total_count: 1,
+			returned: 1,
+			page_returned: 1,
+			limit: 20,
+			offset: 0,
+			regeneration_id: 'regen-example-1',
+			next_cursor: null,
+			results: [linked]
+		});
+		const value = parsed(result);
+
+		expect(result.content[0].text.length).toBeLessThanOrEqual(MAX_TOOL_RESULT_CHARS);
+		expect(value.returned).toBe(1);
+		const [first] = value.results as { atlas_id: string; coverage: { found_in: string[] } }[];
+		expect(first.atlas_id).toBe('atlas-1');
+		expect(first.coverage.found_in).toEqual(registers.slice(0, 3));
+	});
+
 	it('returns one compact JSON text item with paging fields', () => {
 		const response: SearchResponse = {
 			query: 'example hardware',
