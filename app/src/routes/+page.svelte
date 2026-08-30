@@ -99,7 +99,7 @@
 				emphasis="lead"
 			/>
 			<div class="flex flex-col gap-2">
-				<p class="text-xs font-medium text-ink-muted">Registers loaded</p>
+				<p class="text-xs font-medium text-ink-muted">Registers loaded, across all country packs</p>
 				<ul class="flex flex-wrap gap-2">
 					{#each stats.sources as source (source.slug)}
 						<li>

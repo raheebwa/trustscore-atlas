@@ -4,14 +4,24 @@ import { error } from '@sveltejs/kit';
 import { RegenerationInProgressError } from '$lib/server/atlas';
 import { exploreSegmentsCached } from '$lib/server/explore';
 import { listFacetsCached } from '$lib/server/facets';
+import { packBoundaryMap, resolveCountry } from '$lib/server/packs';
 import { requireDatabases } from '$lib/server/platform';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ platform, url }) => {
+export const load: PageServerLoad = async ({ cookies, platform, url }) => {
 	const databases = requireDatabases(platform);
-	const country = url.searchParams.get('country')?.trim() ?? '';
-	if (country && !/^[A-Za-z]{2}$/.test(country)) error(400, 'Invalid country code.');
+	const requested = url.searchParams.get('country')?.trim() ?? '';
+	if (requested && !/^[A-Za-z]{2}$/.test(requested)) error(400, 'Invalid country code.');
 	const version = deploymentVersion(platform?.env as Record<string, unknown> | undefined);
+	// The header switch scopes this page like every other: the map, the counts and the bar lists
+	// all belong to one pack.
+	const country = await resolveCountry(
+		databases,
+		platform?.env?.CACHE,
+		requested,
+		cookies.get('country'),
+		version
+	);
 	// The filter controls offer published values only, so a chosen filter always has results.
 	const facetsPromise = listFacetsCached(databases, platform?.env?.CACHE, country, version);
 	try {
@@ -28,7 +38,12 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 			},
 			version
 		);
-		return { explore, facets: (await facetsPromise).facets };
+		return {
+			explore,
+			facets: (await facetsPromise).facets,
+			// The pack's own map, or nothing: the explorer never borrows another country's outline.
+			map: await packBoundaryMap(databases, country)
+		};
 	} catch (cause) {
 		if (cause instanceof RegenerationInProgressError) {
 			error(503, 'Data is being refreshed, try again in a minute.');

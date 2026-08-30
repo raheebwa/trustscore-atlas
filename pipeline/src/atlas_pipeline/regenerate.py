@@ -247,6 +247,9 @@ def _methodology_meta(rubrics_dir: Path, packs: list[Path]) -> str:
                 }
                 for scheme, spec in (pack.get("identifier_schemes") or {}).items()
             },
+            # The explorer reads its map from here, so a pack that declares one gets a map at the
+            # next regeneration rather than at the next deploy.
+            "boundaries_map": (pack.get("boundaries") or {}).get("map"),
             "precedence": pack["precedence"],
             "bindings": yaml.safe_load((pack_path / "rubrics" / "bindings.yml").read_text()),
         }

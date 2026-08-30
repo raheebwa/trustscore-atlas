@@ -4,7 +4,13 @@
 	import Copy from '@lucide/svelte/icons/copy';
 	import Flag from '@lucide/svelte/icons/flag';
 	import { resolve } from '$app/paths';
-	import { displayFieldValue, formatFieldLabel, formatWhen, identifierKey } from '$lib/format';
+	import {
+		displayFieldValue,
+		formatFieldLabel,
+		formatWhen,
+		humaniseValue,
+		identifierKey
+	} from '$lib/format';
 	import { describeRegister } from '$lib/registers';
 	import { scoreEarnedAndMissing } from '$lib/measures';
 	import { INTENTS, intentById, missingFor, uncheckedFor } from '$lib/record-intents';
@@ -96,8 +102,8 @@
 					<p class="text-base text-ink-muted">
 						{record.entity_kind} &middot; {record.location}
 						{#if record.sector_category}
-							&middot; {record.sector_category}{record.sector_nature
-								? `/${record.sector_nature}`
+							&middot; {humaniseValue(record.sector_category)}{record.sector_nature
+								? ` / ${humaniseValue(record.sector_nature)}`
 								: ''}
 						{/if}
 					</p>

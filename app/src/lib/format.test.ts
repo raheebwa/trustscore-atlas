@@ -5,6 +5,7 @@ import {
 	formatCoverageSentence,
 	formatScoreSentence,
 	formatWhen,
+	humaniseValue,
 	summariseIdentifiers
 } from './format';
 
@@ -176,5 +177,23 @@ describe('summariseIdentifiers with a synthetic scheme', () => {
 		]);
 
 		expect(summary).toEqual(['ug:kcca_licence x2']);
+	});
+});
+
+describe('humaniseValue', () => {
+	it('reads a register slug value as words', () => {
+		expect(humaniseValue('commercial_bank')).toBe('Commercial bank');
+		expect(humaniseValue('GENERAL')).toBe('General');
+		expect(humaniseValue('Wholesalers')).toBe('Wholesalers');
+	});
+
+	it('leaves a value that is already a name alone', () => {
+		expect(humaniseValue('Central Division')).toBe('Central Division');
+		expect(humaniseValue('KAMPALA')).toBe('Kampala');
+	});
+
+	it('has nothing to say about nothing', () => {
+		expect(humaniseValue(null)).toBe('');
+		expect(humaniseValue('')).toBe('');
 	});
 });

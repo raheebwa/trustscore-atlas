@@ -8,33 +8,27 @@
  * interface names a country in copy; adding a pack changes these numbers, not any sentence.
  */
 
-import { getLiveRegenerationId } from '$lib/server/atlas';
+import { getLiveRegenerationId, getSources } from '$lib/server/atlas';
 import { deploymentVersion } from '$lib/server/cache-scope';
-import { listPacksCached, type Pack } from '$lib/server/packs';
+import { listPacksCached, resolveCountry } from '$lib/server/packs';
 import { requireDatabases } from '$lib/server/platform';
 import type { LayoutServerLoad } from './$types';
-
-function chooseCountry(
-	packs: Pack[],
-	requested: string | null,
-	remembered: string | undefined
-): string {
-	const codes = new Set(packs.map((pack) => pack.code));
-	for (const candidate of [requested, remembered]) {
-		const code = candidate?.trim().toUpperCase();
-		if (code && codes.has(code)) return code;
-	}
-	return packs[0]?.code ?? 'UG';
-}
 
 export const load: LayoutServerLoad = async ({ cookies, platform, url }) => {
 	const databases = requireDatabases(platform);
 	const version = deploymentVersion(platform?.env as Record<string, unknown> | undefined);
-	const [packs, regeneration] = await Promise.all([
+	const [packs, regeneration, sources] = await Promise.all([
 		listPacksCached(databases, platform?.env?.CACHE, version),
-		getLiveRegenerationId(databases.db)
+		getLiveRegenerationId(databases.db),
+		getSources(databases.db)
 	]);
-	const country = chooseCountry(packs, url.searchParams.get('country'), cookies.get('country'));
+	const country = await resolveCountry(
+		databases,
+		platform?.env?.CACHE,
+		url.searchParams.get('country'),
+		cookies.get('country'),
+		version
+	);
 	// A country chosen in the URL becomes the visitor's default for a year; a link shared with
 	// ?country= still wins for whoever opens it.
 	if (url.searchParams.get('country') && cookies.get('country') !== country) {
@@ -45,5 +39,16 @@ export const load: LayoutServerLoad = async ({ cookies, platform, url }) => {
 			httpOnly: false
 		});
 	}
-	return { packs, country, regeneration };
+	const pack = packs.find((entry) => entry.code === country);
+	return {
+		packs,
+		country,
+		countryName: pack?.name ?? country,
+		// How many of this pack's registers have actually been loaded: the number every scope
+		// line quotes, so no page has to count it again.
+		registersLoaded: sources.filter(
+			(source) => source.country === country && source.status !== 'not_loaded'
+		).length,
+		regeneration
+	};
 };

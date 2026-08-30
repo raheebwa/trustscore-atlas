@@ -56,8 +56,16 @@ function normaliseContextPart(value: string | null | undefined): string {
 }
 
 /** Stable context for a search cursor. Both parts are normalised before hashing. */
-export function searchCursorContext(query: string, district: string | null | undefined): string {
-	return JSON.stringify([normaliseContextPart(query), normaliseContextPart(district)]);
+export function searchCursorContext(
+	query: string,
+	district: string | null | undefined,
+	country?: string | null
+): string {
+	return JSON.stringify([
+		normaliseContextPart(query),
+		normaliseContextPart(district),
+		normaliseContextPart(country)
+	]);
 }
 
 /** Stable context shared by statement API and trace cursors. */
@@ -98,9 +106,15 @@ export function buildSearchCursor(
 	offset: number,
 	query: string,
 	district: string | null | undefined,
-	regenerationId: string | null
+	regenerationId: string | null,
+	country?: string | null
 ): string {
-	return encodeCursor('search', offset, searchCursorContext(query, district), regenerationId);
+	return encodeCursor(
+		'search',
+		offset,
+		searchCursorContext(query, district, country),
+		regenerationId
+	);
 }
 
 export function decodeCursor(

@@ -31,7 +31,9 @@
 				href={hrefFor ? hrefFor(row.key) : undefined}
 				class="group flex items-center gap-3 rounded-sm px-1 py-1 transition-colors duration-120 hover:bg-panel"
 			>
-				<span class="w-40 shrink-0 truncate text-xs text-ink">{row.key}</span>
+				<span class="w-40 shrink-0 truncate text-xs text-ink lg:w-56" title={row.key}
+					>{row.key}</span
+				>
 				<span class="h-2 grow rounded-xs bg-panel">
 					<span
 						class="block h-full rounded-xs bg-score-earned transition-[width] duration-240 ease-[cubic-bezier(.2,0,0,1)]"

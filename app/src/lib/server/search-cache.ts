@@ -15,6 +15,7 @@ function cacheKey(scope: string, options: SearchOptions): string {
 	const parts = [
 		options.q.trim().toLowerCase(),
 		(options.district ?? '').trim().toLowerCase(),
+		(options.country ?? '').trim().toUpperCase(),
 		options.limit == null ? '' : String(options.limit),
 		options.cursor ?? ''
 	];

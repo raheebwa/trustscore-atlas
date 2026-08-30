@@ -545,6 +545,10 @@ def test_regenerate_publishes_the_methodology_it_scored_with(tmp_path: Path):
     assert payload["packs"]["UG"]["identifier_schemes"]["ug:tin"]["issuer_unique"] is True
     # A key we invented for a register row is marked as such, so no surface offers it as an
     # identifier someone could quote back to the register.
+    # The explorer draws the pack's own map, or says it has none: the declaration travels here.
+    assert payload["packs"]["UG"]["boundaries_map"]["asset"] == "ug-adm2.topojson"
+    assert payload["packs"].get("KE", {}).get("boundaries_map") is None
+
     schemes = payload["packs"]["UG"]["identifier_schemes"]
     assert schemes["ug:tin"]["synthetic"] is False
     assert schemes["ug:kcca_licence"]["synthetic"] is True

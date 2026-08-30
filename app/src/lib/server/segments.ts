@@ -19,6 +19,13 @@ export function buildSegmentFilter(filters: SegmentFilters): SegmentFilterSql {
 		bindings.push(trimmed);
 	};
 
+	// One pack per segment, for the same reason as search: a count that mixes packs answers a
+	// question nobody asked.
+	const country = filters.country?.trim().toUpperCase();
+	if (country) {
+		clauses.push('b.country = ?');
+		bindings.push(country);
+	}
 	addExact('b.sector_category', filters.category);
 	addExact('b.sector_nature', filters.nature);
 	addExact('b.district', filters.district);

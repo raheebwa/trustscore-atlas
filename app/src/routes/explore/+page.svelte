@@ -1,276 +1,201 @@
 <script lang="ts">
 	// SPDX-License-Identifier: Apache-2.0
-	import { onMount } from 'svelte';
-	import { SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
 	import { resolve } from '$app/paths';
-	import type { ResolvedPathname } from '$app/types';
-	import {
-		boundsOf,
-		decodeTopology,
-		districtKey,
-		projectRing,
-		type BoundaryFeature
-	} from '$lib/topojson';
+	import Download from '@lucide/svelte/icons/download';
+	import Search from '@lucide/svelte/icons/search';
+	import BarList from '$lib/components/BarList.svelte';
+	import Callout from '$lib/components/Callout.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import FilterBar from '$lib/components/FilterBar.svelte';
+	import MapChoropleth from '$lib/components/MapChoropleth.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import StatTile from '$lib/components/StatTile.svelte';
+	import { humaniseValue } from '$lib/format';
+	import { describeRegister } from '$lib/registers';
+	import { scopeLine } from '$lib/scope';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+	const explore = $derived(data.explore);
+	const filters = $derived(explore.filters);
 
-	const MAP_SIZE = 600;
-	let features = $state<BoundaryFeature[]>([]);
-	let mapError = $state<string | null>(null);
+	const FILTER_FIELDS = $derived([
+		{ name: 'district', label: 'District', options: data.facets.district },
+		{ name: 'division', label: 'Division or subcounty', options: data.facets.division },
+		{ name: 'category', label: 'Sector category', options: data.facets.sector_category },
+		{ name: 'nature', label: 'Sector nature', options: data.facets.sector_nature },
+		{ name: 'present_in', label: 'Present in register', options: data.facets.register }
+	]);
 
-	onMount(async () => {
-		try {
-			const response = await fetch('/boundaries/ug-adm2.topojson');
-			if (!response.ok) throw new Error(`boundaries ${response.status}`);
-			features = decodeTopology(await response.json(), 'adm2');
-		} catch {
-			mapError = 'The district map could not be loaded.';
-		}
+	const filterValues = $derived({
+		district: filters.district ?? '',
+		division: filters.division ?? '',
+		category: filters.category ?? '',
+		nature: filters.nature ?? '',
+		present_in: filters.present_in ?? ''
 	});
 
-	const filters = $derived(data.explore.filters);
+	const explorePath = $derived(resolve('/explore'));
 
-	// One control per published dimension; the options come from the data, never from free text.
-	const FILTERS = [
-		{ name: 'district', facet: 'district', label: 'District' },
-		{ name: 'division', facet: 'division', label: 'Division or subcounty' },
-		{ name: 'category', facet: 'sector_category', label: 'Sector category' },
-		{ name: 'nature', facet: 'sector_nature', label: 'Sector nature' },
-		{ name: 'present_in', facet: 'register', label: 'Present in register' }
-	] as const;
-
-	// A GET form submits every control, so an untouched filter would add an empty query parameter.
-	function dropEmptyControls(event: SubmitEvent) {
-		const form = event.currentTarget as HTMLFormElement;
-		for (const control of form.elements) {
-			const field = control as HTMLInputElement | HTMLSelectElement;
-			if (field.name && field.value === '') field.disabled = true;
+	/** The same page with one filter added, so a bar and an area on the map are both links. */
+	function withFilter(name: string, value: string): string {
+		const pairs: [string, string][] = [['country', data.country]];
+		for (const [key, current] of Object.entries(filterValues)) {
+			if (current && key !== name) pairs.push([key, current]);
 		}
+		pairs.push([name, value]);
+		return `${explorePath}?${pairs
+			.map(([key, item]) => `${encodeURIComponent(key)}=${encodeURIComponent(item)}`)
+			.join('&')}`;
 	}
-	const countsByDistrict = $derived.by(() => {
-		const map = new SvelteMap<string, number>();
-		for (const row of data.explore.counts_by_district) {
-			if (row.district === null) continue;
-			const key = districtKey(row.district);
-			map.set(key, (map.get(key) ?? 0) + row.count);
-		}
-		return map;
-	});
-	const unknownDistrict = $derived(
-		data.explore.counts_by_district.find((row) => row.district === null)?.count ?? 0
+
+	const districtRows = $derived(
+		explore.counts_by_district
+			.filter((row) => row.district !== null)
+			.map((row) => ({ key: row.district as string, count: row.count }))
 	);
-	const maxCount = $derived(Math.max(1, ...countsByDistrict.values()));
-	const bounds = $derived(features.length > 0 ? boundsOf(features) : null);
-
-	const BUCKETS = [78, 66, 54, 42, 30];
-	function shade(count: number | undefined): string {
-		if (!count) return 'url(#no-businesses)';
-		const level = Math.min(1, Math.log10(count + 1) / Math.log10(maxCount + 1));
-		const lightness = BUCKETS[Math.min(BUCKETS.length - 1, Math.floor(level * BUCKETS.length))];
-		return `hsl(24 60% ${lightness}%)`;
-	}
-
-	const allKeys = ['country', 'category', 'nature', 'district', 'division', 'present_in'];
-
-	/** A resolved path with the current filters (and any extra pairs) as its query string. */
-	function withQuery(
-		path: ResolvedPathname,
-		extra: Record<string, string>,
-		keys = ['country', 'category', 'nature', 'present_in']
-	): ResolvedPathname {
-		const params = new SvelteURLSearchParams();
-		for (const key of keys as (keyof typeof filters)[]) {
-			const value = filters[key];
-			if (value) params.set(key, value);
-		}
-		for (const [key, value] of Object.entries(extra)) params.set(key, value);
-		const text = params.toString();
-		return (text ? `${path}?${text}` : path) as ResolvedPathname;
-	}
+	const unknownDistrict = $derived(
+		explore.counts_by_district.find((row) => row.district === null)?.count ?? 0
+	);
 </script>
 
 <svelte:head>
 	<title>TrustScore Atlas: Explore</title>
 </svelte:head>
 
-<h1 class="text-2xl font-semibold text-stone-900">Explore segments</h1>
-<p class="mt-2 max-w-2xl text-sm text-stone-600">
-	Counts of businesses by district, register and sector, from the same regeneration that serves the
-	pages. Filter, then open the matching search or export the district breakdown.
-</p>
-
-<form method="get" class="mt-4 flex flex-wrap gap-2" onsubmit={dropEmptyControls}>
-	<label class="sr-only" for="country">Country</label>
-	<select
-		id="country"
-		name="country"
-		class="rounded-md border border-stone-300 px-3 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
+<div class="flex flex-col gap-6">
+	<PageHeader
+		title="Explore segments"
+		lede="Counts of businesses by district, register and sector, from the same regeneration that serves every page. Filter here, then open the matching search."
+		meta={[scopeLine('Exploring', data.countryName, data.registersLoaded)]}
 	>
-		{#each data.explore.countries as code (code)}
-			<option value={code} selected={code === filters.country}>{code}</option>
-		{/each}
-	</select>
-	{#each FILTERS as filter (filter.name)}
-		<label class="sr-only" for={filter.name}>{filter.label}</label>
-		<select
-			id={filter.name}
-			name={filter.name}
-			value={filters[filter.name] ?? ''}
-			class="rounded-md border border-stone-300 bg-white px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
-		>
-			<option value="">{filter.label}: any</option>
-			{#each data.facets[filter.facet] as option (option.value)}
-				<option value={option.value}>{option.value} ({option.count.toLocaleString()})</option>
-			{/each}
-		</select>
-	{/each}
-	<button
-		type="submit"
-		class="rounded-md bg-stone-900 px-5 py-2 text-base font-medium text-white hover:bg-stone-700"
-	>
-		Apply
-	</button>
-</form>
-
-<p class="mt-6 text-sm text-stone-500">
-	<span class="text-lg font-semibold text-stone-900"
-		>{data.explore.total_count.toLocaleString()}</span
-	>
-	business{data.explore.total_count === 1 ? '' : 'es'}
-	{#if filters.district}
-		in {filters.district}
-		(<a href={withQuery(resolve('/explore'), {})} class="underline">all districts</a>)
-	{/if}
-	&middot;
-	<a href={withQuery(resolve('/search'), {}, allKeys)} class="underline">open in search</a>
-	&middot;
-	<a href={withQuery(resolve('/api/v1/explore'), { format: 'csv' }, allKeys)} class="underline"
-		>export districts as CSV</a
-	>
-</p>
-
-<div class="mt-6 grid gap-8 lg:grid-cols-2">
-	<section>
-		<h2 class="text-lg font-semibold text-stone-900">By district</h2>
-		{#if mapError}
-			<p class="mt-2 text-sm text-amber-700">{mapError}</p>
-		{:else if bounds}
-			<svg
-				viewBox="0 0 {MAP_SIZE} {MAP_SIZE}"
-				class="mt-3 w-full max-w-xl"
-				role="group"
-				aria-label="Map of Uganda's districts; each district is a link shaded by business count"
+		{#snippet actions()}
+			<a
+				href={`${resolve('/search')}${explore.search_link.replace('/search', '')}`}
+				class="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm text-ink transition-colors duration-120 hover:border-border-strong"
 			>
-				<defs>
-					<pattern id="no-businesses" width="6" height="6" patternUnits="userSpaceOnUse">
-						<rect width="6" height="6" fill="#fafaf9" />
-						<path d="M0,6 L6,0" stroke="#d6d3d1" stroke-width="1" />
-					</pattern>
-				</defs>
-				{#each features as feature (feature.pcode ?? feature.name)}
-					{@const count = countsByDistrict.get(districtKey(feature.name))}
-					{@const selected =
-						!!filters.district && districtKey(filters.district) === districtKey(feature.name)}
-					<a
-						href={withQuery(resolve('/explore'), { district: feature.name ?? '' })}
-						aria-label="{feature.name}: {(count ?? 0).toLocaleString()} businesses"
-						class="outline-none focus-visible:[&>path]:stroke-sky-600 focus-visible:[&>path]:stroke-[3]"
-					>
-						<path
-							d={feature.rings.map((ring) => projectRing(ring, bounds, MAP_SIZE)).join('')}
-							fill={shade(count)}
-							fill-rule="evenodd"
-							stroke={selected ? '#1c1917' : '#78716c'}
-							stroke-width={selected ? 2.5 : 0.7}
-						>
-							<title>{feature.name}: {(count ?? 0).toLocaleString()}</title>
-						</path>
-					</a>
-				{/each}
-			</svg>
-			<p class="mt-2 text-xs text-stone-500">
-				Boundaries: OCHA common operational datasets for Uganda (COD-AB), CC BY-IGO, simplified.
-				Darker means more businesses; hatched means none matched. The dataset draws Kampala as one
-				polygon, so its divisions appear in the list below rather than on the map. The full list
-				below carries every count.
-			</p>
-		{:else}
-			<p class="mt-2 text-sm text-stone-500">Loading the district map...</p>
-		{/if}
-		<ul class="mt-3 flex flex-wrap gap-2 text-sm text-stone-600">
-			{#each data.explore.counts_by_district as row (row.district ?? 'unknown')}
-				<li class="rounded-full bg-stone-100 px-3 py-1">
-					{#if row.district}
-						<a
-							href={withQuery(resolve('/explore'), { district: row.district })}
-							class="hover:underline">{row.district}</a
-						>: {row.count.toLocaleString()}
-					{:else}
-						Unknown district: {row.count.toLocaleString()}
-					{/if}
-				</li>
-			{/each}
-		</ul>
-		{#if unknownDistrict > 0}
-			<p class="mt-2 text-xs text-stone-500">
-				Registers without addresses (procurement and tax lists) leave {unknownDistrict.toLocaleString()}
-				businesses without a district.
-			</p>
-		{/if}
-	</section>
+				<Search size={20} strokeWidth={1.5} aria-hidden="true" />
+				Open in search
+			</a>
+			<a
+				href={`${resolve('/api/v1/explore')}?country=${data.country}&format=csv`}
+				class="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm text-ink transition-colors duration-120 hover:border-border-strong"
+			>
+				<Download size={20} strokeWidth={1.5} aria-hidden="true" />
+				District CSV
+			</a>
+		{/snippet}
+	</PageHeader>
 
-	<section class="flex flex-col gap-6">
-		{#if data.explore.counts_by_division.length > 0}
-			<div>
-				<h2 class="text-lg font-semibold text-stone-900">By division or subcounty</h2>
-				<ul class="mt-3 flex flex-wrap gap-2 text-sm text-stone-600">
-					{#each data.explore.counts_by_division as row (row.division ?? 'unknown')}
-						<li class="rounded-full bg-stone-100 px-3 py-1">
-							{row.division ?? 'Unknown division'}: {row.count.toLocaleString()}
-						</li>
-					{/each}
-				</ul>
+	<FilterBar
+		fields={FILTER_FIELDS}
+		values={filterValues}
+		hidden={[{ name: 'country', value: data.country }]}
+		clearHref={`${explorePath}?country=${data.country}`}
+		submitLabel="Apply"
+	/>
+
+	<StatTile
+		label="Businesses in this segment"
+		value={explore.total_count}
+		caption={`Counted once each, from the ${data.registersLoaded} ${data.registersLoaded === 1 ? 'register' : 'registers'} loaded for ${data.countryName}.`}
+		emphasis="lead"
+	/>
+
+	{#if explore.total_count === 0}
+		<EmptyState
+			title="No business matches these filters"
+			body="Every filter offers only values the data carries, so this combination is simply empty. Drop one filter to widen it."
+			examples={[{ label: 'Clear all filters', href: `${explorePath}?country=${data.country}` }]}
+		/>
+	{:else}
+		<div class="grid gap-6 lg:grid-cols-12">
+			<section class="flex flex-col gap-3 lg:col-span-7">
+				<h2 class="text-xl font-semibold text-ink">Where they are</h2>
+				{#if data.map}
+					<MapChoropleth
+						asset={data.map.asset}
+						object={data.map.object}
+						attribution={data.map.attribution}
+						counts={districtRows}
+						selected={filterValues.district}
+						hrefFor={(name) => withFilter('district', name)}
+						label={`Map of ${data.countryName}: each area is a link shaded by how many businesses it holds`}
+					/>
+				{:else}
+					<Callout tone="info" title="No boundary map for this pack yet">
+						This pack has not declared a boundary set, so its areas are listed rather than drawn.
+						Every count beside this is the same number a map would shade.
+					</Callout>
+				{/if}
+				{#if unknownDistrict > 0}
+					<p class="text-xs text-ink-muted">
+						<span class="tnum">{unknownDistrict.toLocaleString()}</span>
+						businesses carry no district in any register that publishes one.
+					</p>
+				{/if}
+			</section>
+
+			<div class="flex flex-col gap-6 lg:col-span-5">
+				<section class="flex flex-col gap-2">
+					<h2 class="text-lg font-semibold text-ink">By district</h2>
+					<BarList
+						rows={districtRows}
+						unit="districts"
+						hrefFor={(key) => withFilter('district', key)}
+					/>
+				</section>
+
+				{#if explore.counts_by_division.length > 0}
+					<section class="flex flex-col gap-2">
+						<h2 class="text-lg font-semibold text-ink">By division</h2>
+						<BarList
+							rows={explore.counts_by_division
+								.filter((row) => row.division !== null)
+								.map((row) => ({ key: row.division as string, count: row.count }))}
+							unit="divisions"
+							hrefFor={(key) => withFilter('division', key)}
+						/>
+					</section>
+				{/if}
+
+				<section class="flex flex-col gap-2">
+					<h2 class="text-lg font-semibold text-ink">By register</h2>
+					<BarList
+						rows={explore.counts_by_register.map((row) => ({
+							key: describeRegister(row.register).short,
+							count: row.count
+						}))}
+						unit="registers"
+					/>
+				</section>
+
+				{#if explore.counts_by_category}
+					<section class="flex flex-col gap-2">
+						<h2 class="text-lg font-semibold text-ink">By sector category</h2>
+						<BarList
+							rows={explore.counts_by_category
+								.filter((row) => row.key !== null)
+								.map((row) => ({ key: humaniseValue(row.key), count: row.count }))}
+							unit="categories"
+							hrefFor={(key) => withFilter('category', key)}
+						/>
+					</section>
+				{/if}
+
+				{#if explore.counts_by_nature}
+					<section class="flex flex-col gap-2">
+						<h2 class="text-lg font-semibold text-ink">By sector nature</h2>
+						<BarList
+							rows={explore.counts_by_nature
+								.filter((row) => row.key !== null)
+								.map((row) => ({ key: humaniseValue(row.key), count: row.count }))}
+							unit="natures"
+							hrefFor={(key) => withFilter('nature', key)}
+						/>
+					</section>
+				{/if}
 			</div>
-		{/if}
-		<div>
-			<h2 class="text-lg font-semibold text-stone-900">By register</h2>
-			<p class="mt-1 text-xs text-stone-500">
-				A business linked across registers is counted in each.
-			</p>
-			<ul class="mt-3 flex flex-wrap gap-2 text-sm text-stone-600">
-				{#each data.explore.counts_by_register as row (row.register)}
-					<li class="rounded-full bg-stone-100 px-3 py-1">
-						{row.register}: {row.count.toLocaleString()}
-					</li>
-				{/each}
-			</ul>
 		</div>
-		{#if data.explore.counts_by_category}
-			<div>
-				<h2 class="text-lg font-semibold text-stone-900">By sector category</h2>
-				<ul class="mt-3 flex flex-wrap gap-2 text-sm text-stone-600">
-					{#each data.explore.counts_by_category.slice(0, 30) as row (row.key ?? 'unknown')}
-						<li class="rounded-full bg-stone-100 px-3 py-1">
-							{row.key ?? 'Unknown category'}: {row.count.toLocaleString()}
-						</li>
-					{/each}
-				</ul>
-			</div>
-		{/if}
-		{#if data.explore.counts_by_nature}
-			<div>
-				<h2 class="text-lg font-semibold text-stone-900">
-					By sector nature within {filters.category}
-				</h2>
-				<ul class="mt-3 flex flex-wrap gap-2 text-sm text-stone-600">
-					{#each data.explore.counts_by_nature.slice(0, 40) as row (row.key ?? 'unknown')}
-						<li class="rounded-full bg-stone-100 px-3 py-1">
-							{row.key ?? 'Unknown nature'}: {row.count.toLocaleString()}
-						</li>
-					{/each}
-				</ul>
-			</div>
-		{/if}
-	</section>
+	{/if}
 </div>

@@ -233,3 +233,17 @@ export function displayFieldValue(field: string, value: string): string {
 		return value;
 	}
 }
+
+/**
+ * A value a register published as a key, read as words: "commercial_bank" is a slug, and a page
+ * that prints it is asking a reader to decode a database column. Values that are already names
+ * keep their own capitalisation beyond the first word.
+ */
+export function humaniseValue(value: string | null | undefined): string {
+	const text = value?.trim();
+	if (!text) return '';
+	const words = text.replace(/[_-]+/g, ' ').trim();
+	// A value shouted in capitals is a key, not a name; a mixed-case value is already written.
+	const normalised = words === words.toUpperCase() ? words.toLowerCase() : words;
+	return normalised.charAt(0).toUpperCase() + normalised.slice(1);
+}

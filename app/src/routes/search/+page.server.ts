@@ -5,6 +5,7 @@ import { InvalidCursorError } from '$lib/pagination';
 import { RegenerationInProgressError } from '$lib/server/atlas';
 import { checkDistrictFilter } from '$lib/server/district-filter';
 import { listFacetsCached } from '$lib/server/facets';
+import { resolveCountry } from '$lib/server/packs';
 import { searchBusinessesCached } from '$lib/server/search-cache';
 import { FTS_MIN_QUERY_LENGTH, normalizeQuery } from '$lib/server/search';
 import { requireDatabases } from '$lib/server/platform';
@@ -12,12 +13,20 @@ import { findSegment } from '$lib/server/segments';
 import type { SegmentFilters } from '$lib/types';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ platform, url }) => {
+export const load: PageServerLoad = async ({ cookies, platform, url }) => {
 	const databases = requireDatabases(platform);
 	const rawQuery = url.searchParams.get('q') ?? '';
 	const query = normalizeQuery(rawQuery);
 	const district = normalizeQuery(url.searchParams.get('district') ?? '');
+	const country = await resolveCountry(
+		databases,
+		platform?.env?.CACHE,
+		url.searchParams.get('country'),
+		cookies.get('country'),
+		deploymentVersion(platform?.env as Record<string, unknown> | undefined)
+	);
 	const segmentFilters: SegmentFilters = {
+		country,
 		category: url.searchParams.get('category')?.trim() || null,
 		nature: url.searchParams.get('nature')?.trim() || null,
 		district: url.searchParams.get('district')?.trim() || null,
@@ -25,7 +34,6 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 		present_in: url.searchParams.get('present_in')?.trim() || null
 	};
 	const hasSegmentFilters = Object.values(segmentFilters).some(Boolean);
-	const country = url.searchParams.get('country');
 	const version = deploymentVersion(platform?.env as Record<string, unknown> | undefined);
 	// The filter controls offer published values only, so a chosen filter always has results.
 	const facetsPromise = listFacetsCached(databases, platform?.env?.CACHE, country, version);
@@ -58,6 +66,7 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 			{
 				q: query,
 				district,
+				country,
 				cursor: url.searchParams.get('cursor')
 			},
 			undefined,

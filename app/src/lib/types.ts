@@ -57,6 +57,8 @@ export interface SearchResultItem {
 export interface SearchResponse {
 	query: string;
 	district: string;
+	/** The pack this answer belongs to; a result set never mixes packs. */
+	country?: string | null;
 	total_count: number;
 	returned: number;
 	page_returned: number;
@@ -206,6 +208,8 @@ export interface ScoreExplanationResponse {
 }
 
 export interface SegmentFilters {
+	/** The country pack in scope; a segment never mixes packs. */
+	country?: string | null;
 	category?: string | null;
 	nature?: string | null;
 	district?: string | null;

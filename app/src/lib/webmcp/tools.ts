@@ -53,7 +53,7 @@ export type WriteExecutionDependencies = StartClaimDependencies;
 export const SEARCH_BUSINESSES_TOOL = {
 	name: 'search_businesses',
 	description:
-		'Search TrustScore Atlas for Uganda businesses by name, with optional district paging. Returns locations, sectors, identifiers, and Formality details. Read only.',
+		'Search TrustScore Atlas by business name within one country pack, with optional district paging. Results, counts and paging are scoped to the country argument, which defaults to the pack this page is showing. Returns locations, sectors, identifiers and Formality details. Read only.',
 	inputSchema: {
 		type: 'object',
 		properties: {
@@ -742,6 +742,7 @@ export function shapeSearchResults(response: SearchResponse): ToolTextResult {
 			: response.next_cursor;
 		const payload = {
 			query: response.query,
+			...(response.country ? { country: response.country } : {}),
 			...(response.district_known === false
 				? {
 						district_known: false,
@@ -782,6 +783,7 @@ export function shapeSearchResults(response: SearchResponse): ToolTextResult {
 
 	return textResult({
 		query: response.query,
+		...(response.country ? { country: response.country } : {}),
 		total_count: response.total_count,
 		returned: 0,
 		next_cursor: response.next_cursor,

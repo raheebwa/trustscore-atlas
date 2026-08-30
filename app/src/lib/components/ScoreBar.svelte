@@ -53,6 +53,11 @@
 		<div class="h-full hatch" style={`width: ${widthOf(segments.unknown)}`}></div>
 	</div>
 	{#if compact}
-		<p class="tnum text-2xs text-ink-muted">{label} {score.value}/{score.max}</p>
+		<p class="tnum text-2xs text-ink-muted">
+			{label}
+			{score.value} of {score.checkable} checkable{score.unknown > 0
+				? ` · ${score.unknown} unknown`
+				: ''}
+		</p>
 	{/if}
 </figure>

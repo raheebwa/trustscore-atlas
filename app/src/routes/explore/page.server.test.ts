@@ -26,6 +26,7 @@ describe('explore page load', () => {
 	it('offers the filter value sets alongside the breakdowns', async () => {
 		const db = segmentsDatabase();
 		const data = (await load({
+			cookies: { get: () => undefined },
 			platform: { env: { DB: db, DB_STATEMENTS: db, DB_SCORES: db } },
 			url: new URL('https://atlas.example.invalid/explore')
 		} as never)) as { facets: Record<string, { value: string; count: number }[]> };

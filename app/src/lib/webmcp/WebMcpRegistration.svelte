@@ -3,6 +3,7 @@
 	/** Registers the page surface and tears every registration down on navigation. */
 	import { onDestroy, onMount } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
+	import { page } from '$app/state';
 	import { browser } from '$app/environment';
 	import {
 		EXPLAIN_SCORE_TOOL,
@@ -105,12 +106,21 @@
 					scoped({
 						...SEARCH_BUSINESSES_TOOL,
 						async execute(
-							input: { query: string; district?: string; limit?: number; cursor?: string },
+							input: {
+								query: string;
+								district?: string;
+								country?: string;
+								limit?: number;
+								cursor?: string;
+							},
 							context?: ToolExecutionContext
 						): Promise<ToolTextResult> {
 							const query = queryString({
 								q: input.query,
 								district: input.district,
+								// The page's own scope unless the caller names one: a tool on a page showing
+								// one pack should not quietly answer for another.
+								country: input.country ?? (page.data.country as string | undefined),
 								limit: input.limit,
 								cursor: input.cursor
 							});

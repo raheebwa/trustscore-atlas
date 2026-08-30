@@ -11,10 +11,11 @@ import {
 	apiServerError
 } from '$lib/server/api';
 import { checkDistrictFilter } from '$lib/server/district-filter';
+import { resolveCountry } from '$lib/server/packs';
 import { requireDatabases } from '$lib/server/platform';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = async ({ platform, request, url }) => {
+export const GET: RequestHandler = async ({ cookies, platform, request, url }) => {
 	try {
 		const databases = requireDatabases(platform);
 		const version = deploymentVersion(platform?.env as Record<string, unknown> | undefined);
@@ -22,7 +23,14 @@ export const GET: RequestHandler = async ({ platform, request, url }) => {
 		const limit = url.searchParams.get('limit');
 		const district = url.searchParams.get('district');
 		const cursor = url.searchParams.get('cursor');
-		const country = url.searchParams.get('country');
+		// The API scopes exactly as the page does, so a page and the API behind it never disagree.
+		const country = await resolveCountry(
+			databases,
+			platform?.env?.CACHE,
+			url.searchParams.get('country'),
+			cookies.get('country'),
+			version
+		);
 		// A district the data does not carry is a dead end unless the answer says what it does
 		// carry, so the check runs before the search rather than after an empty result.
 		const districtCheck = await checkDistrictFilter(
@@ -40,6 +48,7 @@ export const GET: RequestHandler = async ({ platform, request, url }) => {
 				{
 					query: q,
 					district,
+					country,
 					total_count: 0,
 					returned: 0,
 					page_returned: 0,
@@ -57,7 +66,7 @@ export const GET: RequestHandler = async ({ platform, request, url }) => {
 		const response = await searchBusinessesCached(
 			databases,
 			platform?.env?.CACHE,
-			{ q, limit, district, cursor },
+			{ q, limit, district, cursor, country },
 			undefined,
 			version
 		);

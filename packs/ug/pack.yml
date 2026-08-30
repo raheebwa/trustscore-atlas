@@ -46,6 +46,9 @@ identifier_schemes:
     # (with optional branch suffixes), credit reference bureaus, and the register's own
     # four-digit codes. Free text such as an expiry note is not a code and is not emitted.
     pattern: "^(?:(?:SC: )?[A-Z]{4}UG[A-Z0-9]{2}(?:[A-Z0-9]{3})?|FXB ?[0-9]{2,3}|MR [0-9]{2,3}(?: ?\\([a-z]\\))?(?:/MR [0-9]{2,3} ?\\([a-z]\\))?|CRB[0-9]{3,4}|[0-9]{4})$"
+    # What the register prints in the code column when it has no code. These match the pattern
+    # above but identify nothing, and publishing them would offer a reader a number to quote back.
+    null_values: ["0000", "0", "N/A", "n/a", "-", "--", "TBA"]
     org_id_guide: null
   ug:nlgrb_licence:
     title: NLGRB gaming operator licence number
@@ -71,6 +74,13 @@ boundaries:
   provider: HDX COD-AB (UBOS)
   licence: CC-BY-IGO
   levels: [adm1, adm2, adm3, adm4]
+  # The map the explorer draws for this pack. A pack without this key shows its bar lists and
+  # says it has no map yet, rather than borrowing another country's outline.
+  map:
+    level: adm2
+    asset: ug-adm2.topojson
+    object: adm2
+    attribution: OCHA common operational datasets for Uganda (COD-AB), CC BY-IGO, simplified.
   # The capital's licensing divisions; a business licensed in one of them is in Kampala district.
   kcca_divisions: [Central Division, Kawempe Division, Makindye Division, Nakawa Division, Rubaga Division]
 

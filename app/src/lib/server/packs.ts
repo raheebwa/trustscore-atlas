@@ -78,3 +78,59 @@ export async function listPacksCached(
 	}
 	return packs;
 }
+
+/**
+ * The country pack a request is scoped to: what the URL asked for, else what the visitor last
+ * chose, else the largest pack. The layout, every page load and every API route resolve it the
+ * same way, so a page and the API behind it never disagree about what "all businesses" means.
+ */
+export async function resolveCountry(
+	databases: AtlasDatabases,
+	cache: KVNamespace | undefined,
+	requested: string | null | undefined,
+	remembered: string | null | undefined,
+	versionId: string | null = null
+): Promise<string> {
+	const packs = await listPacksCached(databases, cache, versionId);
+	const codes = new Set(packs.map((pack) => pack.code));
+	for (const candidate of [requested, remembered]) {
+		const code = candidate?.trim().toUpperCase();
+		if (code && codes.has(code)) return code;
+	}
+	return packs[0]?.code ?? 'UG';
+}
+
+export interface BoundaryMap {
+	level: string;
+	asset: string;
+	object: string;
+	attribution?: string;
+}
+
+/**
+ * The map a pack declares for the explorer, read from the published methodology. A pack without
+ * one gets no map: an explorer that draws Uganda's districts while the switch says Kenya is
+ * worse than an explorer with no picture at all.
+ */
+export async function packBoundaryMap(
+	{ db }: AtlasDatabases,
+	country: string
+): Promise<BoundaryMap | null> {
+	const published = await getMetaValue(db, 'methodology');
+	if (!published) return null;
+	try {
+		const parsed = JSON.parse(published) as {
+			packs?: Record<string, { boundaries_map?: Partial<BoundaryMap> | null }>;
+		};
+		const map = parsed.packs?.[country.toUpperCase()]?.boundaries_map;
+		if (!map?.asset || !map.object) return null;
+		return {
+			level: map.level ?? '',
+			asset: map.asset,
+			object: map.object,
+			attribution: map.attribution
+		};
+	} catch {
+		return null;
+	}
+}

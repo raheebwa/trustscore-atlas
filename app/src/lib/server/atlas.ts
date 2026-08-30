@@ -691,6 +691,9 @@ export interface SearchOptions {
 	limit?: number | string | null;
 	district?: string | null;
 	cursor?: string | null;
+	/** The country pack in scope. A search never mixes packs: a Ugandan reader looking for a
+	 * bank must not be handed Kenyan banks, and the count has to mean the same thing as the list. */
+	country?: string | null;
 }
 
 export async function searchBusinesses(
@@ -708,7 +711,7 @@ export async function searchBusinesses(
 	const offset = decodeCursor(
 		options.cursor,
 		'search',
-		searchCursorContext(query, normalisedDistrict),
+		searchCursorContext(query, normalisedDistrict, options.country),
 		liveRegenerationId
 	);
 
@@ -716,6 +719,7 @@ export async function searchBusinesses(
 		return {
 			query,
 			district: normalisedDistrict,
+			country: options.country?.trim().toUpperCase() || null,
 			total_count: 0,
 			returned: 0,
 			page_returned: 0,
@@ -732,6 +736,12 @@ export async function searchBusinesses(
 		? ' AND (b.district = ? COLLATE NOCASE OR b.division = ? COLLATE NOCASE)'
 		: '';
 	const districtArgs = districtFilter ? [districtFilter, districtFilter] : [];
+	// One pack per search: the row list, the count and the paging cursor all mean the same thing.
+	const countryFilter = options.country?.trim().toUpperCase() || null;
+	const countryClause = countryFilter ? ' AND b.country = ?' : '';
+	const countryArgs = countryFilter ? [countryFilter] : [];
+	const scopeClause = `${districtClause}${countryClause}`;
+	const scopeArgs = [...districtArgs, ...countryArgs];
 
 	let rows: BusinessRow[];
 	let totalCount: number;
@@ -743,18 +753,18 @@ export async function searchBusinesses(
 				.prepare(
 					`SELECT COUNT(*) AS n
 					 FROM businesses_fts JOIN businesses AS b ON b.atlas_id = businesses_fts.atlas_id
-					 WHERE businesses_fts MATCH ?${districtClause}`
+					 WHERE businesses_fts MATCH ?${scopeClause}`
 				)
-				.bind(phrase, ...districtArgs)
+				.bind(phrase, ...scopeArgs)
 				.first<{ n: number }>(),
 			db
 				.prepare(
 					`SELECT b.*
 					 FROM businesses_fts JOIN businesses AS b ON b.atlas_id = businesses_fts.atlas_id
-					 WHERE businesses_fts MATCH ?${districtClause}
+					 WHERE businesses_fts MATCH ?${scopeClause}
 					 ORDER BY rank, b.atlas_id LIMIT ? OFFSET ?`
 				)
-				.bind(phrase, ...districtArgs, limit + 1, offset)
+				.bind(phrase, ...scopeArgs, limit + 1, offset)
 				.all<BusinessRow>()
 		]);
 		totalCount = countRow?.n ?? 0;
@@ -765,17 +775,17 @@ export async function searchBusinesses(
 			db
 				.prepare(
 					`SELECT COUNT(*) AS n FROM businesses AS b
-					 WHERE b.name_normalised LIKE ? ESCAPE '\\'${districtClause}`
+					 WHERE b.name_normalised LIKE ? ESCAPE '\\'${scopeClause}`
 				)
-				.bind(pattern, ...districtArgs)
+				.bind(pattern, ...scopeArgs)
 				.first<{ n: number }>(),
 			db
 				.prepare(
 					`SELECT b.* FROM businesses AS b
-					 WHERE b.name_normalised LIKE ? ESCAPE '\\'${districtClause}
+					 WHERE b.name_normalised LIKE ? ESCAPE '\\'${scopeClause}
 					 ORDER BY b.name_normalised, b.atlas_id LIMIT ? OFFSET ?`
 				)
-				.bind(pattern, ...districtArgs, limit + 1, offset)
+				.bind(pattern, ...scopeArgs, limit + 1, offset)
 				.all<BusinessRow>()
 		]);
 		totalCount = countRow?.n ?? 0;
@@ -812,6 +822,7 @@ export async function searchBusinesses(
 	return {
 		query,
 		district: normalisedDistrict,
+		country: countryFilter,
 		total_count: totalCount,
 		returned: items.length,
 		page_returned: items.length,
@@ -820,7 +831,13 @@ export async function searchBusinesses(
 		regeneration_id: liveRegenerationId,
 		next_cursor:
 			hasMore && offset + items.length <= CURSOR_MAX_OFFSET
-				? buildSearchCursor(offset + items.length, query, normalisedDistrict, liveRegenerationId)
+				? buildSearchCursor(
+						offset + items.length,
+						query,
+						normalisedDistrict,
+						liveRegenerationId,
+						countryFilter
+					)
 				: null,
 		results: items
 	};

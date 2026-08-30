@@ -93,6 +93,7 @@ describe('segments API', () => {
 			'https://atlas.example.invalid/api/v1/segments?category=Trade&district=Example%20District'
 		);
 		const response = await GET({
+			cookies: { get: () => undefined },
 			platform: {
 				env: {
 					DB: mainDatabase(),

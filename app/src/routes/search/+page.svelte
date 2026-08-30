@@ -1,6 +1,8 @@
 <script lang="ts">
 	// SPDX-License-Identifier: Apache-2.0
 	import { resolve } from '$app/paths';
+	import { humaniseValue } from '$lib/format';
+	import { scopeLine } from '$lib/scope';
 	import Search from '@lucide/svelte/icons/search';
 	import BarList from '$lib/components/BarList.svelte';
 	import Callout from '$lib/components/Callout.svelte';
@@ -42,7 +44,7 @@
 		const total = data.results.total_count.toLocaleString();
 		const noun = data.results.total_count === 1 ? 'result' : 'results';
 		const where = filterValues.district ? ` in ${filterValues.district}` : '';
-		return `${total} ${noun} for "${data.query}"${where}`;
+		return `${total} ${noun} for "${data.query}"${where} in ${data.countryName}`;
 	});
 
 	const nextHref = $derived(
@@ -65,7 +67,8 @@
 <div class="flex flex-col gap-6">
 	<PageHeader
 		title="Search businesses"
-		lede="Search by name or identifier across every register Atlas has loaded, then narrow by the values the data actually carries."
+		lede="Search by name or identifier across the registers loaded for the pack in view, then narrow by the values the data actually carries."
+		meta={[scopeLine('Searching', data.countryName, data.registersLoaded)]}
 	/>
 
 	<form method="get" class="flex flex-wrap gap-2">
@@ -181,8 +184,8 @@
 								<span class="text-xs text-ink-muted">
 									{item.location}
 									{#if item.sector_category}
-										&middot; {item.sector_category}{item.sector_nature
-											? `/${item.sector_nature}`
+										&middot; {humaniseValue(item.sector_category)}{item.sector_nature
+											? ` / ${humaniseValue(item.sector_nature)}`
 											: ''}
 									{/if}
 								</span>

@@ -111,6 +111,35 @@ describe('clampLimit', () => {
 	});
 });
 
+describe('search scope', () => {
+	it("binds the country so one pack never answers with another pack's businesses", async () => {
+		const sql: string[] = [];
+		const bindings: unknown[][] = [];
+		const db = {
+			prepare: (statement: string) => {
+				sql.push(statement);
+				return {
+					bind: (...args: unknown[]) => {
+						bindings.push(args);
+						return {
+							first: async () =>
+								statement.includes('FROM meta') ? { value: 'regen-1' } : { n: 0 },
+							all: async () => ({ results: [] })
+						};
+					}
+				};
+			}
+		} as unknown as D1Database;
+
+		const { searchBusinesses } = await import('./atlas');
+		await searchBusinesses({ db, statementsDb: db, scoresDb: db }, { q: 'bank', country: 'ke' });
+
+		const scoped = sql.find((statement) => statement.includes('b.country = ?'));
+		expect(scoped).toBeDefined();
+		expect(bindings.some((args) => args.includes('KE'))).toBe(true);
+	});
+});
+
 describe('searchBusinessesCached', () => {
 	it('answers a repeated query from KV within one regeneration and keys on every option', async () => {
 		const { searchBusinessesCached } = await import('./search-cache');
@@ -130,12 +159,18 @@ describe('searchBusinessesCached', () => {
 			searches += 1;
 			return { query: 'example', total_count: 1, results: [] } as never;
 		};
-		const options = { q: ' Example ', district: 'Kampala', limit: '5', cursor: null };
+		const options = {
+			q: ' Example ',
+			district: 'Kampala',
+			country: 'UG',
+			limit: '5',
+			cursor: null
+		};
 		const first = await searchBusinessesCached(databases, cache, options, search);
 		const second = await searchBusinessesCached(databases, cache, options, search);
 		expect(second).toEqual(first);
 		expect(searches).toBe(1);
-		expect([...store.keys()]).toEqual(['search:regen-1:dev:["example","kampala","5",""]']);
+		expect([...store.keys()]).toEqual(['search:regen-1:dev:["example","kampala","UG","5",""]']);
 		await searchBusinessesCached(databases, cache, { ...options, cursor: 'c1' }, search);
 		expect(searches).toBe(2);
 	});

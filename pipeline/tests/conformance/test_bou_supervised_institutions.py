@@ -111,6 +111,48 @@ def test_4_identifier_values_match_pack_patterns(run):
     assert {item["scheme"] for item in identifiers} == {"ug:bou_code"}
 
 
+def test_placeholder_codes_never_become_identifiers(spec, tmp_path):
+    """The register prints 0000 where an institution has no code. It matches the code shape, so
+    the pattern alone would publish it, and a reader would take it back to the register where it
+    means nothing. The pack declares those placeholders and the adapter drops them."""
+    payload = json.loads((FIXTURES / "supervision.json").read_text())
+
+    def rewrite(node):
+        if isinstance(node, dict):
+            if "code" in node and isinstance(node.get("code"), str):
+                node["code"] = "0000"
+            for value in node.values():
+                rewrite(value)
+        elif isinstance(node, list):
+            for value in node:
+                rewrite(value)
+
+    rewrite(payload)
+
+    class PlaceholderFetcher(FixtureFetcher):
+        def __call__(self, url, *, method="GET", data=None, headers=None):
+            if (method, url) == ("GET", self.module.ENDPOINT):
+                return json.dumps(payload).encode()
+            return super().__call__(url, method=method, data=data, headers=headers)
+
+    result = run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=PlaceholderFetcher(spec.module),
+        salt=SALT,
+    )
+    statements = pq.read_table(result.output_dir / "statements.parquet").to_pylist()
+    identifiers = [
+        json.loads(statement["value"])
+        for statement in statements
+        if statement["field"] == "identifiers"
+    ]
+    assert identifiers == []
+    assert spec.module.CODE_PATTERN.fullmatch("0000")
+
+
 def test_5_rerun_on_same_raw_input_is_byte_identical(spec, run, tmp_path):
     again, _ = _run(spec, tmp_path / "again")
     assert (
