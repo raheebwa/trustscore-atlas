@@ -65,7 +65,7 @@ def test_regenerate_from_one_source(tmp_path: Path):
     assert summary["sources"][0]["status"] == "fresh"
 
 
-def test_regenerate_writes_a_prelude_that_frees_the_largest_live_table(tmp_path: Path):
+def test_regenerate_prelude_never_drops_a_live_main_table(tmp_path: Path):
     """On the free plan a database may not exceed 500 MB. Staged tables sit beside live ones
     during an import, so the loader drops the largest live table (statements) before loading
     and keeps the previous regeneration's SQL as the rollback path."""
@@ -92,12 +92,13 @@ def test_regenerate_writes_a_prelude_that_frees_the_largest_live_table(tmp_path:
         schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
     )
     prelude = (out.directory / "prelude.sql").read_text().splitlines()
+    # The main database stages beside its live tables and swaps; only tables that no longer
+    # live there (moved to the statements and scores databases) are dropped beforehand, so a
+    # failed stage never takes search or the explorer down.
     assert prelude == [
-        "DROP TABLE IF EXISTS scores;",
-        "DROP TABLE IF EXISTS segments;",
-        "DROP TABLE IF EXISTS businesses_fts;",
         "DROP TABLE IF EXISTS statements;",
         "DROP TABLE IF EXISTS refs;",
+        "DROP TABLE IF EXISTS scores;",
     ]
     statements_prelude = (out.directory / "statements-prelude.sql").read_text().splitlines()
     assert statements_prelude == ["DROP TABLE IF EXISTS statements;"]

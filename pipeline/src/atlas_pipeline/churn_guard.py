@@ -80,5 +80,41 @@ def check_churn(*, regeneration_dir: Path, previous_bundle: Path, labels_file: P
     )
 
 
+def compare_bundles(*, target: Path, live: Path) -> ChurnReport:
+    """A rollback target measured against the live bundle: refuse when the target's business
+    count differs by more than the churn limit, when the live bundle carries labels and the
+    target none, or when the target has no aliases while the live one has some."""
+    previous_businesses = _parquet_rows(live / "canonical" / "businesses.parquet")
+    previous_aliases = _parquet_rows(live / "canonical" / "aliases.parquet")
+    live_labels = _labels_on_file(live / "canonical" / "labels.jsonl")
+    target_businesses = _parquet_rows(target / "canonical" / "businesses.parquet")
+    target_aliases = _parquet_rows(target / "canonical" / "aliases.parquet")
+    target_labels = _labels_on_file(target / "canonical" / "labels.jsonl")
+    delta = abs(target_businesses - previous_businesses)
+    share = delta / previous_businesses if previous_businesses else 0.0
+
+    reasons: list[str] = []
+    if previous_businesses and share > NEW_ENTITY_SHARE_LIMIT:
+        reasons.append(
+            f"target has {target_businesses} businesses against {previous_businesses} live "
+            f"({share:.1%} apart, limit {NEW_ENTITY_SHARE_LIMIT:.0%})"
+        )
+    if live_labels and target_labels == 0:
+        reasons.append(f"target carries no labels while the live bundle has {live_labels}")
+    if previous_aliases and target_aliases == 0:
+        reasons.append(f"aliases 0 in the target while the live bundle has {previous_aliases}")
+    return ChurnReport(
+        regeneration_id=target.name,
+        previous_businesses=previous_businesses,
+        previous_aliases=previous_aliases,
+        labels_on_file=live_labels,
+        new_entities=delta,
+        new_entity_share=round(share, 4),
+        labels_applied=target_labels,
+        aliases=target_aliases,
+        reasons=reasons,
+    )
+
+
 def report_json(report: ChurnReport) -> str:
     return json.dumps(asdict(report) | {"ok": report.ok}, indent=2)

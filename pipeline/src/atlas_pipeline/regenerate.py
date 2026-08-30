@@ -22,8 +22,12 @@ PHASE0_RUBRICS = ("formality", "activity", "compliance_signals", "procurement_re
 # Regenerated tables dropped before a load so the free-plan peak stays under the cap.
 # The main database also drops statements and refs so a layout from before the split can
 # never inflate a load.
+# Tables dropped before a load. The main database (under 100 MB) stages beside its live
+# tables and swaps, so a failed stage never takes search or the explorer down; it only drops
+# tables that moved to the statements and scores databases. Those two drop their one large
+# live table first because staging beside it would exceed the free-plan size limit.
 PRELUDE_DROPS = {
-    "DB": ("scores", "segments", "businesses_fts", "statements", "refs"),
+    "DB": ("statements", "refs", "scores"),
     "DB_STATEMENTS": ("statements",),
     "DB_SCORES": ("scores",),
 }

@@ -134,6 +134,45 @@ jobs:
               --file "$SQL_DIR/$sql_file" --remote)
           done
 
+      - name: Verify retained SQL against the index
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REGENERATION_ID: ${{ inputs.regeneration_id }}
+          SQL_DIR: ${{ steps.rollback.outputs.sql_dir }}
+        run: |
+          set -euo pipefail
+          (cd app && pnpm exec wrangler r2 object get "atlas-data/regen/index.json" \
+            --file "$RUNNER_TEMP/regen-index.json" --remote)
+          pipeline/.venv/bin/python -m atlas_pipeline regen verify \
+            --dir "$SQL_DIR" --index "$RUNNER_TEMP/regen-index.json" \
+            --regeneration "$REGENERATION_ID" | tee data/rollback/verify.json
+
+      - name: Compare the target bundle with the live bundle
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REGENERATION_ID: ${{ inputs.regeneration_id }}
+        run: |
+          set -euo pipefail
+          get_object() {
+            mkdir -p "$(dirname "$2")"
+            (cd app && pnpm exec wrangler r2 object get "$1" --file "$2" --remote)
+          }
+          get_object "atlas-data/bundles/latest.json" "$RUNNER_TEMP/latest.json"
+          live_id=$(pipeline/.venv/bin/python -c \
+            'import json, re, sys; v = json.load(open(sys.argv[1]))["regeneration_id"]; assert re.fullmatch(r"[0-9]{8}T[0-9]{6}Z", v); print(v)' \
+            "$RUNNER_TEMP/latest.json")
+          for pair in "$live_id:live" "$REGENERATION_ID:target"; do
+            id=${pair%%:*}; role=${pair##*:}
+            for name in canonical/businesses.parquet canonical/aliases.parquet canonical/labels.jsonl; do
+              get_object "atlas-data/bundles/$id/$name" "$RUNNER_TEMP/bundles/$role/$name" || true
+            done
+          done
+          pipeline/.venv/bin/python -m atlas_pipeline guard \
+            --target-bundle "$RUNNER_TEMP/bundles/target" --live-bundle "$RUNNER_TEMP/bundles/live" \
+            --out data/rollback/guard.json
+
       - name: Load retained regeneration
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

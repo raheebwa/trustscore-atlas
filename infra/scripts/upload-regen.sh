@@ -80,14 +80,16 @@ else
   fi
 fi
 
-python3 - "$index_file" "$regeneration_id" "$next_index_file" "$retired_file" <<'PY'
+described_file="$temp_dir/described.json"
+pipeline/.venv/bin/python -m atlas_pipeline regen describe --dir "$regeneration_dir" >"$described_file"
+python3 - "$index_file" "$regeneration_id" "$next_index_file" "$retired_file" "$described_file" <<'PY'
 import datetime
 import json
 import pathlib
 import re
 import sys
 
-source, current, destination, retired = sys.argv[1:]
+source, current, destination, retired, described_path = sys.argv[1:]
 payload = json.loads(pathlib.Path(source).read_text())
 ids = payload.get("regenerations")
 if not isinstance(ids, list) or not all(
@@ -97,10 +99,14 @@ if not isinstance(ids, list) or not all(
     raise ValueError("invalid regen/index.json")
 ordered = sorted(set(ids) | {current}, reverse=True)
 kept = ordered[:3]
+files = payload.get("files") if isinstance(payload.get("files"), dict) else {}
+files = {key: value for key, value in files.items() if key in kept}
+files[current] = json.loads(pathlib.Path(described_path).read_text())
 pathlib.Path(destination).write_text(
     json.dumps(
         {
             "regenerations": kept,
+            "files": files,
             "updated_at": datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         },
         indent=2,

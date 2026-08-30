@@ -9,7 +9,7 @@ from pathlib import Path
 from . import boundaries
 from .adapters import accept_run, load_adapter, run_adapter
 from .bundle import publish_bundle
-from .churn_guard import check_churn, report_json
+from .churn_guard import check_churn, compare_bundles, report_json
 from .conformance import check_run
 from .maintainer_labels import compile_maintainer_labels
 from .refresh import CADENCES, due_adapter_directories, restore_bundle
@@ -20,6 +20,7 @@ from .regeneration_requests import (
     mark_request,
     next_pending_request,
 )
+from .retained_sql import describe_sql_dir, index_entry, load_index, verify_sql_dir
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -78,10 +79,20 @@ def main(argv: list[str] | None = None) -> int:
     guard = sub.add_parser(
         "guard", help="refuse a regeneration that rewrites identities or drops labels"
     )
-    guard.add_argument("--regeneration", required=True)
-    guard.add_argument("--data-root", type=Path, required=True)
-    guard.add_argument("--previous-bundle", type=Path, required=True)
+    guard.add_argument("--regeneration")
+    guard.add_argument("--data-root", type=Path)
+    guard.add_argument("--previous-bundle", type=Path)
+    guard.add_argument("--target-bundle", type=Path, help="rollback: the target's bundle")
+    guard.add_argument("--live-bundle", type=Path, help="rollback: the live bundle")
     guard.add_argument("--out", type=Path)
+    regen_cmd = sub.add_parser("regen", help="retained load sql: describe for the index, verify")
+    regen_sub = regen_cmd.add_subparsers(dest="regen_command", required=True)
+    describe = regen_sub.add_parser("describe")
+    describe.add_argument("--dir", type=Path, required=True)
+    verify = regen_sub.add_parser("verify")
+    verify.add_argument("--dir", type=Path, required=True)
+    verify.add_argument("--index", type=Path, required=True)
+    verify.add_argument("--regeneration", required=True)
     labels = sub.add_parser("labels", help="manage canonical maintainer labels")
     label_commands = labels.add_subparsers(dest="labels_command", required=True)
     compile_labels = label_commands.add_parser("compile", help="compile new maintainer labels")
@@ -143,12 +154,36 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(json.dumps(result, indent=2))
         return 0
-    if args.command == "guard":
-        report = check_churn(
-            regeneration_dir=args.data_root / "regen" / args.regeneration,
-            previous_bundle=args.previous_bundle,
-            labels_file=args.data_root / "canonical" / "labels.jsonl",
+    if args.command == "regen":
+        if args.regen_command == "describe":
+            print(json.dumps(describe_sql_dir(args.dir), indent=2))
+            return 0
+        entry = index_entry(load_index(args.index), args.regeneration)
+        if entry is None:
+            print(f"{args.regeneration} has no entry in the retained sql index", file=sys.stderr)
+            return 1
+        reasons = verify_sql_dir(args.dir, entry)
+        for reason in reasons:
+            print(reason, file=sys.stderr)
+        print(
+            json.dumps(
+                {"regeneration_id": args.regeneration, "ok": not reasons, "reasons": reasons}
+            )
         )
+        return 0 if not reasons else 1
+    if args.command == "guard":
+        if args.target_bundle is not None:
+            if args.live_bundle is None:
+                parser.error("--target-bundle needs --live-bundle")
+            report = compare_bundles(target=args.target_bundle, live=args.live_bundle)
+        else:
+            if args.regeneration is None or args.data_root is None or args.previous_bundle is None:
+                parser.error("guard needs --regeneration, --data-root and --previous-bundle")
+            report = check_churn(
+                regeneration_dir=args.data_root / "regen" / args.regeneration,
+                previous_bundle=args.previous_bundle,
+                labels_file=args.data_root / "canonical" / "labels.jsonl",
+            )
         text = report_json(report)
         print(text)
         if args.out:
