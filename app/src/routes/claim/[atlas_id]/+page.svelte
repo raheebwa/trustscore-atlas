@@ -15,6 +15,14 @@
 	// A check can take several seconds against a slow site, and a second click would spend
 	// another of the five attempts on the same question.
 	let checking = $state(false);
+
+	/** What a reader calls the file, rather than the media type it is stored as. */
+	function documentLabel(contentType: string): string {
+		if (contentType === 'application/pdf') return 'PDF document';
+		if (contentType === 'image/png') return 'PNG image';
+		if (contentType === 'image/jpeg') return 'JPEG image';
+		return 'Document';
+	}
 	const challengeCloses = $derived(
 		formatWhen(data.verification?.challenge?.expires_at ?? null, { showTime: false })?.text
 	);
@@ -175,6 +183,77 @@
 						Claim the business again with your website address, and Atlas will give you a string to
 						publish.
 					</Callout>
+				{/if}
+			</section>
+		{/if}
+
+		{#if data.verification && data.verification.state !== 'closed'}
+			<section class="flex flex-col gap-3 rounded-md border border-border bg-surface p-4">
+				<h2 class="text-xl font-semibold text-ink">Supporting documents</h2>
+				<p class="text-base text-ink-muted">
+					A document never verifies a claim: it can be forged and cannot be checked automatically.
+					It is here so a maintainer reviewing the claim can see what you hold, such as a trading
+					licence or a letter on the business's paper. Only maintainers can open what you attach.
+				</p>
+
+				{#if data.verification.documents.length > 0}
+					<ul class="flex flex-col gap-2">
+						{#each data.verification.documents as document (document.evidence_id)}
+							<li
+								class="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-md border border-border bg-panel-2 p-3"
+							>
+								<span class="text-base text-ink">{documentLabel(document.content_type)}</span>
+								<span class="tnum text-xs text-ink-muted"
+									>{formatWhen(document.uploaded_at)?.text}</span
+								>
+								{#if document.uploaded_note}
+									<span class="text-xs text-ink-muted">{document.uploaded_note}</span>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				{/if}
+
+				{#if data.verification.documents.length < 5}
+					<form
+						method="post"
+						enctype="multipart/form-data"
+						action={`${resolve('/api/v1/claims/[claim_id]/evidence', { claim_id: data.verification.claim_id })}`}
+						class="flex flex-col gap-3"
+					>
+						<input type="hidden" name="token" value={data.verification.token} />
+						<input type="hidden" name="from" value="page" />
+						<label class="flex max-w-md flex-col gap-1">
+							<span class="text-xs font-medium text-ink-muted">A PDF, PNG or JPEG, under 5 MB</span>
+							<input
+								type="file"
+								name="file"
+								required
+								accept="application/pdf,image/png,image/jpeg"
+								class="text-base text-ink file:mr-3 file:rounded-md file:border file:border-border file:bg-panel-2 file:px-3 file:py-1.5 file:text-base file:text-ink"
+							/>
+						</label>
+						<label class="flex max-w-md flex-col gap-1">
+							<span class="text-xs font-medium text-ink-muted">What it is, in a few words</span>
+							<input
+								name="note"
+								maxlength="300"
+								placeholder="Trading licence for 2026"
+								class="h-10 rounded-md border border-border bg-surface px-3 text-base text-ink transition-colors duration-120 hover:border-border-strong"
+							/>
+						</label>
+						<button
+							type="submit"
+							class="h-10 w-fit rounded-md border border-border-strong bg-panel-2 px-4 text-base font-medium text-ink transition-colors duration-120 hover:border-accent-ink hover:bg-accent"
+						>
+							Attach this document
+						</button>
+					</form>
+				{:else}
+					<p class="text-xs text-ink-muted">
+						Five documents are attached, which is the most a claim holds. Write to the maintainers
+						if something else matters.
+					</p>
 				{/if}
 			</section>
 		{/if}

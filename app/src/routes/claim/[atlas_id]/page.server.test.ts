@@ -145,6 +145,7 @@ async function loadVerificationLink(
 	options: {
 		claim?: Partial<StoredClaim>;
 		challenge?: Partial<StoredChallenge> | null;
+		documents?: { evidence_id: string; content_type: string; uploaded_at: string }[];
 		token?: string;
 		pathAtlasId?: string;
 	} = {}
@@ -157,6 +158,13 @@ async function loadVerificationLink(
 	const db = {
 		prepare: (sql: string) => ({
 			bind: (...bindings: unknown[]) => ({
+				all: async () => ({
+					results: sql.includes('FROM claim_evidence')
+						? bindings[0] === claim.claim_id
+							? (options.documents ?? [])
+							: []
+						: []
+				}),
 				first: async () => {
 					if (sql.includes('FROM claim_challenges')) {
 						return bindings[0] === claim.claim_id ? challenge : null;
@@ -277,5 +285,20 @@ describe('claim verification panel loader', () => {
 		const data = await loadVerificationLink({ challenge: null });
 
 		expect(data.verification?.state).toBe('none');
+	});
+
+	it('lists the documents attached to the claim, which prove nothing on their own', async () => {
+		const data = await loadVerificationLink({
+			documents: [
+				{
+					evidence_id: 'evidence_1',
+					content_type: 'application/pdf',
+					uploaded_at: '2026-08-30T10:00:00.000Z'
+				}
+			]
+		});
+
+		expect(data.verification?.documents).toHaveLength(1);
+		expect(data.verification?.documents[0]).toMatchObject({ content_type: 'application/pdf' });
 	});
 });

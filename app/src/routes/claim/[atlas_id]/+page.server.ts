@@ -75,8 +75,25 @@ async function loadVerification(
 			consumed_at: string | null;
 		}>();
 
+	// Documents never advance verification; they are listed so a claimant can see what a maintainer
+	// will see, and so the same document is not sent twice.
+	const documents = await db
+		.prepare(
+			`SELECT evidence_id, content_type, byte_size, uploaded_at, uploaded_note
+			 FROM claim_evidence WHERE claim_id = ? ORDER BY uploaded_at`
+		)
+		.bind(claimId)
+		.all<{
+			evidence_id: string;
+			content_type: string;
+			byte_size: number;
+			uploaded_at: string;
+			uploaded_note: string | null;
+		}>();
+
 	const base = {
 		claim_id: claim.claim_id,
+		documents: documents.results ?? [],
 		token,
 		verified_at: claim.verified_at,
 		verified_domain: claim.verified_domain,

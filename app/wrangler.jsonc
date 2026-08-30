@@ -12,6 +12,14 @@
 	"workers_dev": true,
 	"preview_urls": true,
 	"routes": [{ "pattern": "atlas.trustscorehq.com", "custom_domain": true }],
+	"vars": {
+		// The canonical address of this deployment. Links that leave the Worker, such as a
+		// mailed verification link, are built from this rather than from a caller's own Host.
+		"PUBLIC_ORIGIN": "https://atlas.trustscorehq.com",
+		"MAIL_FROM": "claims@atlas.trustscorehq.com",
+		// A Turnstile site key is public by design: it is served in the page markup.
+		"TURNSTILE_SITE_KEY": "0x4AAAAAAEh9YeR-HZsVLYnr"
+	},
 	"r2_buckets": [{ "binding": "DATA", "bucket_name": "atlas-data" }],
 	"kv_namespaces": [{ "binding": "CACHE", "id": "f4b549f2e82a4ef992f759f972415559" }],
 	"version_metadata": { "binding": "CF_VERSION_METADATA" },
