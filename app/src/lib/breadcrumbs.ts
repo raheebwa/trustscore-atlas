@@ -85,7 +85,8 @@ export function buildCrumbs(context: CrumbContext): Crumb[] {
 
 	if (head === 'b') {
 		// A record is the thing itself: it takes its own crumb rather than sitting under "Record".
-		const name = context.recordName ?? context.recordId ?? 'Record';
+		// When there is no record to name, the page is a refusal rather than a record, and says so.
+		const name = context.recordName ?? context.recordId ?? 'Not found';
 		const recordHref = context.recordId ? `/b/${encodeURIComponent(context.recordId)}` : undefined;
 		const isRecordPage = segments.length === 2;
 		crumbs.push({
@@ -98,7 +99,9 @@ export function buildCrumbs(context: CrumbContext): Crumb[] {
 		return crumbs;
 	}
 
-	const section = SECTIONS[head] ?? head;
+	// The site's sections are a fixed set, so a first segment outside it is not a section: it is an
+	// address that matched nothing, and the trail says that rather than repeating the typo.
+	const section = SECTIONS[head] ?? 'Not found';
 	const sectionHref = GLOBAL_SECTIONS.has(head) ? `/${head}` : scoped(`/${head}`, context.country);
 
 	// A page about one business sits under that business, not under the action: someone reading a

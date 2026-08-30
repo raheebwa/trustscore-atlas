@@ -128,4 +128,18 @@ describe('breadcrumbJsonLd', () => {
 		});
 		expect(parsed.itemListElement[3].item).toBeUndefined();
 	});
+
+	// A record page that found no record is a refusal, and a trail that still says "Record" is
+	// telling a reader they are looking at one.
+	it('says not found when there is no record to name', () => {
+		const crumbs = buildCrumbs({ ...base, pathname: '/b/atl_missing', recordName: null });
+
+		expect(crumbs.map((crumb) => crumb.label)).toEqual(['Home', base.countryName, 'Not found']);
+	});
+
+	it('says not found for an address that matches no section', () => {
+		const crumbs = buildCrumbs({ ...base, pathname: '/not-a-route' });
+
+		expect(crumbs.map((crumb) => crumb.label)).toEqual(['Home', base.countryName, 'Not found']);
+	});
 });
