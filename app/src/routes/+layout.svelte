@@ -49,6 +49,7 @@
 <AppShell
 	packs={data.packs}
 	country={data.country}
+	countryName={data.countryName}
 	regeneration={refreshed ? `Data refreshed ${refreshed.text}` : undefined}
 >
 	{@render children()}

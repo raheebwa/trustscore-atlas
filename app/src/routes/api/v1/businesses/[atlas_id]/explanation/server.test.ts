@@ -29,7 +29,8 @@ function db(kind: 'main' | 'statements' | 'scores'): D1Database {
 			bind: () => ({
 				first: async () => {
 					if (sql.includes('FROM meta')) return { value: 'regen-example-1' };
-					if (sql.includes('SELECT 1 AS ok')) return { ok: 1 };
+					if (sql.includes('canonical_name FROM businesses'))
+						return { canonical_name: 'Example Hardware Supplies Ltd' };
 					if (kind === 'scores' && sql.includes('FROM scores')) return scoreRow;
 					return null;
 				},

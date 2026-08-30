@@ -8,7 +8,7 @@ function mainDb(): D1Database {
 			bind: () => ({
 				first: async () => {
 					if (sql.includes('FROM meta')) return { value: 'regen-main' };
-					return { ok: 1 };
+					return { canonical_name: 'Example Hardware Supplies Ltd' };
 				}
 			})
 		})

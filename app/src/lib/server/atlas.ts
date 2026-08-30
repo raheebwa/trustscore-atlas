@@ -1188,11 +1188,16 @@ export async function getStatementsPage(
 }
 
 export async function businessExists(db: D1Database, atlasId: string): Promise<boolean> {
+	return (await businessName(db, atlasId)) !== null;
+}
+
+/** The canonical name, or null when no business carries that id. */
+export async function businessName(db: D1Database, atlasId: string): Promise<string | null> {
 	const row = await db
-		.prepare('SELECT 1 AS ok FROM businesses WHERE atlas_id = ?')
+		.prepare('SELECT canonical_name FROM businesses WHERE atlas_id = ?')
 		.bind(atlasId)
-		.first<{ ok: number }>();
-	return row !== null;
+		.first<{ canonical_name: string }>();
+	return row?.canonical_name ?? null;
 }
 
 export interface ScoreLookupOptions {

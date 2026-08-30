@@ -1,6 +1,11 @@
 <script lang="ts">
 	// SPDX-License-Identifier: Apache-2.0
 	import { onMount } from 'svelte';
+	import Copy from '@lucide/svelte/icons/copy';
+	import Callout from '$lib/components/Callout.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import {
 		formatExecutionResult,
 		normaliseInputSchema,
@@ -140,126 +145,164 @@
 
 <svelte:head><title>TrustScore Atlas: Actions</title></svelte:head>
 
-<h1 class="text-2xl font-semibold text-stone-900">Atlas actions</h1>
+<div class="flex flex-col gap-6">
+	<PageHeader
+		title="Atlas actions"
+		lede="The same reads and writes an agent can call, runnable here in the page. A read answers from the published regeneration; a write records a request that a maintainer reviews, and never changes a published record on its own."
+	/>
 
-{#if available === false}
-	<p class="mt-4 max-w-2xl rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
-		{CHROME_REQUIREMENT}
-	</p>
-{:else if available === true}
-	<p class="mt-2 max-w-2xl text-stone-700">
-		Review an available action, enter its details, and run it in this tab.
-	</p>
-
-	{#if loading && actions.length === 0}
-		<p class="mt-6 text-stone-600">Loading available actions…</p>
-	{:else if actions.length === 0}
-		<p class="mt-6 text-stone-600">No actions are currently available in this tab.</p>
-	{:else}
-		<div class="mt-8 space-y-8">
-			{#each actions as action (action.registered.name)}
-				<section class="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-					<h2 class="font-mono text-lg font-semibold text-stone-900">
-						{action.registered.name}
-					</h2>
-					<p class="mt-2 text-stone-700">{action.registered.description}</p>
-
-					<dl class="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-stone-600">
-						<div class="flex gap-2">
-							<dt class="font-medium text-stone-800">Read only</dt>
-							<dd>{action.registered.annotations?.readOnlyHint ? 'Yes' : 'No'}</dd>
-						</div>
-						<div class="flex gap-2">
-							<dt class="font-medium text-stone-800">Register text</dt>
-							<dd>
-								{action.registered.annotations?.untrustedContentHint
-									? 'May be included'
-									: 'Not included'}
-							</dd>
-						</div>
-					</dl>
-
-					<form class="mt-5 space-y-4" onsubmit={(event) => runAction(event, action)}>
-						{#each Object.entries(action.schema.properties) as [name, property] (name)}
-							<label class="block max-w-2xl">
-								<span class="block text-sm font-medium text-stone-800">
-									{name}
-									{#if action.schema.required.includes(name)}
-										<span class="text-red-700"> required</span>
-									{/if}
-								</span>
-								{#if property.description}
-									<span class="mt-0.5 block text-sm text-stone-600">{property.description}</span>
-								{/if}
-
-								{#if property.enum}
-									<select
-										{name}
-										required={action.schema.required.includes(name)}
-										class="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-900"
-									>
-										<option value="">Choose a value</option>
-										{#each property.enum as option (String(option))}
-											<option value={String(option)}>{String(option)}</option>
-										{/each}
-									</select>
-								{:else if property.type === 'boolean'}
-									<input {name} type="checkbox" class="mt-2 h-4 w-4 rounded border-stone-300" />
-								{:else}
-									<input
-										{name}
-										type={property.type === 'number' || property.type === 'integer'
-											? 'number'
-											: property.format === 'uri'
-												? 'url'
-												: 'text'}
-										required={action.schema.required.includes(name)}
-										min={property.minimum}
-										max={property.maximum}
-										maxlength={property.maxLength}
-										step={property.type === 'number' || property.type === 'integer'
-											? '1'
-											: undefined}
-										class="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-900"
-									/>
-								{/if}
-							</label>
-						{/each}
-
-						<button
-							type="submit"
-							disabled={running !== null}
-							class="rounded-md bg-stone-900 px-5 py-2 font-medium text-white hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-400"
+	{#if available === false}
+		<Callout tone="warning" title="This browser does not offer the tool surface">
+			{CHROME_REQUIREMENT}
+		</Callout>
+	{:else if available === true}
+		{#if loading && actions.length === 0}
+			<Skeleton variant="row" label="Loading the available actions" />
+		{:else if actions.length === 0}
+			<EmptyState
+				title="No action is available in this tab"
+				body="The page registers its tools when it loads. Reload, or open a business record, where the record-specific actions are offered."
+				examples={[{ label: 'Open a business record', href: '/b/atl_11bf115c93cd7870' }]}
+			/>
+		{:else}
+			<div class="grid gap-4 lg:grid-cols-12">
+				<!-- The list of what can be run, and what running it would do. -->
+				<nav
+					class="flex flex-col gap-1 lg:sticky lg:top-6 lg:col-span-4 lg:max-h-[80vh] lg:self-start lg:overflow-y-auto"
+					aria-label="Available actions"
+				>
+					{#each actions as action (action.registered.name)}
+						<a
+							href={`#action-${action.registered.name}`}
+							class="flex flex-col gap-1 rounded-md border border-border bg-surface p-3 transition-colors duration-120 hover:border-border-strong hover:bg-panel"
 						>
-							{running === action.registered.name ? 'Running…' : 'Run action'}
-						</button>
-					</form>
+							<span class="flex items-center justify-between gap-2">
+								<span class="font-mono text-2xs text-ink">{action.registered.name}</span>
+								<span
+									class="rounded-md border border-border px-2 py-0.5 text-2xs {action.registered
+										.annotations?.readOnlyHint
+										? 'bg-panel text-ink-muted'
+										: 'bg-accent-tint text-accent-ink'}"
+								>
+									{action.registered.annotations?.readOnlyHint ? 'read' : 'writes a request'}
+								</span>
+							</span>
+							<span class="line-clamp-2 text-xs text-ink-muted"
+								>{action.registered.description}</span
+							>
+						</a>
+					{/each}
+				</nav>
 
-					{#if results[action.registered.name]}
-						<div class="mt-6">
-							<div class="flex flex-wrap items-center justify-between gap-3">
-								<h3 class="font-medium text-stone-900">Result</h3>
-								<div class="flex items-center gap-3 text-sm">
-									<span class="text-stone-600">
-										{results[action.registered.name].elapsedMs.toFixed(1)} ms
+				<div class="flex flex-col gap-4 lg:col-span-8">
+					{#each actions as action (action.registered.name)}
+						<section
+							id={`action-${action.registered.name}`}
+							class="flex flex-col gap-3 rounded-md border border-border bg-surface p-4"
+						>
+							<div class="flex flex-col gap-1">
+								<h2 class="font-mono text-base text-ink">{action.registered.name}</h2>
+								<p class="text-base text-ink-muted">{action.registered.description}</p>
+								<p class="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-ink-muted">
+									<span>
+										{action.registered.annotations?.readOnlyHint
+											? 'Reads the published data'
+											: 'Records a request for review'}
 									</span>
-									<button
-										type="button"
-										onclick={() => copyResult(action.registered.name)}
-										class="rounded border border-stone-300 px-3 py-1.5 font-medium text-stone-700 hover:bg-stone-50"
-									>
-										{copied === action.registered.name ? 'Copied' : 'Copy result'}
-									</button>
-								</div>
+									<span>
+										{action.registered.annotations?.untrustedContentHint
+											? 'May include register text'
+											: 'No register text in the result'}
+									</span>
+								</p>
 							</div>
-							<pre
-								class="mt-2 overflow-x-auto rounded-md bg-stone-950 p-4 text-sm whitespace-pre-wrap text-stone-100">{results[
-									action.registered.name
-								].text}</pre>
-						</div>
-					{/if}
-				</section>
-			{/each}
-		</div>
+
+							<form class="flex flex-col gap-3" onsubmit={(event) => runAction(event, action)}>
+								{#each Object.entries(action.schema.properties) as [name, property] (name)}
+									<label class="flex flex-col gap-1">
+										<span class="text-xs font-medium text-ink-muted">
+											{name}
+											{#if action.schema.required.includes(name)}
+												<span class="text-error-ink">required</span>
+											{/if}
+										</span>
+										{#if property.description}
+											<span class="text-2xs text-ink-muted">{property.description}</span>
+										{/if}
+
+										{#if property.enum}
+											<select
+												{name}
+												required={action.schema.required.includes(name)}
+												class="h-10 rounded-md border border-border bg-surface px-3 text-base text-ink transition-colors duration-120 hover:border-border-strong"
+											>
+												<option value="">Choose a value</option>
+												{#each property.enum as option (String(option))}
+													<option value={String(option)}>{String(option)}</option>
+												{/each}
+											</select>
+										{:else if property.type === 'boolean'}
+											<input {name} type="checkbox" class="h-4 w-4 rounded border-border" />
+										{:else}
+											<input
+												{name}
+												type={property.type === 'number' || property.type === 'integer'
+													? 'number'
+													: property.format === 'uri'
+														? 'url'
+														: 'text'}
+												required={action.schema.required.includes(name)}
+												min={property.minimum}
+												max={property.maximum}
+												maxlength={property.maxLength}
+												step={property.type === 'number' || property.type === 'integer'
+													? '1'
+													: undefined}
+												class="h-10 rounded-md border border-border bg-surface px-3 text-base text-ink transition-colors duration-120 hover:border-border-strong"
+											/>
+										{/if}
+									</label>
+								{/each}
+
+								<button
+									type="submit"
+									disabled={running !== null}
+									class="h-10 w-fit rounded-md border border-accent bg-accent px-4 text-base font-medium text-ink transition-colors duration-120 hover:border-accent-ink hover:bg-accent-ink hover:text-canvas"
+								>
+									{running === action.registered.name ? 'Running' : 'Run this action'}
+								</button>
+							</form>
+
+							{#if results[action.registered.name]}
+								<div class="flex flex-col gap-2">
+									<div class="flex flex-wrap items-center justify-between gap-3">
+										<p class="text-xs font-medium text-ink-muted">What it returned</p>
+										<div class="flex items-center gap-3 text-xs text-ink-muted">
+											<span class="tnum">
+												{results[action.registered.name].elapsedMs.toFixed(1)} ms
+											</span>
+											<button
+												type="button"
+												onclick={() => copyResult(action.registered.name)}
+												class="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-surface px-3 transition-colors duration-120 hover:border-border-strong"
+											>
+												<Copy size={16} strokeWidth={1.5} aria-hidden="true" />
+												{copied === action.registered.name ? 'Copied' : 'Copy'}
+											</button>
+										</div>
+									</div>
+									<pre
+										class="overflow-x-auto rounded-md border border-border-strong bg-panel-2 p-3 font-mono text-2xs whitespace-pre-wrap text-ink">{results[
+											action.registered.name
+										].text}</pre>
+								</div>
+							{/if}
+						</section>
+					{/each}
+				</div>
+			</div>
+		{/if}
+	{:else}
+		<Skeleton variant="row" label="Checking this browser for the tool surface" />
 	{/if}
-{/if}
+</div>

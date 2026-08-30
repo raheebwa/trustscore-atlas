@@ -27,7 +27,7 @@ function mainDb(): D1Database {
 			bind: () => ({
 				first: async () => {
 					if (sql.includes('FROM meta')) return { value: 'regen-example-1' };
-					return { ok: 1 };
+					return { canonical_name: 'Example Hardware Supplies Ltd' };
 				}
 			})
 		})
@@ -42,7 +42,7 @@ function statementsDb(rows: StatementRow[], statementSql: string[]): D1Database 
 				bind: () => ({
 					first: async () => {
 						if (sql.includes('FROM meta')) return { value: 'regen-example-1' };
-						return { ok: 1 };
+						return { canonical_name: 'Example Hardware Supplies Ltd' };
 					},
 					all: async () => ({ results: rows })
 				})

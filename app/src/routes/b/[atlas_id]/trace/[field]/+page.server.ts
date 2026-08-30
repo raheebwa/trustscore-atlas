@@ -4,7 +4,7 @@ import { InvalidCursorError } from '$lib/pagination';
 import {
 	PRECEDENCE_RANKS,
 	RegenerationInProgressError,
-	businessExists,
+	businessName,
 	getFieldTrace
 } from '$lib/server/atlas';
 import { requireDatabases } from '$lib/server/platform';
@@ -12,8 +12,8 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ platform, params, url }) => {
 	const databases = requireDatabases(platform);
-	const exists = await businessExists(databases.db, params.atlas_id);
-	if (!exists) {
+	const canonicalName = await businessName(databases.db, params.atlas_id);
+	if (canonicalName === null) {
 		error(404, `No business found for atlas_id "${params.atlas_id}".`);
 	}
 
@@ -33,5 +33,5 @@ export const load: PageServerLoad = async ({ platform, params, url }) => {
 		error(404, `No statements on file for field "${params.field}" on this business.`);
 	}
 
-	return { atlasId: params.atlas_id, trace, precedenceRanks: PRECEDENCE_RANKS };
+	return { atlasId: params.atlas_id, canonicalName, trace, precedenceRanks: PRECEDENCE_RANKS };
 };
