@@ -8,6 +8,7 @@
 
 import type { SegmentFilters } from '$lib/types';
 import { getLiveRegenerationId, RegenerationInProgressError } from './atlas';
+import { cacheScope } from './cache-scope';
 import type { AtlasDatabases } from './platform';
 
 export const DEFAULT_COUNTRY = 'UG';
@@ -195,12 +196,13 @@ const CACHE_TTL_SECONDS = 86400;
 export async function exploreSegmentsCached(
 	databases: AtlasDatabases,
 	cache: KVNamespace | undefined,
-	inputFilters: ExploreFilters
+	inputFilters: ExploreFilters,
+	versionId: string | null = null
 ): Promise<ExploreResponse> {
 	const filters = cleanFilters(inputFilters);
 	const liveId = cache ? await getLiveRegenerationId(databases.db) : null;
 	const key = liveId
-		? `explore:${liveId}:${JSON.stringify([filters.country, filters.category, filters.nature, filters.district, filters.division, filters.present_in].map((v) => v ?? ''))}`
+		? `explore:${cacheScope(liveId, versionId)}:${JSON.stringify([filters.country, filters.category, filters.nature, filters.district, filters.division, filters.present_in].map((v) => v ?? ''))}`
 		: null;
 	if (key) {
 		try {

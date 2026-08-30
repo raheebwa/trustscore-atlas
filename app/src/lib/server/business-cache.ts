@@ -5,6 +5,7 @@
  */
 
 import { getBusinessDetail, getConsistentLiveRegenerationId, type BusinessDetail } from './atlas';
+import { cacheScope } from './cache-scope';
 import type { AtlasDatabases } from './platform';
 
 const TTL_SECONDS = 86400;
@@ -16,10 +17,11 @@ export async function cachedBusinessDetail(
 	compose: (
 		databases: AtlasDatabases,
 		atlasId: string
-	) => Promise<BusinessDetail | null> = getBusinessDetail
+	) => Promise<BusinessDetail | null> = getBusinessDetail,
+	versionId: string | null = null
 ): Promise<BusinessDetail | null> {
 	const liveId = await getConsistentLiveRegenerationId(databases);
-	const key = liveId && cache ? `business:${liveId}:${atlasId}` : null;
+	const key = liveId && cache ? `business:${cacheScope(liveId, versionId)}:${atlasId}` : null;
 	if (key) {
 		try {
 			const hit = await cache!.get(key);

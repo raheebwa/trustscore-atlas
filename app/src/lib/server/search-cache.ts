@@ -4,19 +4,20 @@
  */
 
 import { getLiveRegenerationId, searchBusinesses, type SearchOptions } from './atlas';
+import { cacheScope } from './cache-scope';
 import type { AtlasDatabases } from './platform';
 import type { SearchResponse } from '$lib/types';
 
 const TTL_SECONDS = 86400;
 
-function cacheKey(liveId: string, options: SearchOptions): string {
+function cacheKey(scope: string, options: SearchOptions): string {
 	const parts = [
 		options.q.trim().toLowerCase(),
 		(options.district ?? '').trim().toLowerCase(),
 		options.limit == null ? '' : String(options.limit),
 		options.cursor ?? ''
 	];
-	return `search:${liveId}:${JSON.stringify(parts)}`;
+	return `search:${scope}:${JSON.stringify(parts)}`;
 }
 
 export async function searchBusinessesCached(
@@ -26,10 +27,11 @@ export async function searchBusinessesCached(
 	search: (
 		databases: AtlasDatabases,
 		options: SearchOptions
-	) => Promise<SearchResponse> = searchBusinesses
+	) => Promise<SearchResponse> = searchBusinesses,
+	versionId: string | null = null
 ): Promise<SearchResponse> {
 	const liveId = cache ? await getLiveRegenerationId(databases.db) : null;
-	const key = liveId ? cacheKey(liveId, options) : null;
+	const key = liveId ? cacheKey(cacheScope(liveId, versionId), options) : null;
 	if (key) {
 		try {
 			const hit = await cache!.get(key);

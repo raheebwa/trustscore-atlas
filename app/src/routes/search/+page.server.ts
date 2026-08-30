@@ -1,3 +1,4 @@
+import { deploymentVersion } from '$lib/server/cache-scope';
 import { error } from '@sveltejs/kit';
 import { InvalidCursorError } from '$lib/pagination';
 import { RegenerationInProgressError } from '$lib/server/atlas';
@@ -34,11 +35,17 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 			};
 		}
 
-		const response = await searchBusinessesCached(databases, platform?.env?.CACHE, {
-			q: query,
-			district,
-			cursor: url.searchParams.get('cursor')
-		});
+		const response = await searchBusinessesCached(
+			databases,
+			platform?.env?.CACHE,
+			{
+				q: query,
+				district,
+				cursor: url.searchParams.get('cursor')
+			},
+			undefined,
+			deploymentVersion(platform?.env as Record<string, unknown> | undefined)
+		);
 		return {
 			query,
 			district,

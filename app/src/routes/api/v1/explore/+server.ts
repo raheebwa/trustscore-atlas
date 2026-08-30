@@ -1,3 +1,4 @@
+import { deploymentVersion } from '$lib/server/cache-scope';
 import { getLiveRegenerationId, RegenerationInProgressError } from '$lib/server/atlas';
 import {
 	apiBadRequest,
@@ -34,7 +35,12 @@ export const GET: RequestHandler = async ({ platform, request, url }) => {
 		const format = url.searchParams.get('format') ?? 'json';
 		if (format !== 'json' && format !== 'csv') return apiBadRequest('invalid format');
 		const databases = requireDatabases(platform);
-		const response = await exploreSegmentsCached(databases, platform?.env?.CACHE, filters);
+		const response = await exploreSegmentsCached(
+			databases,
+			platform?.env?.CACHE,
+			filters,
+			deploymentVersion(platform?.env as Record<string, unknown> | undefined)
+		);
 		if (format === 'csv') {
 			const liveRegenerationId = (await getLiveRegenerationId(databases.db)) ?? 'unseeded';
 			const etag = deriveEtag(liveRegenerationId, url.pathname + url.search);

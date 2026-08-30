@@ -147,6 +147,6 @@ describe('exploreSegments with a cache', () => {
 		const second = await exploreSegmentsCached(databases, cache, { district: 'Kampala' });
 		expect(second).toEqual(first);
 		expect(calls.filter((sql) => sql.includes('FROM segments')).length).toBe(queriesAfterFirst);
-		expect([...store.keys()]).toEqual(['explore:regen-example-1:["UG","","","Kampala","",""]']);
+		expect([...store.keys()]).toEqual(['explore:regen-example-1:dev:["UG","","","Kampala","",""]']);
 	});
 });

@@ -41,7 +41,7 @@ describe('cachedBusinessDetail', () => {
 		expect(first).toEqual(detail);
 		expect(second).toEqual(detail);
 		expect(composed).toBe(1);
-		expect([...store.keys()]).toEqual(['business:regen-1:atlas-1']);
+		expect([...store.keys()]).toEqual(['business:regen-1:dev:atlas-1']);
 	});
 
 	it('recomposes for a new regeneration and never caches a missing record', async () => {
@@ -54,7 +54,7 @@ describe('cachedBusinessDetail', () => {
 		await cachedBusinessDetail(databases('regen-1'), cache, 'atlas-1', compose);
 		await cachedBusinessDetail(databases('regen-2'), cache, 'atlas-1', compose);
 		expect(composed).toBe(2);
-		expect(store.has('business:regen-2:atlas-1')).toBe(false);
+		expect(store.has('business:regen-2:dev:atlas-1')).toBe(false);
 		expect(await cachedBusinessDetail(databases('regen-2'), cache, 'atlas-1', compose)).toBeNull();
 	});
 

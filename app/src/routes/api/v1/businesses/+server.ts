@@ -1,3 +1,4 @@
+import { deploymentVersion } from '$lib/server/cache-scope';
 import { RegenerationInProgressError } from '$lib/server/atlas';
 import { searchBusinessesCached } from '$lib/server/search-cache';
 import { InvalidCursorError } from '$lib/pagination';
@@ -18,12 +19,13 @@ export const GET: RequestHandler = async ({ platform, request, url }) => {
 		const limit = url.searchParams.get('limit');
 		const district = url.searchParams.get('district');
 		const cursor = url.searchParams.get('cursor');
-		const response = await searchBusinessesCached(databases, platform?.env?.CACHE, {
-			q,
-			limit,
-			district,
-			cursor
-		});
+		const response = await searchBusinessesCached(
+			databases,
+			platform?.env?.CACHE,
+			{ q, limit, district, cursor },
+			undefined,
+			deploymentVersion(platform?.env as Record<string, unknown> | undefined)
+		);
 		return await apiResponse(databases.db, request, url.pathname + url.search, response);
 	} catch (err) {
 		if (err instanceof InvalidCursorError) return apiBadRequest('invalid cursor');
