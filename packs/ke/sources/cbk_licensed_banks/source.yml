@@ -2,23 +2,28 @@ slug: cbk.licensed_banks
 country: KE
 publisher: Central Bank of Kenya
 title: Licensed banks
-url: https://www.centralbank.go.ke/financial-sector/financial-institutions/
-endpoint: https://www.centralbank.go.ke
+url: https://www.centralbank.go.ke/bank-supervision/
+endpoint: https://www.centralbank.go.ke/bank-supervision/
 licence: public-record
 rights: public_register
 attribution: Central Bank of Kenya, licensed banks directories (centralbank.go.ke)
-cadence: monthly
-coverage: Licensed commercial banks and microfinance banks shown on public CBK pages.
+cadence: irregular
+coverage: >-
+  Institutions in the newest commercial-banks and microfinance-banks directory PDFs linked
+  from the CBK Bank Supervision page, including mortgage finance institutions and authorised
+  non-operating bank holding companies.
 precedence_class: regulator_or_authority
 pii:
-  excluded_columns: []
+  excluded_columns: [postal_address, telephone, fax, email, physical_address]
   hashed_columns: []
 terms:
-  url: https://www.centralbank.go.ke/financial-sector/financial-institutions/
+  url: https://www.centralbank.go.ke/bank-supervision/
   checked_on: "2026-08-30"
   note: >-
-    The pages list active licensed institutions. We follow the robots policy and request only
-    one page per category in normal HTML.
-identifier_schemes: [ke:cbk_licence]
-adapter_version: 0.1.0
+    The directories are PDFs linked from the Bank Supervision page. Contact details are dropped
+    at ingestion; only institution and directory metadata used by the atlas are retained.
+    Format note, 2026-08-30: the former HTML directory pages under /bank-supervision/ answer
+    404, so the adapter discovers the newest PDF edition of each directory from that page.
+identifier_schemes: []
+adapter_version: 0.2.0
 row_count_tolerance: 0.15

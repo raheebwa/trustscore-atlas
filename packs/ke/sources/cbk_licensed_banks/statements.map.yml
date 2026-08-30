@@ -3,7 +3,7 @@ country: KE
 precedence_class: regulator_or_authority
 confidence: official
 record_id:
-  columns: [name, category, licence_number]
+  columns: [name, category, directory_edition]
 entity_id:
   columns: [name]
   normalise: [name]
@@ -16,6 +16,5 @@ statements:
     from: category
   - field: status.cbk_licensed
     value: licensed
-  - field: identifiers
-    identifier: ke:cbk_licence
-    from: licence_number
+  - field: website
+    from: website

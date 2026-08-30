@@ -5,14 +5,7 @@ currency: KES
 languages: [en]
 timezone: Africa/Nairobi
 
-identifier_schemes:
-  ke:cbk_licence:
-    title: Central Bank of Kenya licence number
-    issuer: Central Bank of Kenya
-    pattern: "^KE-CBK-(?:CMB|MFB)-[0-9]{3}$"
-    issuer_unique: true
-    org_id_guide: null
-    note: Published on CBK's public register directories for both commercial and microfinance banks.
+identifier_schemes: {}
 
 precedence:
   operator_verified: 1

@@ -3,7 +3,7 @@ formality:
   legal_register_presence:
     sources: []
   tax_identity_present:
-    identifier_schemes: [ke:cbk_licence]
+    identifier_schemes: []
   local_trading_licence:
     sources: [cbk.licensed_banks]
   sector_regulator_licence:

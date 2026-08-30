@@ -14,6 +14,20 @@ from ..conftest import PACKS, RUN_ID, SALT, STARTED_AT
 ADAPTER = PACKS / "ke" / "sources" / "cbk_licensed_banks"
 FIXTURES = ADAPTER / "fixtures" / "raw"
 EXPECTED = json.loads((ADAPTER / "fixtures" / "expected.json").read_text())
+COMMERCIAL_PDF_URL = (
+    "https://www.centralbank.go.ke/wp-content/uploads/2026/07/"
+    "Directory-of-Licenced-Commercial-Banks-Mortgage-Finance-Institutions-and-"
+    "Authorised-Non-Operating-Bank-Holding-Companies.pdf"
+)
+MICROFINANCE_PDF_URL = (
+    "https://www.centralbank.go.ke/wp-content/uploads/2026/02/"
+    "Directory-of-Licenced-Microfinance-Banks-Feb-2026.pdf"
+)
+OLDER_MICROFINANCE_PDF_URL = (
+    "https://www.centralbank.go.ke/wp-content/uploads/2025/11/"
+    "Directory-of-Licenced-Microfinance-Banks-Nov-2025.pdf"
+)
+CONTACT_FIELDS = {"postal_address", "telephone", "fax", "email", "physical_address"}
 
 
 class FixtureFetcher:
@@ -23,10 +37,12 @@ class FixtureFetcher:
 
     def __call__(self, url, *, method="GET", data=None, headers=None):
         self.calls.append({"url": url, "method": method, "data": data, "headers": headers})
-        if (method, url) == ("GET", self.module.COMMERCIAL_URL):
-            return (FIXTURES / "commercial-banks.html").read_bytes()
-        if (method, url) == ("GET", self.module.MICROFINANCE_URL):
-            return (FIXTURES / "microfinance-banks.html").read_bytes()
+        if (method, url) == ("GET", self.module.BANK_SUPERVISION_URL):
+            return (FIXTURES / "bank-supervision.html").read_bytes()
+        if (method, url) == ("GET", COMMERCIAL_PDF_URL):
+            return (FIXTURES / "commercial-banks.pdf").read_bytes()
+        if (method, url) == ("GET", MICROFINANCE_PDF_URL):
+            return (FIXTURES / "microfinance-banks.pdf").read_bytes()
         raise KeyError((method, url))
 
 
@@ -65,13 +81,19 @@ def test_1_emits_both_parquet_files_and_a_valid_manifest(run):
     assert run.manifest["rows_dropped"] == EXPECTED["rows_dropped"]
 
 
-def test_2_every_statement_carries_provenance(run):
+def test_2_every_statement_carries_provenance(spec, run):
     assert check_run(ADAPTER, run.output_dir, checks=["provenance"]) == []
     statements = pq.read_table(run.output_dir / "statements.parquet").to_pylist()
     assert statements
     assert {statement["source_ref"] for statement in statements} == {
-        run.manifest["raw_objects"][0]["url"],
-        run.manifest["raw_objects"][1]["url"],
+        COMMERCIAL_PDF_URL,
+        MICROFINANCE_PDF_URL,
+    }
+    raw_urls = {item["name"]: item["url"] for item in run.manifest["raw_objects"]}
+    assert raw_urls == {
+        "bank-supervision.html": spec.module.BANK_SUPERVISION_URL,
+        "commercial-banks.pdf": COMMERCIAL_PDF_URL,
+        "microfinance-banks.pdf": MICROFINANCE_PDF_URL,
     }
     assert {statement["licence"] for statement in statements} == {"public-record"}
     assert {statement["precedence"] for statement in statements} == {3}
@@ -83,20 +105,20 @@ def test_3_excluded_columns_never_appear(spec, run):
     excluded = set(spec.source["pii"]["excluded_columns"]) | set(
         spec.source["pii"]["hashed_columns"]
     )
+    assert excluded == CONTACT_FIELDS
     for name in ("records.parquet", "statements.parquet"):
         assert not excluded & set(pq.read_schema(run.output_dir / name).names)
+    records = pq.read_table(run.output_dir / "records.parquet").to_pylist()
+    assert all(not CONTACT_FIELDS & set(record) for record in records)
 
 
-def test_4_identifier_values_match_pack_patterns(run):
+def test_4_identifier_values_match_pack_patterns(spec, run):
     assert check_run(ADAPTER, run.output_dir, checks=["identifiers"]) == []
     statements = pq.read_table(run.output_dir / "statements.parquet").to_pylist()
-    identifiers = [
-        json.loads(statement["value"])
-        for statement in statements
-        if statement["field"] == "identifiers"
-    ]
+    identifiers = [statement for statement in statements if statement["field"] == "identifiers"]
     assert len(identifiers) == EXPECTED["identifier_statements"]
-    assert {item["scheme"] for item in identifiers} == {"ke:cbk_licence"}
+    assert spec.source["identifier_schemes"] == []
+    assert spec.pack["identifier_schemes"] == {}
 
 
 def test_5_rerun_on_same_raw_input_is_byte_identical(spec, run, tmp_path):
@@ -122,12 +144,22 @@ def test_records_and_statements_match_the_expected_fixture(run):
     statements = pq.read_table(run.output_dir / "statements.parquet").to_pylist()
     assert len(records) == EXPECTED["rows"]
     assert len({statement["entity_id"] for statement in statements}) == EXPECTED["entities"]
-    commercial = [r for r in records if r["category"] == "commercial_bank"]
-    microfinance = [r for r in records if r["category"] == "microfinance_bank"]
-    assert len(commercial) == EXPECTED["commercial_bank_rows"]
-    assert len(microfinance) == EXPECTED["microfinance_bank_rows"]
-    assert EXPECTED["commercial_bank"] in {r["name"] for r in commercial}
-    assert EXPECTED["microfinance_bank"] in {r["name"] for r in microfinance}
+    by_category = {
+        category: [record for record in records if record["category"] == category]
+        for category in {
+            "commercial_bank",
+            "mortgage_finance_institution",
+            "bank_holding_company",
+            "microfinance_bank",
+        }
+    }
+    for category, rows in by_category.items():
+        assert len(rows) == EXPECTED[f"{category}_rows"]
+        assert EXPECTED[category] in {row["name"] for row in rows}
+    assert {row["directory_edition"] for row in by_category["commercial_bank"]} == {"2026/07"}
+    assert {row["directory_edition"] for row in by_category["microfinance_bank"]} == {"2026/02"}
+    example = next(record for record in records if record["name"] == EXPECTED["commercial_bank"])
+    assert example["website"] == "https://www.examplebank.example.invalid/corporate"
     assert {s["value"] for s in statements if s["field"] == "status.cbk_licensed"} == {"licensed"}
     assert sorted(path.name for path in run.raw_dir.iterdir()) == EXPECTED["raw_files"]
 
@@ -135,4 +167,7 @@ def test_records_and_statements_match_the_expected_fixture(run):
 def test_both_directories_are_fetched_once(run_case):
     _, fetcher = run_case
     urls = [call["url"] for call in fetcher.calls]
-    assert urls == [fetcher.module.COMMERCIAL_URL, fetcher.module.MICROFINANCE_URL]
+    assert urls == [fetcher.module.BANK_SUPERVISION_URL, COMMERCIAL_PDF_URL, MICROFINANCE_PDF_URL]
+    assert urls.count(COMMERCIAL_PDF_URL) == 1
+    assert urls.count(MICROFINANCE_PDF_URL) == 1
+    assert OLDER_MICROFINANCE_PDF_URL not in urls

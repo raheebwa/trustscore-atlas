@@ -10,13 +10,27 @@ fields:
     constraints: { required: true }
   - name: category
     type: string
-    description: commercial_bank or microfinance_bank.
-    constraints: { required: true, pattern: "^(commercial_bank|microfinance_bank)$" }
-  - name: licence_number
+    description: Institution category parsed from the directory section heading.
+    constraints:
+      required: true
+      pattern: "^(commercial_bank|mortgage_finance_institution|bank_holding_company|microfinance_bank)$"
+  - name: website
     type: string
-    description: Optional licence or reference number from the directory row.
-    constraints: { required: false }
+    description: Institution website published in the directory, when present.
+  - name: date_licensed
+    type: string
+    description: Raw licensed or authorised date text published in the directory, when present.
+  - name: peer_group
+    type: string
+    description: Peer group published in the directory, when present.
+  - name: branches
+    type: string
+    description: Raw branch count text published in the directory, when present.
+  - name: directory_edition
+    type: string
+    description: Year and month of the selected directory PDF upload.
+    constraints: { required: true, pattern: "^[0-9]{4}/[0-9]{2}$" }
   - name: source_ref
     type: string
-    description: The page URL from which the row was parsed.
+    description: The selected directory PDF URL from which the row was parsed.
     constraints: { required: true }

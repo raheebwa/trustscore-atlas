@@ -1,14 +1,19 @@
 {
-  "rows": 4,
+  "rows": 6,
   "rows_dropped": 1,
-  "entities": 4,
-  "identifier_statements": 4,
+  "entities": 6,
+  "identifier_statements": 0,
   "commercial_bank_rows": 2,
+  "mortgage_finance_institution_rows": 1,
+  "bank_holding_company_rows": 1,
   "microfinance_bank_rows": 2,
   "raw_files": [
-    "commercial-banks.html",
-    "microfinance-banks.html"
+    "bank-supervision.html",
+    "commercial-banks.pdf",
+    "microfinance-banks.pdf"
   ],
-  "commercial_bank": "RURAL INVESTMENT BANK",
-  "microfinance_bank": "COMMUNITY MICROFINANCE BANK"
+  "commercial_bank": "Example Bank Kenya PLC",
+  "mortgage_finance_institution": "Sample Mortgage Finance Limited",
+  "bank_holding_company": "Example Holding Company Limited",
+  "microfinance_bank": "Community Microfinance Bank Limited"
 }

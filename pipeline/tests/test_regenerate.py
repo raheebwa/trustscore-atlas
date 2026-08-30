@@ -443,16 +443,23 @@ def test_regenerate_merges_two_packs_and_keeps_coverage_per_country(tmp_path: Pa
     )
     cbk_dir = PACKS / "ke" / "sources" / "cbk_licensed_banks"
     cbk = load_adapter(cbk_dir)
+    cbk_page = (cbk_dir / "fixtures" / "raw" / "bank-supervision.html").read_bytes()
+    cbk_directories = cbk.module._latest_directories(cbk_page)
     cbk_pages = {
-        cbk.module.COMMERCIAL_URL: (cbk_dir / "fixtures" / "raw" / "commercial-banks.html"),
-        cbk.module.MICROFINANCE_URL: (cbk_dir / "fixtures" / "raw" / "microfinance-banks.html"),
+        cbk.module.BANK_SUPERVISION_URL: cbk_page,
+        cbk_directories["commercial"][0]: (
+            cbk_dir / "fixtures" / "raw" / "commercial-banks.pdf"
+        ).read_bytes(),
+        cbk_directories["microfinance"][0]: (
+            cbk_dir / "fixtures" / "raw" / "microfinance-banks.pdf"
+        ).read_bytes(),
     }
     run_adapter(
         cbk,
         data_root=tmp_path,
         run_id=RUN_ID,
         started_at=STARTED_AT,
-        fetcher=lambda url, **_: cbk_pages[url].read_bytes(),
+        fetcher=lambda url, **_: cbk_pages[url],
         salt=SALT,
     )
     out = regenerate(
@@ -468,9 +475,18 @@ def test_regenerate_merges_two_packs_and_keeps_coverage_per_country(tmp_path: Pa
     for b in businesses:
         by_country.setdefault(b["country"], []).append(b)
     assert set(by_country) == {"UG", "KE"}
-    kenyan = json.loads(by_country["KE"][0]["coverage"])
-    assert kenyan["applicable"] == ["cbk.licensed_banks"]
-    assert kenyan["found_in"] == ["cbk.licensed_banks"]
+    cbk_expected = json.loads((cbk_dir / "fixtures" / "expected.json").read_text())
+    assert len(by_country["KE"]) == cbk_expected["entities"]
+    assert {business["canonical_name"] for business in by_country["KE"]} >= {
+        cbk_expected["commercial_bank"],
+        cbk_expected["mortgage_finance_institution"],
+        cbk_expected["bank_holding_company"],
+        cbk_expected["microfinance_bank"],
+    }
+    for business in by_country["KE"]:
+        coverage = json.loads(business["coverage"])
+        assert coverage["applicable"] == ["cbk.licensed_banks"]
+        assert coverage["found_in"] == ["cbk.licensed_banks"]
     scores = pq.read_table(out.directory / "scores.parquet").to_pylist()
     assert {s["atlas_id"] for s in scores} >= {b["atlas_id"] for b in by_country["KE"]}
     assert out.summary["packs"] == ["UG", "KE"]
