@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Three Ugandan tax registers publish a citation, not a link ("URA report 13, pulled
  * 2026-05-12"), and the page was rendering every reference as a URL. 81,733 statements sat

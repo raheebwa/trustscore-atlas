@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * What a register published as its reference, and what a page may do with it.
  *

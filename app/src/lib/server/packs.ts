@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * The loaded country packs, for the header's country switch and the home page's pack strip.
  *

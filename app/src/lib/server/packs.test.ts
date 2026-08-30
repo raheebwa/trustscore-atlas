@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * The header's country switch is the one place a visitor changes what every page is about, so the
  * list behind it comes from the data rather than from a hardcoded list of countries.

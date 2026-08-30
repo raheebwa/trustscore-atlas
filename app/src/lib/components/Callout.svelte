@@ -1,4 +1,5 @@
 <script lang="ts">
+	// SPDX-License-Identifier: Apache-2.0
 	import type { Snippet } from 'svelte';
 	import Info from '@lucide/svelte/icons/info';
 	import AlertTriangle from '@lucide/svelte/icons/triangle-alert';
