@@ -15,6 +15,7 @@
 	Signed in as {data.maintainer}. Confirmed claims, corrections, linkage labels and issues waiting
 	for a decision, oldest first. A decision is recorded once and never edits the request.
 	<a href={resolve('/ops/sources')} class="underline">Sources</a>
+	<a href={resolve('/ops/linkage')} class="underline">Linkage review</a>
 </p>
 
 {#if form?.message}
