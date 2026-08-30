@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
-import { formatCoverageSentence, formatScoreSentence, formatWhen } from './format';
+import {
+	formatCoverageSentence,
+	formatScoreSentence,
+	formatWhen,
+	displayFieldValue
+} from './format';
 
 describe('formatCoverageSentence', () => {
 	it('uses checked and pending register counts', () => {
@@ -117,5 +122,31 @@ describe('formatWhen', () => {
 		expect(formatWhen(null)).toBeNull();
 		expect(formatWhen('')).toBeNull();
 		expect(formatWhen('not a date')).toBeNull();
+	});
+});
+
+describe('displayFieldValue', () => {
+	it('renders an identifier statement as the identifier, not as its JSON', () => {
+		expect(displayFieldValue('identifiers', '{"scheme":"ug:tin","value":"1000026854"}')).toBe(
+			'ug:tin 1000026854'
+		);
+	});
+
+	it('renders a list of identifiers as a readable list', () => {
+		expect(
+			displayFieldValue(
+				'identifiers',
+				'[{"scheme":"ug:tin","value":"1"},{"scheme":"ug:kcca_licence","value":"K-2"}]'
+			)
+		).toBe('ug:tin 1, ug:kcca_licence K-2');
+	});
+
+	it('leaves an ordinary published value exactly as the register published it', () => {
+		expect(displayFieldValue('canonical_name', 'ROOFINGS LIMITED')).toBe('ROOFINGS LIMITED');
+		expect(displayFieldValue('location.district', 'Wakiso')).toBe('Wakiso');
+	});
+
+	it('keeps text that merely looks like JSON rather than dropping it', () => {
+		expect(displayFieldValue('canonical_name', '{not json')).toBe('{not json');
 	});
 });

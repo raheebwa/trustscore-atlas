@@ -18,7 +18,7 @@ import type { Column } from './table';
 // The table is generic over its row; a test renders it with the plainest row type there is.
 type Row = Record<string, unknown>;
 
-const columns: Column<Row>[] = [
+const columns: Column[] = [
 	{ key: 'register', label: 'Register', primary: true },
 	{ key: 'businesses', label: 'Businesses', numeric: true, align: 'end', sortable: true }
 ];

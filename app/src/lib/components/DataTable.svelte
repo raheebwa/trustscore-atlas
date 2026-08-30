@@ -1,4 +1,4 @@
-<script lang="ts" generics="Row extends Record<string, unknown>">
+<script lang="ts" generics="Row extends object">
 	// SPDX-License-Identifier: Apache-2.0
 	import type { Snippet } from 'svelte';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
@@ -20,28 +20,32 @@
 		cell,
 		sort = $bindable<{ key: string; direction: 'asc' | 'desc' } | null>(null)
 	}: {
-		columns: Column<Row>[];
+		columns: Column[];
 		rows: Row[];
 		caption: string;
 		loading?: boolean;
 		empty?: Snippet;
-		cell?: Snippet<[{ row: Row; column: Column<Row> }]>;
+		cell?: Snippet<[{ row: Row; column: Column }]>;
 		sort?: { key: string; direction: 'asc' | 'desc' } | null;
 	} = $props();
+
+	// A row is the caller's own type, so reading a column out of it is one deliberate cast here
+	// rather than an index signature forced onto every record shape in the app.
+	const valueOf = (row: Row, key: string): unknown => (row as Record<string, unknown>)[key];
 
 	const sorted = $derived.by(() => {
 		if (!sort) return rows;
 		const { key, direction } = sort;
 		const factor = direction === 'asc' ? 1 : -1;
 		return [...rows].sort((a, b) => {
-			const left = a[key];
-			const right = b[key];
+			const left = valueOf(a, key);
+			const right = valueOf(b, key);
 			if (typeof left === 'number' && typeof right === 'number') return (left - right) * factor;
 			return String(left ?? '').localeCompare(String(right ?? '')) * factor;
 		});
 	});
 
-	function toggleSort(column: Column<Row>) {
+	function toggleSort(column: Column) {
 		if (!column.sortable) return;
 		sort =
 			sort?.key === column.key
@@ -49,7 +53,7 @@
 				: { key: column.key, direction: 'asc' };
 	}
 
-	function classesFor(column: Column<Row>): string {
+	function classesFor(column: Column): string {
 		return [
 			'px-3 py-2',
 			column.align === 'end' ? 'text-right' : 'text-left',
@@ -106,7 +110,9 @@
 					<tr class="border-b border-border last:border-0 hover:bg-panel">
 						{#each columns as column (column.key)}
 							<td class={classesFor(column)}>
-								{#if cell}{@render cell({ row, column })}{:else}{String(row[column.key] ?? '')}{/if}
+								{#if cell}{@render cell({ row, column })}{:else}{String(
+										valueOf(row, column.key) ?? ''
+									)}{/if}
 							</td>
 						{/each}
 					</tr>
@@ -133,7 +139,9 @@
 						<div class="flex justify-between gap-3">
 							<dt class="text-xs text-ink-muted">{column.label}</dt>
 							<dd class="text-right text-base {column.numeric ? 'tnum' : ''}">
-								{#if cell}{@render cell({ row, column })}{:else}{String(row[column.key] ?? '')}{/if}
+								{#if cell}{@render cell({ row, column })}{:else}{String(
+										valueOf(row, column.key) ?? ''
+									)}{/if}
 							</dd>
 						</div>
 					{/each}

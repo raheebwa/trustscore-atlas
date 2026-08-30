@@ -201,3 +201,29 @@ export function formatWhen(
 	const relative = relativeClause((moment.getTime() - now.getTime()) / 1000);
 	return { iso: value, absolute, relative, text: `${absolute} (${relative})`, zone };
 }
+
+/**
+ * A published value as a person should read it. Most fields are already plain text; the
+ * identifiers field carries the statement's own JSON, and a provenance table full of
+ * {"scheme":"ug:tin","value":"1000026854"} is a table nobody reads.
+ */
+export function displayFieldValue(field: string, value: string): string {
+	const text = value?.trim() ?? '';
+	if (!text.startsWith('{') && !text.startsWith('[')) return value;
+	try {
+		const parsed: unknown = JSON.parse(text);
+		const list = Array.isArray(parsed) ? parsed : [parsed];
+		const identifiers = list.filter(
+			(entry): entry is { scheme: string; value: string } =>
+				typeof entry === 'object' &&
+				entry !== null &&
+				typeof (entry as { scheme?: unknown }).scheme === 'string' &&
+				typeof (entry as { value?: unknown }).value === 'string'
+		);
+		if (identifiers.length === 0) return value;
+		return identifiers.map((entry) => `${entry.scheme} ${entry.value}`).join(', ');
+	} catch {
+		// Text that only looks like JSON is still what the register published.
+		return value;
+	}
+}
