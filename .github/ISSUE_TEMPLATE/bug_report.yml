@@ -1,0 +1,105 @@
+name: Bug report
+description: Report incorrect Atlas data or a problem with the site, API, downloads, or tools.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve TrustScore Atlas. Do not include secrets, private records, or vulnerability details here. Use the security policy for vulnerabilities.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Business record
+        - Search or explore
+        - Source registry or methodology
+        - Download or data package
+        - JSON API
+        - Browser or remote tool
+        - Claim or report flow
+        - Other public page
+    validations:
+      required: true
+
+  - type: input
+    id: route_or_endpoint
+    attributes:
+      label: Route or endpoint
+      description: Give the page route, full URL, API endpoint, or tool name where the problem appears.
+      placeholder: /b/atl_... or GET /api/v1/...
+    validations:
+      required: true
+
+  - type: input
+    id: atlas_id
+    attributes:
+      label: Business atlas_id
+      description: Required when the problem concerns a specific business record.
+      placeholder: atl_6307e13f9040f449
+
+  - type: input
+    id: regeneration_id
+    attributes:
+      label: Regeneration ID
+      description: Copy the regeneration ID shown by the Atlas or in the downloaded package, if available.
+      placeholder: 20260830T120000Z
+
+  - type: textarea
+    id: registers_vs_atlas
+    attributes:
+      label: What the registers say and what Atlas shows
+      description: For a data discrepancy, name each public register, link its source or reference, state when you checked it, and compare its value with the Atlas value. For a software bug, write "Not a data discrepancy."
+      placeholder: |
+        Register and source reference:
+        Register value:
+        Date checked:
+        Atlas value:
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Give the shortest sequence that reliably shows the problem, including filters or request parameters.
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: Explain what should happen or what evidence should be displayed instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Supporting evidence
+      description: Add public source links, response excerpts, screenshots, or package filenames. Remove personal or confidential information first.
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: For interface problems, include browser and operating system. For API problems, include the client and response status.
+      placeholder: Firefox 145 on Ubuntu 26.04, or curl with HTTP 500
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: I removed secrets, private records, and unnecessary personal information.
+          required: true

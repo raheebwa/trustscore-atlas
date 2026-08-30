@@ -1,0 +1,82 @@
+name: Feature request
+description: Propose a useful improvement to TrustScore Atlas, its data packages, API, or contributor workflow.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the user need and the public evidence involved. Specific examples help keep the Atlas explainable and reproducible.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: User need
+      description: Who needs this, what decision are they trying to make, and what blocks them today?
+      placeholder: A credit officer needs to compare register coverage across two sectors without downloading the full package.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the smallest complete improvement and how a user would interact with it.
+    validations:
+      required: true
+
+  - type: input
+    id: route_or_endpoint
+    attributes:
+      label: Route, endpoint, or command
+      description: Name the existing or proposed page route, API endpoint, tool, download, or contributor command.
+      placeholder: /explore, GET /api/v1/facets, or just regenerate
+    validations:
+      required: true
+
+  - type: input
+    id: atlas_id
+    attributes:
+      label: Example business atlas_id
+      description: Include a public example when a business record demonstrates the need.
+      placeholder: atl_6307e13f9040f449
+
+  - type: input
+    id: regeneration_id
+    attributes:
+      label: Example regeneration ID
+      description: Include the regeneration that demonstrates the current behavior, if relevant.
+      placeholder: 20260830T120000Z
+
+  - type: textarea
+    id: register_context
+    attributes:
+      label: Register and Atlas context
+      description: If public register evidence motivates the request, say what the registers publish, what Atlas currently shows, and how the proposal should preserve provenance and source rights. Otherwise write "Not register-specific."
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Success criteria
+      description: List observable outcomes that would make the feature complete, including error or empty states where relevant.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Note current workarounds or smaller options you considered.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues and the current documentation for this capability.
+          required: true
+        - label: The request does not include secrets, private records, or unnecessary personal information.
+          required: true

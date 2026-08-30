@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: If you use TrustScore Atlas, please cite this software and preserve the attribution carried with its published data.
+title: TrustScore Atlas
+authors:
+  - family-names: Ramadhan
+    given-names: Aheebwa
+    email: hello@badrama.com
+repository-code: https://github.com/raheebwa/trustscore-atlas
+license: Apache-2.0
+version: 0.1.0
+abstract: TrustScore Atlas code is licensed under Apache-2.0. Its published canonical data is licensed under CC-BY-4.0, with source-specific rights and attribution retained in each data package.

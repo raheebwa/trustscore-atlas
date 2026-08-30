@@ -1,0 +1,5 @@
+{
+  "name": "trustscore-atlas-monorepo",
+  "private": true,
+  "packageManager": "pnpm@11.22.0"
+}
