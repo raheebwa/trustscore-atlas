@@ -8,9 +8,8 @@ interface FakeStatement {
 	bindings: unknown[];
 }
 
-function database(): { db: D1Database; batches: FakeStatement[][]; statements: FakeStatement[] } {
+function database(): { db: D1Database; batches: FakeStatement[][] } {
 	const batches: FakeStatement[][] = [];
-	const statements: FakeStatement[] = [];
 	const db = {
 		prepare: (sql: string) => ({
 			bind: (...bindings: unknown[]) => ({
@@ -19,11 +18,7 @@ function database(): { db: D1Database; batches: FakeStatement[][]; statements: F
 				first: async () =>
 					sql.includes('canonical_name')
 						? { canonical_name: 'Example Hardware Supplies Ltd' }
-						: null,
-				run: async () => {
-					statements.push({ sql, bindings });
-					return { meta: { changes: 1 } };
-				}
+						: null
 			})
 		}),
 		batch: async (batched: FakeStatement[]) => {
@@ -31,7 +26,7 @@ function database(): { db: D1Database; batches: FakeStatement[][]; statements: F
 			return [];
 		}
 	} as unknown as D1Database;
-	return { db, batches, statements };
+	return { db, batches };
 }
 
 describe('claims API', () => {
@@ -155,7 +150,7 @@ describe('claims API', () => {
 	});
 
 	it('records the method on the claim it issued a challenge for', async () => {
-		const { db, batches, statements } = database();
+		const { db, batches } = database();
 		const form = new FormData();
 		form.set('atlas_id', 'atlas-example-1');
 		form.set('claimant_role', 'owner or director');
@@ -171,7 +166,8 @@ describe('claims API', () => {
 
 		expect(response.status).toBe(303);
 		expect(batches[0][0].bindings).toContain('website_string');
-		const challenge = statements.find((entry) =>
+		// The challenge is committed with the claim, in the same batch.
+		const challenge = batches[0].find((entry) =>
 			entry.sql.includes('INSERT INTO claim_challenges')
 		);
 		expect(challenge?.bindings).toContain('https://example.co.ug');

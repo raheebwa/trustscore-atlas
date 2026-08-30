@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { issueWebsiteChallenge, runWebsiteAttempt } from './claim-verification';
+import { prepareWebsiteChallenge, runWebsiteAttempt } from './claim-verification';
 
 interface Recorded {
 	sql: string;
@@ -55,10 +55,10 @@ const challenge = {
 	attempts: 0
 };
 
-describe('issueWebsiteChallenge', () => {
+describe('prepareWebsiteChallenge', () => {
 	it('stores the string and the origin it must appear on, and hands back what to publish', async () => {
 		const recorded: Recorded[] = [];
-		const issued = await issueWebsiteChallenge(
+		const { issued } = prepareWebsiteChallenge(
 			fakeDatabase({}, recorded),
 			'claim_1',
 			'https://Example.ug/about',
@@ -88,9 +88,9 @@ describe('issueWebsiteChallenge', () => {
 
 	it('refuses a target the verifier could never reach, before anything is stored', async () => {
 		const recorded: Recorded[] = [];
-		await expect(
-			issueWebsiteChallenge(fakeDatabase({}, recorded), 'claim_1', 'http://localhost/about')
-		).rejects.toThrow(/https/i);
+		expect(() =>
+			prepareWebsiteChallenge(fakeDatabase({}, recorded), 'claim_1', 'http://localhost/about')
+		).toThrow(/https/i);
 		expect(recorded.some((entry) => entry.sql.includes('INSERT'))).toBe(false);
 	});
 
@@ -101,11 +101,9 @@ describe('issueWebsiteChallenge', () => {
 		'https://example.ug:8443/',
 		'https://user:pass@example.ug/',
 		'https://example..ug/'
-	])('refuses %s, which the verifier itself would refuse', async (address) => {
+	])('refuses %s, which the verifier itself would refuse', (address) => {
 		const recorded: Recorded[] = [];
-		await expect(
-			issueWebsiteChallenge(fakeDatabase({}, recorded), 'claim_1', address)
-		).rejects.toThrow();
+		expect(() => prepareWebsiteChallenge(fakeDatabase({}, recorded), 'claim_1', address)).toThrow();
 		expect(recorded.some((entry) => entry.sql.includes('INSERT'))).toBe(false);
 	});
 });

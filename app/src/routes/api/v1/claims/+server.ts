@@ -7,7 +7,7 @@ import {
 	hashClaimConfirmationToken
 } from '$lib/claims';
 import {
-	issueWebsiteChallenge,
+	prepareWebsiteChallenge,
 	websiteChallengeTarget,
 	type IssuedChallenge
 } from '$lib/server/claim-verification';
@@ -104,6 +104,12 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 		const plainToken = createClaimConfirmationToken();
 		const tokenHash = await hashClaimConfirmationToken(plainToken);
 
+		// The challenge is written with the claim, never after it: a claim whose challenge failed to
+		// land would be a link to a page that can never be completed, and neither row can be removed.
+		const challenge = challengeTarget
+			? prepareWebsiteChallenge(db, claimId, challengeTarget)
+			: null;
+
 		await db.batch([
 			db
 				.prepare(
@@ -141,12 +147,11 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 						status,
 						expires_at: expiresAt
 					})
-				)
+				),
+			...(challenge ? [challenge.statement] : [])
 		]);
 
-		const verification: IssuedChallenge | null = challengeTarget
-			? await issueWebsiteChallenge(db, claimId, challengeTarget)
-			: null;
+		const verification: IssuedChallenge | null = challenge?.issued ?? null;
 
 		if (isPageForm) return claimPageRedirect(atlasId, claimId, plainToken);
 

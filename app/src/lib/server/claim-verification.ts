@@ -65,12 +65,17 @@ export function websiteChallengeTarget(websiteUrl: string): string {
 	return originOf(websiteUrl.trim());
 }
 
-export async function issueWebsiteChallenge(
+/**
+ * The challenge as a statement the caller commits, so it lands in the same batch as the claim it
+ * belongs to. A claim written without its challenge would leave the claimant holding a link to a
+ * page that can never be completed, and claim rows cannot be cleaned up.
+ */
+export function prepareWebsiteChallenge(
 	db: D1Database,
 	claimId: string,
 	websiteUrl: string,
 	now: () => Date = () => new Date()
-): Promise<IssuedChallenge> {
+): { issued: IssuedChallenge; statement: D1PreparedStatement } {
 	// The address is checked before anything is written: a challenge nobody could ever satisfy is
 	// worse than a refusal, because it looks like progress.
 	const target = websiteChallengeTarget(websiteUrl);
@@ -79,16 +84,15 @@ export async function issueWebsiteChallenge(
 	const issuedAt = now();
 	const expiresAt = new Date(issuedAt.getTime() + CLAIM_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-	await db
+	const statement = db
 		.prepare(
 			`INSERT INTO claim_challenges
 			 (challenge_id, claim_id, method, target, challenge_value, created_at, expires_at, attempts)
 			 VALUES (?, ?, 'website_string', ?, ?, ?, ?, 0)`
 		)
-		.bind(challengeId, claimId, target, value, issuedAt.toISOString(), expiresAt.toISOString())
-		.run();
+		.bind(challengeId, claimId, target, value, issuedAt.toISOString(), expiresAt.toISOString());
 
-	return {
+	const issued: IssuedChallenge = {
 		challenge_id: challengeId,
 		method: 'website_string',
 		target,
@@ -100,6 +104,7 @@ export async function issueWebsiteChallenge(
 			'Then come back and ask Atlas to check. Either placement proves you control the site.'
 		]
 	};
+	return { issued, statement };
 }
 
 /** Why the last check ended, kept on the challenge because it is what the claimant is shown. */
