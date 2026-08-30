@@ -6,7 +6,17 @@
  * without it.
  */
 
-export function scopeLine(verb: string, countryName: string, registers: number): string {
+export function scopeLine(
+	verb: string,
+	countryName: string,
+	registers: number,
+	total?: number
+): string {
 	const noun = registers === 1 ? 'register' : 'registers';
+	// A page that lists registers it has not loaded says so, rather than letting a reader count
+	// twelve rows under a line that claims eight.
+	if (total !== undefined && total !== registers) {
+		return `${verb} ${countryName} · ${registers} of ${total} registers loaded`;
+	}
 	return `${verb} ${countryName} · ${registers} ${noun}`;
 }
