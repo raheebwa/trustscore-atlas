@@ -8,6 +8,7 @@ from pathlib import Path
 
 from . import boundaries
 from .adapters import accept_run, load_adapter, run_adapter
+from .bundle import publish_bundle
 from .conformance import check_run
 from .regenerate import regenerate
 
@@ -50,6 +51,10 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         help="slug=YYYY-MM-DD for registers returning nothing",
     )
+    bundle = sub.add_parser("bundle", help="publish one regeneration as a download bundle")
+    bundle.add_argument("--regeneration", required=True, help="regeneration id to publish")
+    bundle.add_argument("--data-root", type=Path, default=Path("data"))
+    bundle.add_argument("--out", type=Path, required=True)
     boundaries_cmd = sub.add_parser("boundaries", help="simplify and write topojson boundaries")
     boundaries_cmd.add_argument("--input", required=True)
     boundaries_cmd.add_argument("--level", required=True)
@@ -73,6 +78,15 @@ def main(argv: list[str] | None = None) -> int:
             empty_since=dict(item.split("=", 1) for item in args.empty_since),
         )
         print(json.dumps(result.summary, indent=2))
+        return 0
+    if args.command == "bundle":
+        result = publish_bundle(
+            regeneration_id=args.regeneration,
+            data_root=args.data_root,
+            out=args.out,
+            packs_root=REPO / "packs",
+        )
+        print(json.dumps(result.manifest, indent=2))
         return 0
     if args.command == "boundaries":
         return boundaries.main(
