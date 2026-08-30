@@ -89,3 +89,22 @@ export function summariseIdentifiers(
 			set.size === 1 ? `${scheme} ${[...set][0]}` : `${scheme} x${set.size}`
 		);
 }
+
+/**
+ * When a register is next due from its cadence and last accepted run, as a date; irregular
+ * registers are pulled on request and a register never pulled has no schedule yet.
+ */
+export function nextScheduledRun(cadence: string, lastRunAt: string | null): string {
+	const key = cadence.trim().toLowerCase();
+	if (key === 'irregular') return 'on request';
+	if (!lastRunAt) return 'not scheduled';
+	const last = new Date(lastRunAt);
+	if (Number.isNaN(last.getTime())) return 'not scheduled';
+	const next = new Date(last);
+	if (key === 'weekly') next.setUTCDate(next.getUTCDate() + 7);
+	else if (key === 'monthly') next.setUTCMonth(next.getUTCMonth() + 1);
+	else if (key === 'quarterly') next.setUTCMonth(next.getUTCMonth() + 3);
+	else if (key === 'annual') next.setUTCFullYear(next.getUTCFullYear() + 1);
+	else return 'not scheduled';
+	return next.toISOString().slice(0, 10);
+}

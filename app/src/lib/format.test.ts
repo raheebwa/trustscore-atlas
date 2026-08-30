@@ -62,3 +62,15 @@ describe('summariseIdentifiers', () => {
 		]);
 	});
 });
+
+describe('nextScheduledRun', () => {
+	it('adds the cadence to the last run and reports never-run and irregular registers honestly', async () => {
+		const { nextScheduledRun } = await import('./format');
+		expect(nextScheduledRun('weekly', '2026-08-16T00:00:00Z')).toBe('2026-08-23');
+		expect(nextScheduledRun('monthly', '2026-08-29T23:37:13Z')).toBe('2026-09-29');
+		expect(nextScheduledRun('quarterly', '2026-05-12T00:00:00Z')).toBe('2026-08-12');
+		expect(nextScheduledRun('annual', '2026-08-30T00:48:51Z')).toBe('2027-08-30');
+		expect(nextScheduledRun('irregular', '2026-08-30T03:01:19Z')).toBe('on request');
+		expect(nextScheduledRun('quarterly', null)).toBe('not scheduled');
+	});
+});
