@@ -129,3 +129,24 @@ describe('exploreCsv', () => {
 		expect(csv).toBe('district,business_count\r\nKampala,3\r\n(unknown),1\r\n"\'=1+1",1\r\n');
 	});
 });
+
+describe('exploreSegments with a cache', () => {
+	it('answers repeated filter sets from KV within one regeneration', async () => {
+		const { exploreSegmentsCached } = await import('./explore');
+		const store = new Map<string, string>();
+		const cache = {
+			get: async (key: string) => store.get(key) ?? null,
+			put: async (key: string, value: string) => {
+				store.set(key, value);
+			}
+		} as unknown as KVNamespace;
+		const calls: string[] = [];
+		const databases = fakeDatabases(calls);
+		const first = await exploreSegmentsCached(databases, cache, { district: 'Kampala ' });
+		const queriesAfterFirst = calls.filter((sql) => sql.includes('FROM segments')).length;
+		const second = await exploreSegmentsCached(databases, cache, { district: 'Kampala' });
+		expect(second).toEqual(first);
+		expect(calls.filter((sql) => sql.includes('FROM segments')).length).toBe(queriesAfterFirst);
+		expect([...store.keys()]).toEqual(['explore:regen-example-1:UG|||Kampala||']);
+	});
+});

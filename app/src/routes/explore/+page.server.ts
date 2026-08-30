@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { RegenerationInProgressError } from '$lib/server/atlas';
-import { exploreSegments } from '$lib/server/explore';
+import { exploreSegmentsCached } from '$lib/server/explore';
 import { requireDatabases } from '$lib/server/platform';
 import type { PageServerLoad } from './$types';
 
@@ -9,7 +9,7 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 	const country = url.searchParams.get('country')?.trim() ?? '';
 	if (country && !/^[A-Za-z]{2}$/.test(country)) error(400, 'Invalid country code.');
 	try {
-		const explore = await exploreSegments(databases, {
+		const explore = await exploreSegmentsCached(databases, platform?.env?.CACHE, {
 			country,
 			category: url.searchParams.get('category'),
 			nature: url.searchParams.get('nature'),

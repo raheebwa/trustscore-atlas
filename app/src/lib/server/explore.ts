@@ -185,3 +185,38 @@ export function exploreCsv(response: ExploreResponse): string {
 	}
 	return lines.join('\r\n') + '\r\n';
 }
+
+const CACHE_TTL_SECONDS = 86400;
+
+/**
+ * The explorer answer is immutable for a regeneration, so it is cached in KV under the live
+ * regeneration id and the cleaned filters; a new regeneration changes the key.
+ */
+export async function exploreSegmentsCached(
+	databases: AtlasDatabases,
+	cache: KVNamespace | undefined,
+	inputFilters: ExploreFilters
+): Promise<ExploreResponse> {
+	const filters = cleanFilters(inputFilters);
+	const liveId = cache ? await getLiveRegenerationId(databases.db) : null;
+	const key = liveId
+		? `explore:${liveId}:${[filters.country, filters.category, filters.nature, filters.district, filters.division, filters.present_in].map((v) => v ?? '').join('|')}`
+		: null;
+	if (key) {
+		try {
+			const hit = await cache!.get(key);
+			if (hit) return JSON.parse(hit) as ExploreResponse;
+		} catch {
+			// A cache failure only costs the queries below.
+		}
+	}
+	const response = await exploreSegments(databases, filters);
+	if (key) {
+		try {
+			await cache!.put(key, JSON.stringify(response), { expirationTtl: CACHE_TTL_SECONDS });
+		} catch {
+			// Same: the page still answers from the database.
+		}
+	}
+	return response;
+}

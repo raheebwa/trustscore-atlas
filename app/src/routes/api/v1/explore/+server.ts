@@ -7,7 +7,7 @@ import {
 	apiServerError
 } from '$lib/server/api';
 import { deriveEtag } from '$lib/server/etag';
-import { exploreCsv, exploreSegments, type ExploreFilters } from '$lib/server/explore';
+import { exploreCsv, exploreSegmentsCached, type ExploreFilters } from '$lib/server/explore';
 import { requireDatabases } from '$lib/server/platform';
 import type { RequestHandler } from './$types';
 
@@ -34,7 +34,7 @@ export const GET: RequestHandler = async ({ platform, request, url }) => {
 		const format = url.searchParams.get('format') ?? 'json';
 		if (format !== 'json' && format !== 'csv') return apiBadRequest('invalid format');
 		const databases = requireDatabases(platform);
-		const response = await exploreSegments(databases, filters);
+		const response = await exploreSegmentsCached(databases, platform?.env?.CACHE, filters);
 		if (format === 'csv') {
 			const liveRegenerationId = (await getLiveRegenerationId(databases.db)) ?? 'unseeded';
 			const etag = deriveEtag(liveRegenerationId, url.pathname + url.search);
