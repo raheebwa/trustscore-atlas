@@ -86,7 +86,6 @@ jobs:
 
       # Secrets are passed only through step environments. Steps must not print the environment or enable xtrace.
       - name: Mark rollback request running
-        if: ${{ !inputs.smoke }}
         if: ${{ !inputs.smoke && inputs.request_id != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -232,7 +231,6 @@ jobs:
             --file "$latest_file" --content-type application/json --remote)
 
       - name: Mark rollback request done
-        if: ${{ !inputs.smoke }}
         if: ${{ !inputs.smoke && success() && inputs.request_id != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -242,11 +240,10 @@ jobs:
         run: |
           set -euo pipefail
           pipeline/.venv/bin/python -m atlas_pipeline requests mark \
-            --request-id "$REQUEST_ID" --status done \
+            --request-id "$REQUEST_ID" --status "done" \
             --note "rollback to $REGENERATION_ID completed"
 
       - name: Mark rollback request failed
-        if: ${{ !inputs.smoke }}
         if: ${{ !inputs.smoke && failure() && inputs.request_id != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -256,11 +253,10 @@ jobs:
         run: |
           set -euo pipefail
           pipeline/.venv/bin/python -m atlas_pipeline requests mark \
-            --request-id "$REQUEST_ID" --status failed \
+            --request-id "$REQUEST_ID" --status "failed" \
             --note "rollback to $REGENERATION_ID failed in run $GITHUB_RUN_ID"
 
       - name: Upload rollback load log
-        if: ${{ !inputs.smoke }}
         if: ${{ !inputs.smoke && always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

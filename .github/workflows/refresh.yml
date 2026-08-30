@@ -306,7 +306,6 @@ jobs:
           infra/scripts/upload-bundle.sh "$regeneration_id"
 
       - name: Mark regeneration request done
-        if: ${{ !inputs.smoke }}
         if: ${{ !inputs.smoke && success() && steps.regeneration-request.outputs.request_id != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -316,11 +315,10 @@ jobs:
           set -euo pipefail
           regeneration_id=$(<data/refresh/regeneration-id.txt)
           pipeline/.venv/bin/python -m atlas_pipeline requests mark \
-            --request-id "$REQUEST_ID" --status done \
+            --request-id "$REQUEST_ID" --status "done" \
             --note "completed regeneration $regeneration_id"
 
       - name: Mark regeneration request failed
-        if: ${{ !inputs.smoke }}
         if: ${{ !inputs.smoke && failure() && steps.regeneration-request.outputs.request_id != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -329,11 +327,10 @@ jobs:
         run: |
           set -euo pipefail
           pipeline/.venv/bin/python -m atlas_pipeline requests mark \
-            --request-id "$REQUEST_ID" --status failed \
+            --request-id "$REQUEST_ID" --status "failed" \
             --note "scheduled refresh run $GITHUB_RUN_ID failed"
 
       - name: Write refresh summary
-        if: ${{ !inputs.smoke }}
         if: ${{ !inputs.smoke && always() }}
         run: |
           set -euo pipefail
@@ -352,6 +349,7 @@ jobs:
             echo "| --- | ---: | --- |"
             if [[ -s data/refresh/source-results.tsv ]]; then
               while IFS=$'\t' read -r adapter rows status; do
+                # shellcheck disable=SC2016 # a printf format string must not expand
                 printf '| `%s` | %s | %s |\n' "$adapter" "$rows" "$status"
               done <data/refresh/source-results.tsv
             else
@@ -383,7 +381,6 @@ jobs:
           } >>"$GITHUB_STEP_SUMMARY"
 
       - name: Upload refresh evidence
-        if: ${{ !inputs.smoke }}
         if: ${{ !inputs.smoke && always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
