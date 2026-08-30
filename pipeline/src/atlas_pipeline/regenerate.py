@@ -88,6 +88,13 @@ def _load_crosswalk(path: Path) -> dict[str, str]:
     )
 
 
+def _load_labels(path: Path) -> list[dict]:
+    """Maintainer verdicts, one JSON object per line, append-only; the latest per pair wins."""
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
 def _append_crosswalk(path: Path, resolution, regeneration_id: str) -> None:
     """Append-only: first-seen entities get a row; existing rows are never rewritten."""
     if not resolution.new_entities and path.exists():
@@ -184,7 +191,10 @@ def regenerate(
         )
     crosswalk_path = data_root / "canonical" / "crosswalk.parquet"
     crosswalk = _load_crosswalk(crosswalk_path)
-    resolution = resolve(statements, pack=pack, checked_sources=list(inputs), crosswalk=crosswalk)
+    labels = _load_labels(data_root / "canonical" / "labels.jsonl")
+    resolution = resolve(
+        statements, pack=pack, checked_sources=list(inputs), crosswalk=crosswalk, labels=labels
+    )
     by_business: dict[str, list[dict]] = {}
     for s in resolution.statements:
         by_business.setdefault(s["atlas_id"], []).append(s)
@@ -367,6 +377,7 @@ def regenerate(
         },
         "sources": sources,
         "new_entities": len(resolution.new_entities),
+        "labels": len(labels),
         "load_order": load_order,
     }
     (out / "regeneration.json").write_text(json.dumps(summary, indent=2) + "\n")

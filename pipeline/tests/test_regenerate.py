@@ -369,3 +369,55 @@ def test_regenerate_puts_scores_in_a_third_database_and_shares_pack_coverage_onc
     assert scores_db.execute("SELECT value FROM meta WHERE key='live_regeneration'").fetchone() == (
         "20260829T210000Z",
     )
+
+
+def test_regenerate_applies_maintainer_labels_from_the_canonical_labels_file(tmp_path: Path):
+    """A match label recorded in data/canonical/labels.jsonl merges the two businesses on
+    the next regeneration and leaves an alias row with the label as the reason."""
+    spec = load_adapter(ADAPTER)
+    pages = {
+        spec.module.query_url(n): (ADAPTER / "fixtures" / "raw" / f"{_slug(n)}.html").read_bytes()
+        for n in EXPECTED["natures"]
+    }
+    run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=lambda url, **_: pages[url],
+        salt=SALT,
+        params={"natures": EXPECTED["natures"]},
+    )
+    common = dict(
+        pack_dir=PACKS / "ug",
+        data_root=tmp_path,
+        rubrics_dir=PACKS.parent / "rubrics",
+        schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
+    )
+    first = regenerate(
+        regeneration_id="20260829T210000Z", computed_at="2026-08-29T21:00:00Z", **common
+    )
+    before = pq.read_table(first.directory / "businesses.parquet").to_pylist()
+    kept, merged = sorted(b["atlas_id"] for b in before)[:2]
+    labels = tmp_path / "canonical" / "labels.jsonl"
+    labels.write_text(
+        json.dumps(
+            {
+                "atlas_id": kept,
+                "candidate_atlas_id": merged,
+                "verdict": "match",
+                "labelled_at": "2026-08-30T01:05:00Z",
+                "labelled_by": "maintainer",
+            }
+        )
+        + "\n"
+    )
+    second = regenerate(
+        regeneration_id="20260830T010000Z", computed_at="2026-08-30T01:00:00Z", **common
+    )
+    after = pq.read_table(second.directory / "businesses.parquet").to_pylist()
+    assert len(after) == len(before) - 1
+    aliases = pq.read_table(second.directory / "aliases.parquet").to_pylist()
+    assert aliases == [{"atlas_id": merged, "canonical_atlas_id": kept, "reason": "label:match"}]
+    assert second.summary["counts"]["aliases"] == 1
+    assert second.summary["labels"] == 1
