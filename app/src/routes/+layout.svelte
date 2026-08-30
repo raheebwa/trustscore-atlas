@@ -1,14 +1,16 @@
 <script lang="ts">
 	import './layout.css';
 	import { resolve } from '$app/paths';
-	import favicon from '$lib/assets/favicon.svg';
 	import WebMcpRegistration from '$lib/webmcp/WebMcpRegistration.svelte';
 
 	let { children } = $props();
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+	<link rel="icon" type="image/svg+xml" href="/brand/trustscore-mark.svg" />
+	<link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
+	<link rel="icon" type="image/png" sizes="192x192" href="/brand/favicon-192.png" />
+	<link rel="apple-touch-icon" sizes="192x192" href="/brand/favicon-192.png" />
 	<meta property="og:site_name" content="TrustScore Atlas" />
 	<meta property="og:type" content="website" />
 	<meta property="og:title" content="TrustScore Atlas" />
@@ -31,9 +33,13 @@
 		<div
 			class="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-4"
 		>
-			<a href={resolve('/')} class="text-lg font-semibold tracking-tight text-stone-900"
-				>TrustScore Atlas</a
+			<a
+				href={resolve('/')}
+				class="flex items-center gap-2 text-lg font-semibold tracking-tight text-stone-900"
 			>
+				<img src="/brand/trustscore-mark.svg" alt="TrustScore" class="h-6 w-auto" />
+				<span>Atlas</span>
+			</a>
 			<nav class="flex flex-wrap gap-x-5 gap-y-1 text-sm font-medium text-stone-600">
 				<a href={resolve('/search')} class="hover:text-stone-900">Search</a>
 				<a href={resolve('/explore')} class="hover:text-stone-900">Explore</a>
@@ -50,9 +56,14 @@
 	</main>
 
 	<footer class="border-t border-stone-200 bg-white">
-		<div class="mx-auto max-w-4xl px-4 py-6 text-sm text-stone-500">
-			TrustScore Atlas harmonises public business records published by government registers. It is
-			not a credit or fraud verdict. Every value links to the register that published it.
+		<div
+			class="mx-auto flex max-w-4xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-6 text-sm text-stone-500"
+		>
+			<img src="/brand/trustscore-wordmark.svg" alt="TrustScore" class="h-5 w-auto" />
+			<p class="max-w-2xl">
+				Atlas harmonises public business records published by government registers. It is not a
+				credit or fraud verdict. Every value links to the register that published it.
+			</p>
 		</div>
 	</footer>
 </div>
