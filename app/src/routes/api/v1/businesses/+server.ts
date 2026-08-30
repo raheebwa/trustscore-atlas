@@ -15,6 +15,7 @@ import type { RequestHandler } from './$types';
 export const GET: RequestHandler = async ({ platform, request, url }) => {
 	try {
 		const databases = requireDatabases(platform);
+		const version = deploymentVersion(platform?.env as Record<string, unknown> | undefined);
 		const q = url.searchParams.get('q') ?? '';
 		const limit = url.searchParams.get('limit');
 		const district = url.searchParams.get('district');
@@ -24,9 +25,9 @@ export const GET: RequestHandler = async ({ platform, request, url }) => {
 			platform?.env?.CACHE,
 			{ q, limit, district, cursor },
 			undefined,
-			deploymentVersion(platform?.env as Record<string, unknown> | undefined)
+			version
 		);
-		return await apiResponse(databases.db, request, url.pathname + url.search, response);
+		return await apiResponse(databases.db, request, url.pathname + url.search, response, version);
 	} catch (err) {
 		if (err instanceof InvalidCursorError) return apiBadRequest('invalid cursor');
 		if (err instanceof RegenerationInProgressError) return apiRegenerationInProgress();

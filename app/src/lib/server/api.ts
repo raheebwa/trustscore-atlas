@@ -22,10 +22,11 @@ export async function apiResponse(
 	request: Request,
 	path: string,
 	data: unknown,
+	versionId: string | null,
 	init: { status?: number } = {}
 ): Promise<Response> {
 	const liveRegenerationId = (await getLiveRegenerationId(db)) ?? 'unseeded';
-	const etag = deriveEtag(liveRegenerationId, path);
+	const etag = deriveEtag(liveRegenerationId, path, versionId);
 	const headers = {
 		...CORS_HEADERS,
 		'Cache-Control': 'public, max-age=60',

@@ -1,3 +1,4 @@
+import { deploymentVersion } from '$lib/server/cache-scope';
 import { RegenerationInProgressError, businessExists, getScore } from '$lib/server/atlas';
 import {
 	apiBadRequest,
@@ -30,9 +31,16 @@ export const GET: RequestHandler = async ({ platform, request, url, params }) =>
 		if (!(await businessExists(databases.db, params.atlas_id))) {
 			return apiNotFound('business_not_found');
 		}
+		const deployVersion = deploymentVersion(platform?.env as Record<string, unknown> | undefined);
 		const score = await getScore(databases, params.atlas_id, rubric, { version });
 		if (!score) return apiNotFound('rubric_not_found');
-		return await apiResponse(databases.db, request, url.pathname + url.search, score);
+		return await apiResponse(
+			databases.db,
+			request,
+			url.pathname + url.search,
+			score,
+			deployVersion
+		);
 	} catch (err) {
 		if (err instanceof RegenerationInProgressError) return apiRegenerationInProgress();
 		return apiServerError(err);

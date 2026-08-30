@@ -1,3 +1,4 @@
+import { deploymentVersion } from '$lib/server/cache-scope';
 import { RegenerationInProgressError, businessExists, getStatementsPage } from '$lib/server/atlas';
 import { InvalidCursorError } from '$lib/pagination';
 import {
@@ -14,6 +15,7 @@ import type { RequestHandler } from './$types';
 export const GET: RequestHandler = async ({ platform, request, url, params }) => {
 	try {
 		const databases = requireDatabases(platform);
+		const version = deploymentVersion(platform?.env as Record<string, unknown> | undefined);
 		if (!(await businessExists(databases.db, params.atlas_id))) {
 			return apiNotFound(`No business found for atlas_id "${params.atlas_id}".`);
 		}
@@ -24,7 +26,7 @@ export const GET: RequestHandler = async ({ platform, request, url, params }) =>
 			limit: url.searchParams.get('limit'),
 			cursor: url.searchParams.get('cursor')
 		});
-		return await apiResponse(databases.db, request, url.pathname + url.search, page);
+		return await apiResponse(databases.db, request, url.pathname + url.search, page, version);
 	} catch (err) {
 		if (err instanceof InvalidCursorError) return apiBadRequest('invalid cursor');
 		if (err instanceof RegenerationInProgressError) return apiRegenerationInProgress();

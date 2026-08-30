@@ -1,3 +1,4 @@
+import { deploymentVersion } from '$lib/server/cache-scope';
 import { RegenerationInProgressError, businessExists, getJoinedScore } from '$lib/server/atlas';
 import { explainScore } from '$lib/score-explanation';
 import {
@@ -17,6 +18,7 @@ export const GET: RequestHandler = async ({ platform, request, url, params }) =>
 		const rubric = url.searchParams.get('rubric')?.trim() ?? '';
 		if (rubric.length === 0 || rubric.length > 100) return apiBadRequest('invalid rubric');
 		const databases = requireDatabases(platform);
+		const version = deploymentVersion(platform?.env as Record<string, unknown> | undefined);
 		if (!(await businessExists(databases.db, params.atlas_id))) {
 			return apiNotFound('business_not_found');
 		}
@@ -32,7 +34,7 @@ export const GET: RequestHandler = async ({ platform, request, url, params }) =>
 				evidence: joined.evidence
 			})
 		};
-		return await apiResponse(databases.db, request, url.pathname + url.search, response);
+		return await apiResponse(databases.db, request, url.pathname + url.search, response, version);
 	} catch (err) {
 		if (err instanceof RegenerationInProgressError) return apiRegenerationInProgress();
 		return apiServerError(err);

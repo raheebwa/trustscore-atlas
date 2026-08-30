@@ -17,13 +17,9 @@ export const GET: RequestHandler = async ({ platform, request, url }) => {
 		const country = url.searchParams.get('country')?.trim();
 		if (country && !/^[A-Za-z]{2}$/.test(country)) return apiBadRequest('invalid country');
 		const databases = requireDatabases(platform);
-		const response = await listFacetsCached(
-			databases,
-			platform?.env?.CACHE,
-			country,
-			deploymentVersion(platform?.env as Record<string, unknown> | undefined)
-		);
-		return await apiResponse(databases.db, request, url.pathname + url.search, response);
+		const version = deploymentVersion(platform?.env as Record<string, unknown> | undefined);
+		const response = await listFacetsCached(databases, platform?.env?.CACHE, country, version);
+		return await apiResponse(databases.db, request, url.pathname + url.search, response, version);
 	} catch (err) {
 		if (err instanceof RegenerationInProgressError) return apiRegenerationInProgress();
 		return apiServerError(err);

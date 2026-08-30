@@ -1,3 +1,4 @@
+import { deploymentVersion } from '$lib/server/cache-scope';
 import { RegenerationInProgressError } from '$lib/server/atlas';
 import {
 	apiBadRequest,
@@ -23,8 +24,9 @@ export const GET: RequestHandler = async ({ platform, request, url }) => {
 			filters[name] = value;
 		}
 		const databases = requireDatabases(platform);
+		const version = deploymentVersion(platform?.env as Record<string, unknown> | undefined);
 		const response = await findSegment(databases, filters);
-		return await apiResponse(databases.db, request, url.pathname + url.search, response);
+		return await apiResponse(databases.db, request, url.pathname + url.search, response, version);
 	} catch (err) {
 		if (err instanceof RegenerationInProgressError) return apiRegenerationInProgress();
 		return apiServerError(err);

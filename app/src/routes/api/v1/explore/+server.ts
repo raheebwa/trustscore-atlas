@@ -35,15 +35,11 @@ export const GET: RequestHandler = async ({ platform, request, url }) => {
 		const format = url.searchParams.get('format') ?? 'json';
 		if (format !== 'json' && format !== 'csv') return apiBadRequest('invalid format');
 		const databases = requireDatabases(platform);
-		const response = await exploreSegmentsCached(
-			databases,
-			platform?.env?.CACHE,
-			filters,
-			deploymentVersion(platform?.env as Record<string, unknown> | undefined)
-		);
+		const version = deploymentVersion(platform?.env as Record<string, unknown> | undefined);
+		const response = await exploreSegmentsCached(databases, platform?.env?.CACHE, filters, version);
 		if (format === 'csv') {
 			const liveRegenerationId = (await getLiveRegenerationId(databases.db)) ?? 'unseeded';
-			const etag = deriveEtag(liveRegenerationId, url.pathname + url.search);
+			const etag = deriveEtag(liveRegenerationId, url.pathname + url.search, version);
 			const headers = {
 				'Content-Type': 'text/csv; charset=utf-8',
 				'Content-Disposition': 'attachment; filename="atlas-explore.csv"',
@@ -56,7 +52,7 @@ export const GET: RequestHandler = async ({ platform, request, url }) => {
 			}
 			return new Response(exploreCsv(response), { headers });
 		}
-		return await apiResponse(databases.db, request, url.pathname + url.search, response);
+		return await apiResponse(databases.db, request, url.pathname + url.search, response, version);
 	} catch (err) {
 		if (err instanceof RegenerationInProgressError) return apiRegenerationInProgress();
 		return apiServerError(err);

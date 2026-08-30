@@ -1,3 +1,4 @@
+import { deploymentVersion } from '$lib/server/cache-scope';
 import {
 	RegenerationInProgressError,
 	businessExists,
@@ -28,6 +29,7 @@ export const GET: RequestHandler = async ({ platform, request, url, params }) =>
 		}
 
 		const databases = requireDatabases(platform);
+		const version = deploymentVersion(platform?.env as Record<string, unknown> | undefined);
 		if (!(await businessExists(databases.db, params.atlas_id))) {
 			return apiNotFound('business_not_found');
 		}
@@ -39,7 +41,7 @@ export const GET: RequestHandler = async ({ platform, request, url, params }) =>
 			? await getFieldEvidencePage(databases, params.atlas_id, field, options)
 			: await getRubricEvidencePage(databases, params.atlas_id, rubric as string, options);
 		if (!evidence) return apiNotFound('rubric_not_found');
-		return await apiResponse(databases.db, request, url.pathname + url.search, evidence);
+		return await apiResponse(databases.db, request, url.pathname + url.search, evidence, version);
 	} catch (err) {
 		if (err instanceof InvalidCursorError) return apiBadRequest('invalid cursor');
 		if (err instanceof RegenerationInProgressError) return apiRegenerationInProgress();

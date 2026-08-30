@@ -88,4 +88,27 @@ describe('scores API', () => {
 		expect(response.status).toBe(404);
 		expect(await response.json()).toEqual({ error: 'rubric_not_found' });
 	});
+	it('keys the ETag on the deployment, not on the requested rubric version', async () => {
+		const call = async (versionId: string) => {
+			const request = new Request(
+				'https://atlas.example.invalid/api/v1/businesses/atlas-example-1/scores?rubric=formality&version=1'
+			);
+			const response = await GET({
+				platform: {
+					env: {
+						DB: database('main'),
+						DB_STATEMENTS: database('statements'),
+						DB_SCORES: database('scores'),
+						CF_VERSION_METADATA: { id: versionId }
+					}
+				},
+				params: { atlas_id: 'atlas-example-1' },
+				request,
+				url: new URL(request.url)
+			} as never);
+			return response.headers.get('etag');
+		};
+
+		expect(await call('deploy-1')).not.toBe(await call('deploy-2'));
+	});
 });
