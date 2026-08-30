@@ -21,3 +21,9 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+    # Actions are pinned to a commit inside the major each workflow already uses. A major bump
+    # changes behaviour rather than only the pin, so it is a deliberate decision rather than a
+    # weekly one; patch and minor updates still arrive.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
