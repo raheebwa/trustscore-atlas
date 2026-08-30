@@ -1,11 +1,25 @@
 cff-version: 1.2.0
-message: If you use TrustScore Atlas, please cite this software and preserve the attribution carried with its published data.
 title: TrustScore Atlas
+message: >-
+  If you use this software or the data packages it publishes, please cite both. The published data
+  is licensed CC BY 4.0 and carries its own per-source attribution in each package's SOURCES.md.
+type: software
+abstract: >-
+  TrustScore Atlas harmonises public business registers into one record per business, keeping the
+  register that published each field and the date it said so, reporting what has not been checked
+  as plainly as what has, and publishing deterministic evidence scores with explicit coverage.
 authors:
   - family-names: Ramadhan
     given-names: Aheebwa
     email: hello@badrama.com
 repository-code: https://github.com/raheebwa/trustscore-atlas
+url: https://atlas.trustscorehq.com
 license: Apache-2.0
 version: 0.1.0
-abstract: TrustScore Atlas code is licensed under Apache-2.0. Its published canonical data is licensed under CC-BY-4.0, with source-specific rights and attribution retained in each data package.
+keywords:
+  - open data
+  - business registers
+  - provenance
+  - data quality
+  - Uganda
+  - Kenya

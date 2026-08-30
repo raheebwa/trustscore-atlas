@@ -308,4 +308,18 @@ The layered raw, typed and canonical pipeline, field-level statements with prece
 
 The public tools never expose administrative actions. [`/ops`](https://atlas.trustscorehq.com/ops) and [`/ops/sources`](https://atlas.trustscorehq.com/ops/sources) sit behind Cloudflare Access and fail closed when Access is not configured or the request has no verified maintainer identity.
 
-The moderation queue lists confirmed claims, corrections, linkage labels and issues oldest first. A maintainer approves or rejects once with a reason; the decision is append-only and never edits the submitted request. Accepted corrections and labels become upstream inputs to the next regeneration. The sources screen shows each register's status, accepted run, row count and note. Pulls currently run through the pipeline; an in-page “run now” action is not part of this deployment.
+The moderation queue lists confirmed claims, corrections, linkage labels and issues oldest first. A maintainer approves or rejects once with a reason; the decision is append-only and never edits the submitted request.
+
+Approving a claim, or a correction filed from one, requires that claim to be verified. Verification proves control of a domain, never that the business belongs to the claimant, so where no register published that domain for the record the maintainer states that they checked what connects the two. What the approval rested on is written with the decision, because the register check reads a table every regeneration rebuilds and could answer differently later. An approval asserts an operator statement, which the next regeneration publishes above every register on the field it covers, beside the claim it came from.
+
+Accepted linkage labels are upstream inputs to the next regeneration in the same way. The sources screen shows each register's status, accepted run, row count and note; a register whose run failed keeps serving its last accepted run and says so with both dates. Pulls currently run through the pipeline; an in-page “run now” action is not part of this deployment.
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it carries the two commands that must be green, the
+test-first policy, what a change to published data has to say about its provenance, the sign-off,
+and the practices this project has decided not to adopt. Participation is under the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+Please report a suspected vulnerability privately, following [SECURITY.md](SECURITY.md), rather
+than in a public issue.
