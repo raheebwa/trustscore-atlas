@@ -11,8 +11,11 @@
  * Atlas scores never use the TrustScore credit tiers: a tier is a credit verdict and these scores
  * are not one. Score bars use the neutral ink ramp below; tier colours appear only on register
  * freshness.
+ *
+ * Declared static because component stylesheets read these as var(--color-...) rather than
+ * through a utility class, and Tailwind emits only the variables its utilities reference.
  */
-@theme {
+@theme static {
 	--color-ink: #0b1e3f;
 	/* Two steps darker than the brand's muted ink: #5c6a7a reads at 3.9:1 on panel-2, under the
 	   4.5:1 floor, and captions sit on panels all over this product. */
@@ -82,6 +85,43 @@
 
 	--ease-enter: cubic-bezier(0.2, 0, 0, 1);
 	--ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/**
+ * Self-hosted latin subsets, copied from the fontsource packages into static/fonts so the paths
+ * are stable enough to preload: no third-party font host, and 136 KB for the four files. Inter
+ * and JetBrains Mono are variable; Newsreader ships only the two weights the design uses.
+ */
+@font-face {
+	font-family: 'InterVariable';
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 900;
+	src: url('/fonts/inter-latin-wght-normal.woff2') format('woff2-variations');
+}
+
+@font-face {
+	font-family: 'Newsreader';
+	font-style: normal;
+	font-display: swap;
+	font-weight: 500;
+	src: url('/fonts/newsreader-latin-500-normal.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Newsreader';
+	font-style: normal;
+	font-display: swap;
+	font-weight: 600;
+	src: url('/fonts/newsreader-latin-600-normal.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'JetBrainsMonoVariable';
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 800;
+	src: url('/fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2-variations');
 }
 
 @layer base {
