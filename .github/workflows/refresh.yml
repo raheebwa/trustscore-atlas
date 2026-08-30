@@ -138,6 +138,30 @@ jobs:
           done <data/refresh/bundle-files.txt
           pipeline/.venv/bin/python -m atlas_pipeline restore \
             --bundle "$bundle_dir" --data-root data
+          printf '%s\n' "$bundle_dir" >data/refresh/previous-bundle.txt
+
+      - name: Start oldest pending regeneration request
+        id: regeneration-request
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          request_json=$(pipeline/.venv/bin/python -m atlas_pipeline requests next \
+            --data-root data --kind regenerate)
+          if [[ -z $request_json ]]; then
+            exit 0
+          fi
+          request_id=$(printf '%s' "$request_json" | pipeline/.venv/bin/python -c \
+            'import json, sys; print(json.load(sys.stdin)["request_id"])')
+          if [[ ! $request_id =~ ^[A-Za-z0-9_-]{1,200}$ ]]; then
+            echo "invalid regeneration request id" >&2
+            exit 1
+          fi
+          pipeline/.venv/bin/python -m atlas_pipeline requests mark \
+            --request-id "$request_id" --status running \
+            --note "scheduled refresh run $GITHUB_RUN_ID"
+          printf 'request_id=%s\n' "$request_id" >>"$GITHUB_OUTPUT"
 
       - name: Run due sources
         env:
@@ -196,13 +220,28 @@ jobs:
           fi
 
       - name: Regenerate serving data
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
           regeneration_id=$(date -u +%Y%m%dT%H%M%SZ)
           printf '%s\n' "$regeneration_id" >data/refresh/regeneration-id.txt
+          pipeline/.venv/bin/python -m atlas_pipeline labels compile \
+            --data-root data --regeneration "$regeneration_id" \
+            | tee data/refresh/labels-compile.log
           pipeline/.venv/bin/python -m atlas_pipeline regenerate \
             --pack packs/ug --pack packs/ke --data-root data --id "$regeneration_id" \
             | tee data/refresh/regenerate.log
+
+      - name: Identity churn guard
+        run: |
+          set -euo pipefail
+          regeneration_id=$(<data/refresh/regeneration-id.txt)
+          pipeline/.venv/bin/python -m atlas_pipeline guard \
+            --regeneration "$regeneration_id" --data-root data \
+            --previous-bundle "$(<data/refresh/previous-bundle.txt)" \
+            --out data/refresh/guard.json
 
       - name: Load D1 databases
         env:
@@ -213,6 +252,15 @@ jobs:
           regeneration_id=$(<data/refresh/regeneration-id.txt)
           infra/scripts/load-d1.sh "$regeneration_id" 2>&1 \
             | tee "data/regen/$regeneration_id/load-d1.log"
+
+      - name: Upload regeneration SQL
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          regeneration_id=$(<data/refresh/regeneration-id.txt)
+          infra/scripts/upload-regen.sh "$regeneration_id"
 
       - name: Build download bundle
         run: |
@@ -230,6 +278,31 @@ jobs:
           set -euo pipefail
           regeneration_id=$(<data/refresh/regeneration-id.txt)
           infra/scripts/upload-bundle.sh "$regeneration_id"
+
+      - name: Mark regeneration request done
+        if: success() && steps.regeneration-request.outputs.request_id != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REQUEST_ID: ${{ steps.regeneration-request.outputs.request_id }}
+        run: |
+          set -euo pipefail
+          regeneration_id=$(<data/refresh/regeneration-id.txt)
+          pipeline/.venv/bin/python -m atlas_pipeline requests mark \
+            --request-id "$REQUEST_ID" --status done \
+            --note "completed regeneration $regeneration_id"
+
+      - name: Mark regeneration request failed
+        if: failure() && steps.regeneration-request.outputs.request_id != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REQUEST_ID: ${{ steps.regeneration-request.outputs.request_id }}
+        run: |
+          set -euo pipefail
+          pipeline/.venv/bin/python -m atlas_pipeline requests mark \
+            --request-id "$REQUEST_ID" --status failed \
+            --note "scheduled refresh run $GITHUB_RUN_ID failed"
 
       - name: Write refresh summary
         if: always()
@@ -256,6 +329,16 @@ jobs:
               echo "| None | 0 | skipped |"
             fi
             echo
+            echo "### Identity churn guard"
+            echo
+            if [[ -f data/refresh/guard.json ]]; then
+              echo '```'
+              cat data/refresh/guard.json
+              echo '```'
+            else
+              echo "Not run."
+            fi
+            echo
             echo "### Database sizes"
             echo
             echo "| Database | Size MB |"
@@ -279,4 +362,6 @@ jobs:
           path: |
             data/regen/*/regeneration.json
             data/refresh/run-manifests
+            data/refresh/labels-compile.log
             data/regen/*/load-d1.log
+            data/refresh/guard.json

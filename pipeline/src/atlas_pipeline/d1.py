@@ -74,8 +74,10 @@ def quote(value) -> str:
     return "'" + str(value).replace("'", "''") + "'"
 
 
-def insert_statements(table: str, columns: list[str], rows: list[dict]) -> list[str]:
-    head = f"INSERT INTO {table} ({', '.join(columns)}) VALUES "
+def insert_statements(
+    table: str, columns: list[str], rows: list[dict], *, verb: str = "INSERT"
+) -> list[str]:
+    head = f"{verb} INTO {table} ({', '.join(columns)}) VALUES "
     out: list[str] = []
     batch: list[str] = []
     size = len(head)
@@ -334,10 +336,12 @@ def regeneration_sql(
 
 
 def _regeneration_row(regeneration: dict) -> list[str]:
+    # A rollback reloads an id that was live before, so the row is upserted, never duplicated.
     return insert_statements(
         "regenerations",
         ["id", "started_at", "finished_at", "inputs", "status"],
         [{**regeneration, "inputs": _json(regeneration["inputs"]), "status": "staged"}],
+        verb="INSERT OR REPLACE",
     )
 
 

@@ -1,0 +1,208 @@
+name: Roll back serving data
+
+on:
+  workflow_dispatch:
+    inputs:
+      regeneration_id:
+        description: Regeneration ID to restore
+        required: true
+        type: string
+      request_id:
+        description: Optional maintainer rollback request ID
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Prepare rollback paths
+        id: rollback
+        env:
+          REGENERATION_ID: ${{ inputs.regeneration_id }}
+          REQUEST_ID: ${{ inputs.request_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/rollback
+          : >data/rollback/load-d1.log
+          if [[ ! $REGENERATION_ID =~ ^[0-9]{8}T[0-9]{6}Z$ ]]; then
+            echo "invalid regeneration id" >&2
+            exit 1
+          fi
+          if [[ -n $REQUEST_ID ]] && [[ ! $REQUEST_ID =~ ^[A-Za-z0-9_-]{1,200}$ ]]; then
+            echo "invalid regeneration request id" >&2
+            exit 1
+          fi
+          sql_dir="$RUNNER_TEMP/atlas-rollback-$GITHUB_RUN_ID"
+          mkdir -p "$sql_dir"
+          printf 'sql_dir=%s\n' "$sql_dir" >>"$GITHUB_OUTPUT"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install Python and pipeline dependencies
+        working-directory: pipeline
+        run: |
+          set -euo pipefail
+          uv python install 3.13
+          uv sync
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install app dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      # Secrets are passed only through step environments. Steps must not print the environment or enable xtrace.
+      - name: Mark rollback request running
+        if: inputs.request_id != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REQUEST_ID: ${{ inputs.request_id }}
+          REGENERATION_ID: ${{ inputs.regeneration_id }}
+        run: |
+          set -euo pipefail
+          pipeline/.venv/bin/python -m atlas_pipeline requests mark \
+            --request-id "$REQUEST_ID" --status running \
+            --note "rollback to $REGENERATION_ID started"
+
+      - name: Guard retained regeneration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REGENERATION_ID: ${{ inputs.regeneration_id }}
+        run: |
+          set -euo pipefail
+          guard_dir="$RUNNER_TEMP/atlas-rollback-guard-$GITHUB_RUN_ID"
+          mkdir -p "$guard_dir"
+          (cd app && pnpm exec wrangler r2 object get \
+            "atlas-data/regen/$REGENERATION_ID/swap.sql" \
+            --file "$guard_dir/swap.sql" --remote)
+          (cd app && pnpm exec wrangler r2 object get \
+            "atlas-data/bundles/$REGENERATION_ID/manifest.json" \
+            --file "$guard_dir/manifest.json" --remote)
+          pipeline/.venv/bin/python - "$guard_dir/manifest.json" "$REGENERATION_ID" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          manifest = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          if manifest.get("regeneration_id") != sys.argv[2]:
+              raise ValueError("bundle manifest regeneration id mismatch")
+          PY
+
+      - name: Download regeneration SQL
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REGENERATION_ID: ${{ inputs.regeneration_id }}
+          SQL_DIR: ${{ steps.rollback.outputs.sql_dir }}
+        run: |
+          set -euo pipefail
+          sql_files=(
+            prelude.sql stage.sql swap.sql
+            statements-prelude.sql statements-stage.sql statements-swap.sql
+            scores-prelude.sql scores-stage.sql scores-swap.sql
+          )
+          for sql_file in "${sql_files[@]}"; do
+            (cd app && pnpm exec wrangler r2 object get \
+              "atlas-data/regen/$REGENERATION_ID/$sql_file" \
+              --file "$SQL_DIR/$sql_file" --remote)
+          done
+
+      - name: Load retained regeneration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SQL_DIR: ${{ steps.rollback.outputs.sql_dir }}
+        run: |
+          set -euo pipefail
+          infra/scripts/load-d1.sh "$SQL_DIR" 2>&1 | tee data/rollback/load-d1.log
+
+      - name: Move latest bundle pointer
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REGENERATION_ID: ${{ inputs.regeneration_id }}
+        run: |
+          set -euo pipefail
+          latest_file="$RUNNER_TEMP/atlas-rollback-latest-$GITHUB_RUN_ID.json"
+          pipeline/.venv/bin/python - "$latest_file" "$REGENERATION_ID" <<'PY'
+          import datetime
+          import json
+          import pathlib
+          import sys
+
+          pathlib.Path(sys.argv[1]).write_text(
+              json.dumps(
+                  {
+                      "regeneration_id": sys.argv[2],
+                      "uploaded_at": datetime.datetime.now(datetime.UTC).strftime(
+                          "%Y-%m-%dT%H:%M:%SZ"
+                      ),
+                  },
+                  separators=(",", ":"),
+              )
+              + "\n"
+          )
+          PY
+          (cd app && pnpm exec wrangler r2 object put "atlas-data/bundles/latest.json" \
+            --file "$latest_file" --content-type application/json --remote)
+
+      - name: Mark rollback request done
+        if: success() && inputs.request_id != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REQUEST_ID: ${{ inputs.request_id }}
+          REGENERATION_ID: ${{ inputs.regeneration_id }}
+        run: |
+          set -euo pipefail
+          pipeline/.venv/bin/python -m atlas_pipeline requests mark \
+            --request-id "$REQUEST_ID" --status done \
+            --note "rollback to $REGENERATION_ID completed"
+
+      - name: Mark rollback request failed
+        if: failure() && inputs.request_id != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          REQUEST_ID: ${{ inputs.request_id }}
+          REGENERATION_ID: ${{ inputs.regeneration_id }}
+        run: |
+          set -euo pipefail
+          pipeline/.venv/bin/python -m atlas_pipeline requests mark \
+            --request-id "$REQUEST_ID" --status failed \
+            --note "rollback to $REGENERATION_ID failed in run $GITHUB_RUN_ID"
+
+      - name: Upload rollback load log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-load-log-${{ github.run_id }}
+          if-no-files-found: warn
+          path: data/rollback/load-d1.log

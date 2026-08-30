@@ -33,7 +33,7 @@ def _safe_manifest_value(value: object, *, field: str, pattern: re.Pattern[str])
     return value
 
 
-def restore_bundle(*, bundle: Path, data_root: Path) -> dict:
+def restore_bundle(*, bundle: Path, data_root: Path, allow_fresh: bool = False) -> dict:
     """Restore accepted source runs and durable canonical state from a bundle."""
     bundle = Path(bundle)
     data_root = Path(data_root)
@@ -77,4 +77,11 @@ def restore_bundle(*, bundle: Path, data_root: Path) -> dict:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, destination)
             canonical.append(filename)
+    if not allow_fresh and len(canonical) < 2:
+        # Regenerating without the crosswalk rewrites every identity and without the labels
+        # undoes every maintainer merge; only a first deployment may start from nothing.
+        raise RuntimeError(
+            "bundle carries no canonical state (crosswalk.parquet and labels.jsonl); "
+            "refusing to restore, pass --allow-fresh for a first deployment"
+        )
     return {"sources": restored, "canonical": canonical}

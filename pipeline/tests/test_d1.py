@@ -254,3 +254,27 @@ def test_segment_rows_count_a_business_without_nature_once_and_carry_the_country
         (None, None, 1),
         (None, "cbk.licensed_banks", 1),
     ]
+
+
+def test_stage_sql_can_reload_a_regeneration_that_was_live_before():
+    """A rollback reloads an earlier regeneration whose regenerations row still exists, so the
+    stage must upsert that row instead of failing on the primary key."""
+    import sqlite3
+
+    from atlas_pipeline.d1 import apply_batch, regeneration_sql, swap_sql
+
+    schema = Path(__file__).resolve().parents[2] / "infra" / "d1" / "schema.sql"
+    regeneration = {
+        "id": "20260830T000000Z",
+        "started_at": "2026-08-30T00:00:00Z",
+        "finished_at": "2026-08-30T00:01:00Z",
+        "inputs": {},
+    }
+    stage = regeneration_sql(schema, regeneration, [], [], [], [], database="DB_SCORES")
+    swap = swap_sql(schema, regeneration, database="DB_SCORES")
+    db = sqlite3.connect(":memory:")
+    apply_batch(db, stage)
+    apply_batch(db, swap)
+    apply_batch(db, stage)  # the same regeneration loaded again, as a rollback does
+    apply_batch(db, swap)
+    assert db.execute("SELECT count(*), status FROM regenerations").fetchone() == (1, "live")

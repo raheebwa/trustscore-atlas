@@ -275,6 +275,8 @@ pnpm dev
 
 The D1 free-plan discipline is to keep each database below 500 MB, report remote size after imports, and normalise or split statements when a database reaches 400 MB. Prelude files drop the largest old live table before staging its replacement; stage and swap files stay on disk as the recovery path.
 
+Successful scheduled loads also publish the nine prelude, stage and swap SQL files under `regen/<regeneration_id>/` in the `atlas-data` R2 bucket. `regen/index.json` stores a newest-first `regenerations` array and an `updated_at` timestamp. The upload script keeps the three newest regeneration IDs in that index and deletes the nine known SQL objects for older IDs. The manual rollback workflow verifies both the retained SQL and its published bundle before loading it and moving `bundles/latest.json`.
+
 The deployed Worker also binds static assets, R2 `DATA` to `atlas-data`, KV `CACHE`, `API_LIMITER`, and the three D1 databases. Downloads read R2; the site and tools read the same serving tables as the HTTP API.
 
 ## Comparables

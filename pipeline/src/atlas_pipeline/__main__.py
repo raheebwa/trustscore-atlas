@@ -9,9 +9,17 @@ from pathlib import Path
 from . import boundaries
 from .adapters import accept_run, load_adapter, run_adapter
 from .bundle import publish_bundle
+from .churn_guard import check_churn, report_json
 from .conformance import check_run
+from .maintainer_labels import compile_maintainer_labels
 from .refresh import CADENCES, due_adapter_directories, restore_bundle
 from .regenerate import regenerate
+from .regeneration_requests import (
+    REQUEST_KINDS,
+    REQUEST_STATUSES,
+    mark_request,
+    next_pending_request,
+)
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -62,6 +70,32 @@ def main(argv: list[str] | None = None) -> int:
     restore = sub.add_parser("restore", help="restore working state from a download bundle")
     restore.add_argument("--bundle", type=Path, required=True)
     restore.add_argument("--data-root", type=Path, required=True)
+    restore.add_argument(
+        "--allow-fresh",
+        action="store_true",
+        help="accept a bundle without canonical state (first deployment only)",
+    )
+    guard = sub.add_parser(
+        "guard", help="refuse a regeneration that rewrites identities or drops labels"
+    )
+    guard.add_argument("--regeneration", required=True)
+    guard.add_argument("--data-root", type=Path, required=True)
+    guard.add_argument("--previous-bundle", type=Path, required=True)
+    guard.add_argument("--out", type=Path)
+    labels = sub.add_parser("labels", help="manage canonical maintainer labels")
+    label_commands = labels.add_subparsers(dest="labels_command", required=True)
+    compile_labels = label_commands.add_parser("compile", help="compile new maintainer labels")
+    compile_labels.add_argument("--data-root", type=Path, default=Path("data"))
+    compile_labels.add_argument("--regeneration", required=True)
+    requests = sub.add_parser("requests", help="manage regeneration requests")
+    request_commands = requests.add_subparsers(dest="requests_command", required=True)
+    next_request = request_commands.add_parser("next", help="print the oldest pending request")
+    next_request.add_argument("--data-root", type=Path, default=Path("data"))
+    next_request.add_argument("--kind", choices=REQUEST_KINDS)
+    mark = request_commands.add_parser("mark", help="append a request status event")
+    mark.add_argument("--request-id", required=True)
+    mark.add_argument("--status", required=True, choices=REQUEST_STATUSES)
+    mark.add_argument("--note")
     boundaries_cmd = sub.add_parser("boundaries", help="simplify and write topojson boundaries")
     boundaries_cmd.add_argument("--input", required=True)
     boundaries_cmd.add_argument("--level", required=True)
@@ -100,7 +134,43 @@ def main(argv: list[str] | None = None) -> int:
             print(adapter_dir)
         return 0
     if args.command == "restore":
-        print(json.dumps(restore_bundle(bundle=args.bundle, data_root=args.data_root), indent=2))
+        try:
+            result = restore_bundle(
+                bundle=args.bundle, data_root=args.data_root, allow_fresh=args.allow_fresh
+            )
+        except RuntimeError as error:
+            print(error, file=sys.stderr)
+            return 1
+        print(json.dumps(result, indent=2))
+        return 0
+    if args.command == "guard":
+        report = check_churn(
+            regeneration_dir=args.data_root / "regen" / args.regeneration,
+            previous_bundle=args.previous_bundle,
+            labels_file=args.data_root / "canonical" / "labels.jsonl",
+        )
+        text = report_json(report)
+        print(text)
+        if args.out:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(text + "\n")
+        return 0 if report.ok else 1
+        return 0
+    if args.command == "labels":
+        compiled = compile_maintainer_labels(
+            data_root=args.data_root,
+            regeneration_id=args.regeneration,
+        )
+        print(json.dumps({"compiled": len(compiled)}))
+        return 0
+    if args.command == "requests":
+        if args.requests_command == "next":
+            request = next_pending_request(data_root=args.data_root, kind=args.kind)
+            if request is not None:
+                print(json.dumps(request))
+            return 0
+        event = mark_request(request_id=args.request_id, status=args.status, note=args.note)
+        print(json.dumps(event))
         return 0
     if args.command == "boundaries":
         return boundaries.main(

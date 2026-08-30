@@ -3,20 +3,23 @@
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
-  echo "usage: infra/scripts/load-d1.sh <regeneration_id>" >&2
-  exit 2
-fi
-
-regeneration_id=$1
-if [[ ! $regeneration_id =~ ^[0-9]{8}T[0-9]{6}Z$ ]]; then
-  echo "invalid regeneration id: $regeneration_id" >&2
+  echo "usage: infra/scripts/load-d1.sh <regeneration_id|sql_directory>" >&2
   exit 2
 fi
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-regeneration_dir="$repo_root/data/regen/$regeneration_id"
+input=$1
+if [[ -d $input ]]; then
+  regeneration_dir=$(cd "$input" && pwd)
+else
+  if [[ ! $input =~ ^[0-9]{8}T[0-9]{6}Z$ ]]; then
+    echo "invalid regeneration id or SQL directory: $input" >&2
+    exit 2
+  fi
+  regeneration_dir="$repo_root/data/regen/$input"
+fi
 if [[ ! -d $regeneration_dir ]]; then
-  echo "regeneration directory not found: data/regen/$regeneration_id" >&2
+  echo "regeneration directory not found: $regeneration_dir" >&2
   exit 1
 fi
 
@@ -57,7 +60,7 @@ done
 for database in "${databases[@]}"; do
   if pnpm exec wrangler d1 info "$database" --json >"$output_file" 2>&1; then
     python3 -c \
-      'import json, sys; data = json.load(sys.stdin); print(sys.argv[1], "size_MB", round(data.get("file_size", 0) / 1e6, 1))' \
+      'import json, sys; data = json.load(sys.stdin); print(sys.argv[1], "size_MB", round(data.get("database_size", data.get("file_size", 0)) / 1e6, 1))' \
       "$database" <"$output_file"
   else
     exit_code=$?
