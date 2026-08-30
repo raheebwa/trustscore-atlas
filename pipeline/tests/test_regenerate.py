@@ -2,6 +2,7 @@
 """Regeneration: every loaded source -> canonical parquet, scores, and serving SQL."""
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -620,3 +621,198 @@ def test_a_source_that_has_never_been_accepted_still_reports_its_failure():
 
     assert status == "failed"
     assert note == "last run failed 2026-08-30"
+
+
+def test_operator_statements_are_emitted_at_precedence_one_for_records_that_exist():
+    """An approved assertion outranks every register, which is the whole point of the gate.
+
+    It is emitted for the entity the record already resolves to, so it joins that record rather
+    than creating a second one, and an assertion about a record this pack does not carry is
+    counted and dropped rather than inventing an entity for it.
+    """
+    compiled = [
+        {
+            "atlas_id": "atl_known",
+            "field": "location.district",
+            "value": "Wakiso",
+            "claim_id": "claim_1",
+            "source_ref": "claim_1",
+            "asserted_at": "2026-08-30T05:00:00Z",
+            "operator_statement_id": "os_1",
+        },
+        {
+            "atlas_id": "atl_missing",
+            "field": "canonical_name",
+            "value": "SOMEONE ELSE LTD",
+            "claim_id": "claim_2",
+            "source_ref": "claim_2",
+            "asserted_at": "2026-08-30T05:01:00Z",
+            "operator_statement_id": "os_2",
+        },
+    ]
+
+    rows, unknown = regenerate_module._operator_statement_rows(
+        compiled, {"atl_known": "kcca.businesses:aaaa"}, country="UG"
+    )
+
+    assert unknown == 1
+    assert rows == [
+        {
+            "statement_id": "operator:os_1",
+            "entity_id": "kcca.businesses:aaaa",
+            "country": "UG",
+            "field": "location.district",
+            "value": "Wakiso",
+            "source": "atlas.operator",
+            "source_ref": "claim_1",
+            "source_record_id": "claim_1",
+            "asserted_at": datetime(2026, 8, 30, 5, 0, tzinfo=UTC),
+            "licence": "operator-statement",
+            "precedence": 1,
+            "confidence": "verified",
+        }
+    ]
+
+
+def test_the_same_approval_emits_the_same_statement_every_time():
+    """Regeneration is deterministic, so a statement compiled once has one identity forever."""
+    compiled = [
+        {
+            "atlas_id": "atl_known",
+            "field": "location.district",
+            "value": "Wakiso",
+            "claim_id": "claim_1",
+            "source_ref": "claim_1",
+            "asserted_at": "2026-08-30T05:00:00Z",
+            "operator_statement_id": "os_1",
+        }
+    ]
+    crosswalk = {"atl_known": "kcca.businesses:aaaa"}
+
+    first, _ = regenerate_module._operator_statement_rows(compiled, crosswalk, country="UG")
+    second, _ = regenerate_module._operator_statement_rows(compiled, crosswalk, country="UG")
+
+    assert first == second
+
+
+def test_an_operator_value_wins_the_field_it_asserts():
+    """Precedence 1 beats every register class, which is what rank_values already does."""
+    from atlas_pipeline.resolve import rank_values
+
+    ranked = rank_values(
+        [
+            {
+                "value": "Kampala",
+                "precedence": 3,
+                "source_record_id": "r1",
+                "asserted_at": "2026-08-29T00:00:00Z",
+            },
+            {
+                "value": "Wakiso",
+                "precedence": 1,
+                "source_record_id": "claim_1",
+                "asserted_at": "2026-08-30T00:00:00Z",
+            },
+        ]
+    )
+
+    assert ranked[0] == "Wakiso"
+
+
+def test_an_approved_statement_reaches_the_published_record(tmp_path: Path):
+    """End to end: an approval compiled to the canonical file is what the record then publishes."""
+    spec = load_adapter(ADAPTER)
+    pages = {
+        spec.module.query_url(n): (ADAPTER / "fixtures" / "raw" / f"{_slug(n)}.html").read_bytes()
+        for n in EXPECTED["natures"]
+    }
+    run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=lambda url, **_: pages[url],
+        salt=SALT,
+        params={"natures": EXPECTED["natures"]},
+    )
+    common = {
+        "pack_dir": PACKS / "ug",
+        "data_root": tmp_path,
+        "computed_at": "2026-08-30T06:00:00Z",
+        "rubrics_dir": PACKS.parent / "rubrics",
+        "schema_path": PACKS.parent / "infra" / "d1" / "schema.sql",
+    }
+
+    first = regenerate(regeneration_id="20260830T060000Z", **common)
+    published = pq.read_table(first.directory / "businesses.parquet").to_pylist()[0]
+    atlas_id = published["atlas_id"]
+    assert json.loads(published["location"]).get("district") != "Wakiso"
+
+    (tmp_path / "canonical" / "operator_statements.jsonl").write_text(
+        json.dumps(
+            {
+                "atlas_id": atlas_id,
+                "field": "location.district",
+                "value": "Wakiso",
+                "claim_id": "claim_1",
+                "source_ref": "claim_1",
+                "asserted_at": "2026-08-30T06:05:00Z",
+                "operator_statement_id": "os_1",
+            }
+        )
+        + "\n"
+    )
+
+    second = regenerate(regeneration_id="20260830T061000Z", **common)
+
+    after = {
+        row["atlas_id"]: row
+        for row in pq.read_table(second.directory / "businesses.parquet").to_pylist()
+    }[atlas_id]
+    assert json.loads(after["location"])["district"] == "Wakiso"
+    assert second.summary["operator_statements"] == {"emitted": 1, "unknown_records": 0}
+    assert any(source["slug"] == "atlas.operator" for source in second.summary["sources"])
+
+
+def test_an_approved_statement_about_a_record_no_pack_carries_is_counted(tmp_path: Path):
+    spec = load_adapter(ADAPTER)
+    pages = {
+        spec.module.query_url(n): (ADAPTER / "fixtures" / "raw" / f"{_slug(n)}.html").read_bytes()
+        for n in EXPECTED["natures"]
+    }
+    run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=lambda url, **_: pages[url],
+        salt=SALT,
+        params={"natures": EXPECTED["natures"]},
+    )
+    (tmp_path / "canonical").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "canonical" / "operator_statements.jsonl").write_text(
+        json.dumps(
+            {
+                "atlas_id": "atl_nobody_has_this",
+                "field": "location.district",
+                "value": "Wakiso",
+                "claim_id": "claim_2",
+                "source_ref": "claim_2",
+                "asserted_at": "2026-08-30T06:05:00Z",
+                "operator_statement_id": "os_2",
+            }
+        )
+        + "\n"
+    )
+
+    result = regenerate(
+        pack_dir=PACKS / "ug",
+        data_root=tmp_path,
+        regeneration_id="20260830T062000Z",
+        computed_at="2026-08-30T06:20:00Z",
+        rubrics_dir=PACKS.parent / "rubrics",
+        schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
+    )
+
+    assert result.summary["operator_statements"] == {"emitted": 0, "unknown_records": 1}
+    assert all(source["slug"] != "atlas.operator" for source in result.summary["sources"])

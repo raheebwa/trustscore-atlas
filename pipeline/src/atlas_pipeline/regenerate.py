@@ -15,6 +15,7 @@ from .adapters import FAILURE_FILE, STATEMENT_ARROW_SCHEMA, accepted_run
 from .d1 import regeneration_sql, segment_rows, swap_sql
 from .linkage import MODEL_VERSION as LINKAGE_MODEL_VERSION
 from .linkage import name_candidates
+from .mapping import PRECEDENCE
 from .resolve import pack_sources, resolve
 from .score import load_rubric, score
 
@@ -120,6 +121,86 @@ def _load_crosswalk(path: Path) -> dict[str, str]:
             table.column("entity_id").to_pylist(), table.column("atlas_id").to_pylist(), strict=True
         )
     )
+
+
+OPERATOR_SOURCE = "atlas.operator"
+
+
+def _instant(value: str) -> datetime:
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+
+
+def _load_operator_statements(path: Path) -> list[dict]:
+    """Approved assertions, one JSON object per line, append-only like the labels file."""
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def _operator_statement_rows(
+    compiled: list[dict], entity_of_atlas: dict[str, str], *, country: str
+) -> tuple[list[dict], int]:
+    """Approved assertions as statements, and how many named a record this pack does not carry.
+
+    An assertion outranks every register, which is what the approval gate exists to control, so it
+    is emitted at precedence 1 against the entity the record already resolves to. One that names an
+    atlas_id this pack has no entity for is counted and dropped: inventing an entity to hold it
+    would publish a business no register ever reported.
+
+    The identity is the approval's own, so regenerating twice emits the same statement twice
+    identically rather than a second one.
+    """
+    rows: list[dict] = []
+    unknown = 0
+    for statement in compiled:
+        entity_id = entity_of_atlas.get(str(statement.get("atlas_id", "")))
+        if not entity_id:
+            unknown += 1
+            continue
+        rows.append(
+            {
+                "statement_id": f"operator:{statement['operator_statement_id']}",
+                "entity_id": entity_id,
+                "country": country,
+                "field": statement["field"],
+                "value": statement["value"],
+                "source": OPERATOR_SOURCE,
+                "source_ref": statement["source_ref"],
+                "source_record_id": statement["claim_id"],
+                # An instant, as every other statement carries it, so the two write to one column.
+                "asserted_at": _instant(statement["asserted_at"]),
+                # Not a register's licence: this is Atlas's own record of a maintainer's decision.
+                "licence": "operator-statement",
+                "precedence": PRECEDENCE["operator_verified"],
+                "confidence": "verified",
+            }
+        )
+    return rows, unknown
+
+
+def _operator_source_row(country: str, asserted_at: str) -> dict:
+    """The sources row for approved operator statements.
+
+    It is not a register and does not belong in any pack's pack.yml, but the record page names the
+    source of every value it shows, so a value asserted by a maintainer's decision needs a row to
+    be named by. It exists only in a regeneration that actually carried one.
+    """
+    return {
+        "slug": OPERATOR_SOURCE,
+        "country": country,
+        "publisher": "TrustScore Atlas",
+        "title": "Verified operator statements",
+        "url": "https://atlas.trustscorehq.com/methodology#operator-statements",
+        "licence": "operator-statement",
+        "cadence": "on approval",
+        "coverage": "Claims a maintainer approved after verification.",
+        "last_run_id": None,
+        "last_run_at": asserted_at,
+        "row_count": None,
+        "adapter_version": None,
+        "status": "fresh",
+        "status_note": "Written when a maintainer approves a verified claim.",
+    }
 
 
 def _load_labels(path: Path) -> list[dict]:
@@ -332,15 +413,43 @@ def regenerate(
 
     crosswalk_path = data_root / "canonical" / "crosswalk.parquet"
     labels = _load_labels(data_root / "canonical" / "labels.jsonl")
+    # What maintainers approved, as statements this regeneration resolves alongside the registers.
+    compiled_operator = _load_operator_statements(
+        data_root / "canonical" / "operator_statements.jsonl"
+    )
+    crosswalk = _load_crosswalk(crosswalk_path)
+    entity_of_atlas = {atlas_id: entity_id for entity_id, atlas_id in crosswalk.items()}
+    unknown_operator = sum(
+        1 for row in compiled_operator if str(row.get("atlas_id", "")) not in entity_of_atlas
+    )
+    emitted_operator = 0
     combined = _Combined()
     for pack_path in packs:
         loaded = _load_pack(pack_path, data_root, empty_since)
         country = loaded.pack["country"]
+        # Only the records this pack carries: an assertion about another pack's record is that
+        # pack's to resolve, and inventing an entity here would publish a business twice.
+        pack_entities = {statement["entity_id"] for statement in loaded.statements}
+        operator_rows, _ = _operator_statement_rows(
+            compiled_operator,
+            {
+                atlas_id: entity_id
+                for atlas_id, entity_id in entity_of_atlas.items()
+                if entity_id in pack_entities
+            },
+            country=country,
+        )
+        emitted_operator += len(operator_rows)
+        if operator_rows:
+            latest = max(row["asserted_at"] for row in operator_rows)
+            loaded.sources.append(
+                _operator_source_row(country, latest.isoformat().replace("+00:00", "Z"))
+            )
         resolution = resolve(
-            loaded.statements,
+            loaded.statements + operator_rows,
             pack=loaded.pack,
             checked_sources=list(loaded.inputs),
-            crosswalk=_load_crosswalk(crosswalk_path),
+            crosswalk=crosswalk,
             labels=labels,
         )
         by_business: dict[str, list[dict]] = {}
@@ -549,6 +658,9 @@ def regenerate(
         "sources": sources,
         "new_entities": len(resolution.new_entities),
         "labels": len(labels),
+        # What maintainers approved, and what named a record no pack carries. A statement that
+        # found no record changes nothing and says so here rather than silently vanishing.
+        "operator_statements": {"emitted": emitted_operator, "unknown_records": unknown_operator},
         "load_order": load_order,
     }
     (out / "regeneration.json").write_text(json.dumps(summary, indent=2) + "\n")
