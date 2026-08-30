@@ -264,3 +264,92 @@ describe('search result shaping', () => {
 		expect(coverageReads.value).toBe(1);
 	});
 });
+
+describe('coverage per country', () => {
+	function db(): D1Database {
+		const base = {
+			name_normalised: 'EXAMPLE',
+			name_variants: '[]',
+			entity_kind: 'company',
+			sector_category: null,
+			sector_nature: null,
+			district: null,
+			division: null,
+			first_seen: '2026-08-01',
+			last_seen: '2026-08-29',
+			scores: '{}'
+		};
+		const ugandan = {
+			...base,
+			atlas_id: 'atlas-ug-1',
+			country: 'UG',
+			canonical_name: 'Example Uganda Ltd',
+			coverage: JSON.stringify({ found_in: ['example.ug.checked'] })
+		};
+		const kenyan = {
+			...base,
+			atlas_id: 'atlas-ke-1',
+			country: 'KE',
+			canonical_name: 'Example Kenya Ltd',
+			coverage: JSON.stringify({ found_in: ['example.ke.checked'] })
+		};
+		return {
+			prepare: (sql: string) => ({
+				bind: () => ({
+					first: async () => {
+						if (sql.includes('FROM meta')) return { value: 'regen-example-1' };
+						if (sql.includes('COUNT(*)')) return { n: 2 };
+						return null;
+					},
+					all: async () => {
+						if (sql.includes('SELECT key, value FROM meta')) {
+							return {
+								results: [
+									{
+										key: 'coverage_applicable',
+										value: '["example.ug.checked","example.ug.pending"]'
+									},
+									{ key: 'coverage_checked', value: '["example.ug.checked"]' },
+									{
+										key: 'coverage_applicable:UG',
+										value: '["example.ug.checked","example.ug.pending"]'
+									},
+									{ key: 'coverage_checked:UG', value: '["example.ug.checked"]' },
+									{
+										key: 'coverage_applicable:KE',
+										value: '["example.ke.checked","example.ke.pending"]'
+									},
+									{ key: 'coverage_checked:KE', value: '["example.ke.checked"]' }
+								]
+							};
+						}
+						if (sql.includes('FROM businesses_fts')) return { results: [ugandan, kenyan] };
+						return { results: [] };
+					}
+				})
+			})
+		} as unknown as D1Database;
+	}
+
+	it('judges each business against the registers of its own country', async () => {
+		const database = db();
+		const response = await searchBusinesses(
+			{ db: database, statementsDb: database, scoresDb: database },
+			{ q: 'Example' }
+		);
+		expect(response.results.map((item) => item.coverage)).toEqual([
+			{
+				applicable: ['example.ug.checked', 'example.ug.pending'],
+				checked: ['example.ug.checked'],
+				found_in: ['example.ug.checked'],
+				not_yet_checked: ['example.ug.pending']
+			},
+			{
+				applicable: ['example.ke.checked', 'example.ke.pending'],
+				checked: ['example.ke.checked'],
+				found_in: ['example.ke.checked'],
+				not_yet_checked: ['example.ke.pending']
+			}
+		]);
+	});
+});

@@ -15,7 +15,7 @@ import {
 } from './search';
 import { formatCoverageSentence, formatScoreSentence } from '$lib/format';
 import { rankValues } from '$lib/ordering';
-import type { AtlasDatabases, CoverageMetadata } from './platform';
+import type { AtlasDatabases, CoverageLists, CoverageMetadata } from './platform';
 import {
 	CURSOR_MAX_OFFSET,
 	STATEMENTS_BYTE_BUDGET,
@@ -437,14 +437,27 @@ export async function getMetaValue(db: D1Database, key: string): Promise<string 
 
 async function readCoverageMetadata(db: D1Database): Promise<CoverageMetadata> {
 	const { results } = await db
-		.prepare('SELECT key, value FROM meta WHERE key IN (SELECT value FROM json_each(?))')
-		.bind(JSON.stringify([COVERAGE_APPLICABLE_KEY, COVERAGE_CHECKED_KEY]))
+		.prepare('SELECT key, value FROM meta WHERE key LIKE ?')
+		.bind('coverage_%')
 		.all<{ key: string; value: string }>();
 	const rows = new Map((results ?? []).map((row) => [row.key, row.value]));
-	return {
-		applicable: parseStringArray(rows.get(COVERAGE_APPLICABLE_KEY) ?? null),
-		checked: parseStringArray(rows.get(COVERAGE_CHECKED_KEY) ?? null)
-	};
+	const lists = (suffix: string): CoverageLists => ({
+		applicable: parseStringArray(rows.get(COVERAGE_APPLICABLE_KEY + suffix) ?? null),
+		checked: parseStringArray(rows.get(COVERAGE_CHECKED_KEY + suffix) ?? null)
+	});
+	const byCountry: Record<string, CoverageLists> = {};
+	for (const key of rows.keys()) {
+		const country = key.startsWith(COVERAGE_APPLICABLE_KEY + ':')
+			? key.slice(COVERAGE_APPLICABLE_KEY.length + 1)
+			: null;
+		if (country) byCountry[country] = lists(':' + country);
+	}
+	return { ...lists(''), byCountry };
+}
+
+/** The register lists a business is judged against: its country's, else the default pack's. */
+export function coverageFor(metadata: CoverageMetadata, country: string | null): CoverageLists {
+	return (country && metadata.byCountry[country]) || metadata;
 }
 
 /** Caches pack-wide coverage metadata on the request-owned database set. */
@@ -545,11 +558,8 @@ function toSearchResultItem(
 	formality: FormalitySummary | null,
 	coverageMetadata: CoverageMetadata
 ): SearchResultItem {
-	const coverage = composeCoverage(
-		row.coverage,
-		coverageMetadata.applicable,
-		coverageMetadata.checked
-	);
+	const lists = coverageFor(coverageMetadata, row.country);
+	const coverage = composeCoverage(row.coverage, lists.applicable, lists.checked);
 	return {
 		atlas_id: row.atlas_id,
 		canonical_name: row.canonical_name,
@@ -837,11 +847,8 @@ async function getBusinessWithStatements(
 			.all<SourceRowDb>();
 		sources = (results ?? []).map(toSourceSummary);
 	}
-	const coverage = composeCoverage(
-		businessRow.coverage,
-		coverageMetadata.applicable,
-		coverageMetadata.checked
-	);
+	const lists = coverageFor(coverageMetadata, businessRow.country);
+	const coverage = composeCoverage(businessRow.coverage, lists.applicable, lists.checked);
 
 	return {
 		record: {

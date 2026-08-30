@@ -7,9 +7,14 @@ export interface AtlasDatabases {
 	coverageMetadata?: Promise<CoverageMetadata>;
 }
 
-export interface CoverageMetadata {
+export interface CoverageLists {
 	applicable: string[];
 	checked: string[];
+}
+
+/** Pack-wide register lists: the default (first pack) plus one entry per country code. */
+export interface CoverageMetadata extends CoverageLists {
+	byCountry: Record<string, CoverageLists>;
 }
 
 function requireBinding(
