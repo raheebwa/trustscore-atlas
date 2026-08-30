@@ -1,4 +1,5 @@
 <script lang="ts">
+	// SPDX-License-Identifier: Apache-2.0
 	import { identifierKey, summariseIdentifiers } from '$lib/format';
 	import { resolve } from '$app/paths';
 	import { formatFieldLabel } from '$lib/format';
@@ -202,12 +203,18 @@
 						<td class="px-4 py-2 text-stone-900">{formatFieldLabel(row.field)}</td>
 						<td class="px-4 py-2 text-stone-700">{row.value}</td>
 						<td class="px-4 py-2">
-							<a
-								href={row.source_ref}
-								class="text-stone-600 underline"
-								target="_blank"
-								rel="external noreferrer">{row.source}</a
-							>
+							{#if row.reference.source_url}
+								<a
+									href={row.reference.source_url}
+									class="text-stone-600 underline"
+									target="_blank"
+									rel="external noreferrer">{row.source}</a
+								>
+								<span class="block text-xs text-stone-500">{row.reference.source_ref_label}</span>
+							{:else}
+								<span class="text-stone-700">{row.source}</span>
+								<span class="block text-xs text-stone-500">{row.reference.source_ref_label}</span>
+							{/if}
 						</td>
 						<td class="px-4 py-2 text-stone-600">{row.asserted_at}</td>
 						<td class="px-4 py-2 text-stone-600">{row.precedence}</td>

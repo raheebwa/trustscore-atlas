@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Query functions shared by the pages and the JSON API (docs/ARCHITECTURE.md
  * section 9 "Serving paths"). Functions take the required database bindings
@@ -15,6 +16,7 @@ import {
 } from './search';
 import { formatCoverageSentence, formatScoreSentence } from '$lib/format';
 import { displayDistrict, displayLocation } from '$lib/location';
+import { describeReference } from '$lib/references';
 import { rankValues } from '$lib/ordering';
 import type { AtlasDatabases, CoverageLists, CoverageMetadata } from './platform';
 import {
@@ -793,7 +795,7 @@ async function fetchStatementsFor(
 	return filterPublishableStatements((results ?? []).map(toStatementRow));
 }
 
-export function buildProvenanceTable(statements: StatementRow[]): ProvenanceRow[] {
+export function buildProvenanceTable(statements: StatementRow[], atlasId: string): ProvenanceRow[] {
 	const byField = new Map<string, StatementRow[]>();
 	for (const statement of filterPublishableStatements(statements)) {
 		const list = byField.get(statement.field) ?? [];
@@ -808,10 +810,15 @@ export function buildProvenanceTable(statements: StatementRow[]): ProvenanceRow[
 			field,
 			value: winner.value,
 			source: winner.source,
-			source_ref: winner.source_ref,
 			asserted_at: winner.asserted_at,
 			precedence: winner.precedence,
-			confidence: winner.confidence
+			confidence: winner.confidence,
+			reference: describeReference({
+				source: winner.source,
+				source_ref: winner.source_ref,
+				atlas_id: atlasId,
+				field
+			})
 		});
 	}
 	rows.sort((a, b) => a.field.localeCompare(b.field));
@@ -930,7 +937,7 @@ export async function getBusinessDetail(
 	const result = await getBusinessWithStatements(databases, atlasId);
 	if (!result) return null;
 	const { record, statements } = result;
-	const provenance = buildProvenanceTable(statements);
+	const provenance = buildProvenanceTable(statements, atlasId);
 	const fields = provenance.map((row) => row.field);
 	return { record, provenance, fields };
 }

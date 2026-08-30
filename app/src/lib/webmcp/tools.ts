@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+import { describeReference, type Reference } from '$lib/references';
 import { summariseIdentifiers } from '$lib/format';
 import type {
 	BusinessRecordResponse,
@@ -354,6 +356,20 @@ function fitArrays(payload: Record<string, unknown>, arrays: unknown[][]): ToolT
 		: textResult({ error: 'result_too_large' });
 }
 
+/** A tool result names the register and gives a link only when the register published one. */
+function referenceOf(
+	row: { source: string; source_ref: string },
+	atlasId: string,
+	field: string
+): Reference {
+	return describeReference({
+		source: row.source,
+		source_ref: row.source_ref,
+		atlas_id: atlasId,
+		field
+	});
+}
+
 export function shapeEvidenceResults(response: EvidenceResponse): ToolTextResult {
 	if (response.mode === 'field') {
 		const grouped = new Map<string, { row: EvidenceStatement; count: number }>();
@@ -366,7 +382,11 @@ export function shapeEvidenceResults(response: EvidenceResponse): ToolTextResult
 		const statements = [...grouped.values()].map(({ row, count }) => ({
 			count,
 			source: bounded(row.source, 80),
-			source_ref: bounded(row.source_ref, 180),
+			source_ref_label: bounded(
+				referenceOf(row, response.atlas_id, response.field).source_ref_label,
+				180
+			),
+			source_url: referenceOf(row, response.atlas_id, response.field).source_url,
 			asserted_at: bounded(row.asserted_at, 40),
 			precedence: row.precedence,
 			value: bounded(row.value, 260)
@@ -390,7 +410,11 @@ export function shapeEvidenceResults(response: EvidenceResponse): ToolTextResult
 		...(item.reason ? { reason: bounded(item.reason, 180) } : {}),
 		statements: item.statements.slice(0, 1).map((row) => ({
 			source: bounded(row.source, 60),
-			source_ref: bounded(row.source_ref, 100),
+			source_ref_label: bounded(
+				referenceOf(row, response.atlas_id, item.field ?? item.predicate).source_ref_label,
+				100
+			),
+			source_url: referenceOf(row, response.atlas_id, item.field ?? item.predicate).source_url,
 			asserted_at: bounded(row.asserted_at, 40),
 			precedence: row.precedence,
 			value: bounded(row.value, 120)

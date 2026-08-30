@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Shapes shared between the server query module (src/lib/server/atlas.ts), the
  * JSON API routes, the page loaders, and the WebMCP tool result shaping
  * (src/lib/webmcp/tools.ts). Kept free of server-only imports so it can be
  * used from browser code too.
  */
+
+import type { Reference } from './references';
 
 export interface Identifier {
 	scheme: string;
@@ -111,10 +114,11 @@ export interface ProvenanceRow {
 	field: string;
 	value: string;
 	source: string;
-	source_ref: string;
 	asserted_at: string;
 	precedence: number;
 	confidence: string;
+	/** Where this value came from, and what a page may link to. See src/lib/references.ts. */
+	reference: Reference;
 }
 
 export interface BusinessRecordResponse {

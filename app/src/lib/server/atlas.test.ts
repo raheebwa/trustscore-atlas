@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
 import {
 	PUBLISHABLE_STATEMENT_FIELDS,
@@ -50,33 +51,36 @@ describe('buildProvenanceTable', () => {
 				value: 'Example Hardware'
 			})
 		];
-		const table = buildProvenanceTable(statements);
+		const table = buildProvenanceTable(statements, 'atlas-example-1');
 		expect(table.map((r) => r.field)).toEqual(['canonical_name', 'location.district']);
 		expect(table[0].value).toBe('Example Hardware Supplies Ltd');
 		expect(table[0].precedence).toBe(2);
 	});
 
 	it('uses distinct source-record support before recency', () => {
-		const table = buildProvenanceTable([
-			statement({
-				statement_id: 'recent',
-				value: 'Example Hardware',
-				source_record_id: 'recent-record',
-				asserted_at: '2026-08-29T00:00:00Z'
-			}),
-			statement({
-				statement_id: 'supported-1',
-				value: 'Example Hardware Supplies Ltd',
-				source_record_id: 'support-1',
-				asserted_at: '2026-08-01T00:00:00Z'
-			}),
-			statement({
-				statement_id: 'supported-2',
-				value: 'Example Hardware Supplies Ltd',
-				source_record_id: 'support-2',
-				asserted_at: '2026-08-01T00:00:00Z'
-			})
-		]);
+		const table = buildProvenanceTable(
+			[
+				statement({
+					statement_id: 'recent',
+					value: 'Example Hardware',
+					source_record_id: 'recent-record',
+					asserted_at: '2026-08-29T00:00:00Z'
+				}),
+				statement({
+					statement_id: 'supported-1',
+					value: 'Example Hardware Supplies Ltd',
+					source_record_id: 'support-1',
+					asserted_at: '2026-08-01T00:00:00Z'
+				}),
+				statement({
+					statement_id: 'supported-2',
+					value: 'Example Hardware Supplies Ltd',
+					source_record_id: 'support-2',
+					asserted_at: '2026-08-01T00:00:00Z'
+				})
+			],
+			'atlas-example-1'
+		);
 
 		expect(table[0].value).toBe('Example Hardware Supplies Ltd');
 	});

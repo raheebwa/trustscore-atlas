@@ -1,4 +1,6 @@
 <script lang="ts">
+	// SPDX-License-Identifier: Apache-2.0
+	import { describeReference } from '$lib/references';
 	import { groupStatements } from '$lib/trace';
 	import { resolve } from '$app/paths';
 	import { formatFieldLabel } from '$lib/format';
@@ -8,7 +10,18 @@
 	let atlasId = $derived(data.atlasId);
 	let trace = $derived(data.trace);
 	let precedenceRanks = $derived(data.precedenceRanks);
+
+	// A reference is a link only when the register published one; the rest are citations.
+	const referenceFor = (statement: { source: string; source_ref: string }) =>
+		describeReference({
+			source: statement.source,
+			source_ref: statement.source_ref,
+			atlas_id: data.atlasId,
+			field: data.trace.field
+		});
 </script>
+
+// SPDX-License-Identifier: Apache-2.0
 
 <svelte:head>
 	<title>TrustScore Atlas: Trace: {formatFieldLabel(trace.field)}</title>
@@ -66,11 +79,18 @@
 						{/if}
 					</td>
 					<td class="px-4 py-2">
-						<a
-							href={statement.source_ref}
-							class="text-stone-600 underline"
-							target="_blank"
-							rel="external noreferrer">{statement.source}</a
+						{#if referenceFor(statement).source_url}
+							<a
+								href={referenceFor(statement).source_url}
+								class="text-stone-600 underline"
+								target="_blank"
+								rel="external noreferrer">{statement.source}</a
+							>
+						{:else}
+							<span class="text-stone-700">{statement.source}</span>
+						{/if}
+						<span class="block text-xs text-stone-500"
+							>{referenceFor(statement).source_ref_label}</span
 						>
 					</td>
 					<td class="px-4 py-2 text-stone-600">{statement.asserted_at}</td>
