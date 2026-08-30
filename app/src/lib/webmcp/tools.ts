@@ -63,7 +63,8 @@ export const SEARCH_BUSINESSES_TOOL = {
 			},
 			district: {
 				type: 'string',
-				description: 'Optional district or division name for an exact case-insensitive match.'
+				description:
+					'District or division, exact and case-insensitive. Use a value from /api/v1/facets; an unknown one returns district_known false plus nearest values.'
 			},
 			limit: {
 				type: 'number',
@@ -741,6 +742,12 @@ export function shapeSearchResults(response: SearchResponse): ToolTextResult {
 			: response.next_cursor;
 		const payload = {
 			query: response.query,
+			...(response.district_known === false
+				? {
+						district_known: false,
+						nearest_districts: (response.nearest_districts ?? []).slice(0, 3)
+					}
+				: {}),
 			total_count: response.total_count,
 			returned: count,
 			page_returned: response.page_returned,
@@ -774,11 +781,20 @@ export function shapeSearchResults(response: SearchResponse): ToolTextResult {
 	}
 
 	return textResult({
+		query: response.query,
 		total_count: response.total_count,
 		returned: 0,
 		next_cursor: response.next_cursor,
 		results: [],
-		truncated: true
+		// An empty answer has to say why: a filter naming a value the data does not carry is a
+		// different thing from a name nobody registered, and a model cannot tell them apart.
+		...(response.district_known === false
+			? {
+					district_known: false,
+					nearest_districts: (response.nearest_districts ?? []).slice(0, 3)
+				}
+			: {}),
+		truncated: response.results.length > 0
 	});
 }
 

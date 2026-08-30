@@ -62,6 +62,10 @@ export interface SearchResponse {
 	regeneration_id: string | null;
 	next_cursor: string | null;
 	results: SearchResultItem[];
+	/** False when the district filter names a value the data does not carry. */
+	district_known?: boolean;
+	/** The published values closest to an unknown district, so a caller can offer them. */
+	nearest_districts?: string[];
 }
 
 export interface CoverageSummary {

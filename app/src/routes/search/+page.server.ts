@@ -3,6 +3,7 @@ import { deploymentVersion } from '$lib/server/cache-scope';
 import { error } from '@sveltejs/kit';
 import { InvalidCursorError } from '$lib/pagination';
 import { RegenerationInProgressError } from '$lib/server/atlas';
+import { checkDistrictFilter } from '$lib/server/district-filter';
 import { listFacetsCached } from '$lib/server/facets';
 import { searchBusinessesCached } from '$lib/server/search-cache';
 import { FTS_MIN_QUERY_LENGTH, normalizeQuery } from '$lib/server/search';
@@ -28,6 +29,14 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 	const version = deploymentVersion(platform?.env as Record<string, unknown> | undefined);
 	// The filter controls offer published values only, so a chosen filter always has results.
 	const facetsPromise = listFacetsCached(databases, platform?.env?.CACHE, country, version);
+	// A district the data does not carry gets an answer, not an empty page.
+	const districtCheck = await checkDistrictFilter(
+		databases,
+		country,
+		segmentFilters.district ?? district,
+		platform?.env?.CACHE,
+		version
+	);
 
 	try {
 		if (query.length === 0) {
@@ -38,6 +47,7 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 				segment: hasSegmentFilters ? await findSegment(databases, segmentFilters) : null,
 				segmentFilters,
 				facets: (await facetsPromise).facets,
+				districtCheck,
 				minLength: FTS_MIN_QUERY_LENGTH
 			};
 		}
@@ -60,6 +70,7 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 			segment: null,
 			segmentFilters,
 			facets: (await facetsPromise).facets,
+			districtCheck,
 			minLength: FTS_MIN_QUERY_LENGTH
 		};
 	} catch (cause) {

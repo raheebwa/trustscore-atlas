@@ -509,6 +509,28 @@ describe('shapeSearchResults', () => {
 		expect(JSON.stringify(value)).not.toContain('Unknown');
 	});
 
+	it('tells a model the district it asked for is not in the data, and what is', () => {
+		const value = parsed(
+			shapeSearchResults({
+				query: 'bank',
+				district: 'Kampala District',
+				total_count: 0,
+				returned: 0,
+				page_returned: 0,
+				limit: 0,
+				offset: 0,
+				regeneration_id: null,
+				next_cursor: null,
+				results: [],
+				district_known: false,
+				nearest_districts: ['KAMPALA', 'WAKISO']
+			})
+		);
+
+		expect(value.district_known).toBe(false);
+		expect(value.nearest_districts).toEqual(['KAMPALA', 'WAKISO']);
+	});
+
 	it('returns one compact JSON text item with paging fields', () => {
 		const response: SearchResponse = {
 			query: 'example hardware',

@@ -2,33 +2,31 @@
 	// SPDX-License-Identifier: Apache-2.0
 	import { summariseIdentifiers, formatWhen } from '$lib/format';
 	import { resolve } from '$app/paths';
+	import FilterBar from '$lib/components/FilterBar.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
-	// One control per published dimension; the options come from the data, never from free text.
-	const FILTERS = [
-		{ name: 'district', facet: 'district', label: 'District' },
-		{ name: 'division', facet: 'division', label: 'Division or subcounty' },
-		{ name: 'category', facet: 'sector_category', label: 'Sector category' },
-		{ name: 'nature', facet: 'sector_nature', label: 'Sector nature' },
-		{ name: 'present_in', facet: 'register', label: 'Present in register' }
-	] as const;
+	// One control per published dimension; every option comes from the data, never from free text.
+	const FILTER_FIELDS = $derived([
+		{ name: 'district', label: 'District', options: data.facets.district },
+		{ name: 'division', label: 'Division or subcounty', options: data.facets.division },
+		{ name: 'category', label: 'Sector category', options: data.facets.sector_category },
+		{ name: 'nature', label: 'Sector nature', options: data.facets.sector_nature },
+		{ name: 'present_in', label: 'Present in register', options: data.facets.register }
+	]);
 
-	// A GET form submits every control, so an untouched filter would add an empty query parameter.
-	// Disabling the empty ones leaves the address bar showing only the filters actually chosen.
-	function dropEmptyControls(event: SubmitEvent) {
-		const form = event.currentTarget as HTMLFormElement;
-		for (const control of form.elements) {
-			const field = control as HTMLInputElement | HTMLSelectElement;
-			if (field.name && field.value === '') field.disabled = true;
-		}
-	}
+	const filterValues = $derived({
+		district: data.district || (data.segmentFilters.district ?? ''),
+		division: data.segmentFilters.division ?? '',
+		category: data.segmentFilters.category ?? '',
+		nature: data.segmentFilters.nature ?? '',
+		present_in: data.segmentFilters.present_in ?? ''
+	});
 
-	function selected(name: (typeof FILTERS)[number]['name']): string {
-		if (name === 'district') return data.district || (data.segmentFilters.district ?? '');
-		return data.segmentFilters[name] ?? '';
-	}
+	// Clearing filters keeps the query and the country: it is the same search, unfiltered.
+	const clearHref = $derived(resolve('/search'));
 </script>
 
 <svelte:head>
@@ -37,37 +35,49 @@
 
 <h1 class="text-2xl font-semibold text-stone-900">Search businesses</h1>
 
-<form method="get" class="mt-4 flex flex-wrap gap-2" onsubmit={dropEmptyControls}>
+<form method="get" class="mt-4 flex flex-col gap-3">
 	<label class="sr-only" for="q">Search businesses</label>
 	<input
 		id="q"
 		name="q"
 		type="search"
 		value={data.query}
-		placeholder="Search by business name..."
-		class="w-full rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
+		placeholder="Search by business name"
+		class="w-full rounded-md border border-border bg-surface px-4 py-2 text-base text-ink transition-colors duration-120 placeholder:text-ink-muted hover:border-border-strong"
 	/>
-	{#each FILTERS as filter (filter.name)}
-		<label class="sr-only" for={filter.name}>{filter.label}</label>
-		<select
-			id={filter.name}
-			name={filter.name}
-			value={selected(filter.name)}
-			class="rounded-md border border-stone-300 bg-white px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
-		>
-			<option value="">{filter.label}: any</option>
-			{#each data.facets[filter.facet] as option (option.value)}
-				<option value={option.value}>{option.value} ({option.count.toLocaleString()})</option>
-			{/each}
-		</select>
-	{/each}
+	<input type="hidden" name="country" value={data.country} />
 	<button
 		type="submit"
-		class="rounded-md bg-stone-900 px-5 py-2 text-base font-medium text-white hover:bg-stone-700"
+		class="h-10 w-fit rounded-md border border-accent bg-accent px-4 text-base font-medium text-ink transition-colors duration-120 hover:border-accent-ink hover:bg-accent-ink hover:text-canvas"
 	>
 		Search
 	</button>
 </form>
+
+{#if !data.districtCheck.known}
+	<div class="mt-4">
+		<EmptyState
+			title="No district by that name"
+			body={`The data carries no district or division called "${data.district || data.segmentFilters.district}". These are the closest published values.`}
+			examples={data.districtCheck.suggestions.map((value) => ({
+				label: value,
+				href: `${resolve('/search')}?q=${encodeURIComponent(data.query)}&district=${encodeURIComponent(value)}`
+			}))}
+		/>
+	</div>
+{/if}
+
+<div class="mt-3 flex flex-col gap-3">
+	<FilterBar
+		fields={FILTER_FIELDS}
+		values={filterValues}
+		hidden={[
+			{ name: 'q', value: data.query },
+			{ name: 'country', value: data.country }
+		]}
+		{clearHref}
+	/>
+</div>
 
 {#if data.segment}
 	<p class="mt-6 text-sm text-stone-500">
