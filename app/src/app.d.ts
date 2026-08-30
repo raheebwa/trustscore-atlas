@@ -10,7 +10,10 @@ declare global {
 		}
 
 		// interface Error {}
-		// interface Locals {}
+		interface Locals {
+			/** Verified Cloudflare Access identity, set by the server hook on /ops paths. */
+			maintainer?: string;
+		}
 		// interface PageData {}
 		// interface PageState {}
 	}

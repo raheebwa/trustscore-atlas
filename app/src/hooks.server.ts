@@ -16,6 +16,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (isMaintainerPath(event.url.pathname)) {
 		const config = accessConfigFrom(event.platform?.env as Record<string, unknown> | undefined);
 		const identity = await verifyAccessRequest(event.request, config);
+		if (identity) event.locals.maintainer = identity.email;
 		if (!identity) {
 			return new Response('Maintainer access required.', {
 				status: 403,
