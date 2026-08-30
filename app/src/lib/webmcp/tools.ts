@@ -1,3 +1,4 @@
+import { summariseIdentifiers } from '$lib/format';
 import type {
 	BusinessRecordResponse,
 	ClaimResponse,
@@ -692,7 +693,7 @@ function shapeSearchHit(item: SearchResultItem, minimal = false) {
 	if (minimal) return identity;
 	return {
 		...identity,
-		identifiers: item.identifiers,
+		identifiers: summariseIdentifiers(item.identifiers),
 		scores: item.formality ? [item.formality] : []
 	};
 }
@@ -766,7 +767,7 @@ export function shapeBusinessRecord(record: BusinessRecordResponse): ToolTextRes
 		division: record.division,
 		sector_category: record.sector_category,
 		sector_nature: record.sector_nature,
-		identifiers: [...record.identifiers],
+		identifiers: summariseIdentifiers(record.identifiers),
 		coverage: {
 			applicable: [...record.coverage.applicable],
 			checked: [...record.coverage.checked],

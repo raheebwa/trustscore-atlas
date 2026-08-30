@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { identifierLabels } from '$lib/format';
+	import { summariseIdentifiers } from '$lib/format';
 	import { resolve } from '$app/paths';
 	import type { PageProps } from './$types';
 
@@ -142,7 +142,7 @@
 					</p>
 					{#if item.identifiers.length > 0}
 						<p class="mt-1 text-sm text-stone-500">
-							{identifierLabels(item.identifiers).join(', ')}
+							{summariseIdentifiers(item.identifiers).join(' \u00b7 ')}
 						</p>
 					{/if}
 					<p class="mt-1 text-xs text-stone-500">

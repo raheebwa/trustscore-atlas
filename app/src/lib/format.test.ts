@@ -39,15 +39,26 @@ describe('identifierKey', () => {
 	});
 });
 
-describe('identifierLabels', () => {
-	it('prints each scheme and value once even when two registers carry it', async () => {
-		const { identifierLabels } = await import('./format');
+describe('summariseIdentifiers', () => {
+	it('shows one entry per scheme in the agreed order, counting duplicates once', async () => {
+		const { summariseIdentifiers } = await import('./format');
 		expect(
-			identifierLabels([
+			summariseIdentifiers([
+				{ scheme: 'ug:unbs_permit', value: 'p1', source: 'unbs.certified_products' },
+				{ scheme: 'ug:unbs_permit', value: 'p2', source: 'unbs.certified_products' },
+				{ scheme: 'ug:customs_licence', value: 'c1', source: 'ura.customs_agents' },
 				{ scheme: 'ug:tin', value: '1000000000', source: 'ura.customs_agents' },
 				{ scheme: 'ug:tin', value: '1000000000', source: 'ura.vat_withholding_agents' },
-				{ scheme: 'ug:kcca_licence', value: 'abc', source: 'kcca.businesses' }
+				{ scheme: 'ug:kcca_licence', value: 'abc', source: 'kcca.businesses' },
+				{ scheme: 'ug:kcca_licence', value: 'def', source: 'kcca.businesses' },
+				{ scheme: 'ke:other', value: 'z', source: 'cbk.licensed_banks' }
 			])
-		).toEqual(['ug:tin: 1000000000', 'ug:kcca_licence: abc']);
+		).toEqual([
+			'ug:tin 1000000000',
+			'ug:kcca_licence x2',
+			'ug:unbs_permit x2',
+			'ug:customs_licence c1',
+			'ke:other z'
+		]);
 	});
 });

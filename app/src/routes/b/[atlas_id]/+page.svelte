@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { identifierKey } from '$lib/format';
+	import { identifierKey, summariseIdentifiers } from '$lib/format';
 	import { resolve } from '$app/paths';
 	import { formatFieldLabel } from '$lib/format';
 	import type { PageProps } from './$types';
@@ -70,12 +70,22 @@
 	<h2 class="text-lg font-semibold text-stone-900">Identifiers</h2>
 	{#if record.identifiers.length > 0}
 		<ul class="mt-2 flex flex-wrap gap-2">
-			{#each record.identifiers as id (identifierKey(id))}
-				<li class="rounded-full bg-stone-100 px-3 py-1 text-sm text-stone-700">
-					{id.scheme}: {id.value}
-				</li>
+			{#each summariseIdentifiers(record.identifiers) as label (label)}
+				<li class="rounded-full bg-stone-100 px-3 py-1 text-sm text-stone-700">{label}</li>
 			{/each}
 		</ul>
+		<details class="mt-2 text-sm text-stone-600">
+			<summary class="cursor-pointer"
+				>All {record.identifiers.length} identifier rows with their registers</summary
+			>
+			<ul class="mt-2 flex flex-wrap gap-2">
+				{#each record.identifiers as id (identifierKey(id))}
+					<li class="rounded-full bg-white px-3 py-1 text-xs text-stone-600 ring-1 ring-stone-200">
+						{id.scheme}: {id.value} <span class="text-stone-400">({id.source})</span>
+					</li>
+				{/each}
+			</ul>
+		</details>
 	{:else}
 		<p class="mt-2 text-sm text-stone-500">No identifiers on file.</p>
 	{/if}

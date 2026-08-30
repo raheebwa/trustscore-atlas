@@ -69,6 +69,8 @@ boundaries:
   provider: HDX COD-AB (UBOS)
   licence: CC-BY-IGO
   levels: [adm1, adm2, adm3, adm4]
+  # The capital's licensing divisions; a business licensed in one of them is in Kampala district.
+  kcca_divisions: [Central Division, Kawempe Division, Makindye Division, Nakawa Division, Rubaga Division]
 
 # Every register in the Phase 0 universe, with its load state. Coverage counts only sources in
 # state loaded that have an accepted run; not_loaded sources are 'not yet checked', never 'checked'.

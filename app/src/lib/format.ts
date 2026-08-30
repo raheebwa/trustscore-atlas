@@ -52,17 +52,40 @@ export function identifierKey(identifier: {
 	return [identifier.scheme, identifier.value, identifier.source ?? ''].join(' ');
 }
 
-/** Display labels for an identifier list, one per scheme and value (a TIN on two lists shows once). */
-export function identifierLabels(
+/** Scheme order for identifier summaries: the tax identity first, then licences and permits. */
+const SCHEME_ORDER = [
+	'tin',
+	'kcca_licence',
+	'bou_code',
+	'nlgrb_licence',
+	'unbs_permit',
+	'customs_licence',
+	'ppda_party_id'
+];
+
+function schemeRank(scheme: string): number {
+	const short = scheme.split(':').pop() ?? scheme;
+	const index = SCHEME_ORDER.indexOf(short);
+	return index === -1 ? SCHEME_ORDER.length : index;
+}
+
+/**
+ * One entry per scheme for cards and tool results: the value when a scheme has one, or
+ * "scheme x N" when it has several (a manufacturer with fourteen customs licences). Duplicates
+ * of the same scheme and value from two registers count once. The full list stays on the record.
+ */
+export function summariseIdentifiers(
 	identifiers: { scheme: string; value: string; source?: string | null }[]
 ): string[] {
-	const seen = new Set<string>();
-	const labels: string[] = [];
+	const values = new Map<string, Set<string>>();
 	for (const identifier of identifiers) {
-		const label = `${identifier.scheme}: ${identifier.value}`;
-		if (seen.has(label)) continue;
-		seen.add(label);
-		labels.push(label);
+		const set = values.get(identifier.scheme) ?? new Set<string>();
+		set.add(identifier.value);
+		values.set(identifier.scheme, set);
 	}
-	return labels;
+	return [...values.entries()]
+		.sort((a, b) => schemeRank(a[0]) - schemeRank(b[0]) || a[0].localeCompare(b[0]))
+		.map(([scheme, set]) =>
+			set.size === 1 ? `${scheme} ${[...set][0]}` : `${scheme} x${set.size}`
+		);
 }

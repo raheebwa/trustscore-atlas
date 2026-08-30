@@ -14,6 +14,7 @@ import {
 	shouldUseFts
 } from './search';
 import { formatCoverageSentence, formatScoreSentence } from '$lib/format';
+import { displayDistrict } from '$lib/location';
 import { rankValues } from '$lib/ordering';
 import type { AtlasDatabases, CoverageLists, CoverageMetadata } from './platform';
 import {
@@ -566,7 +567,7 @@ function toSearchResultItem(
 		atlas_id: row.atlas_id,
 		canonical_name: row.canonical_name,
 		division: row.division,
-		district: row.district,
+		district: displayDistrict(row.district, row.division),
 		sector_category: row.sector_category,
 		sector_nature: row.sector_nature,
 		identifiers,
@@ -860,7 +861,7 @@ async function getBusinessWithStatements(
 			entity_kind: businessRow.entity_kind,
 			sector_category: businessRow.sector_category,
 			sector_nature: businessRow.sector_nature,
-			district: businessRow.district,
+			district: displayDistrict(businessRow.district, businessRow.division),
 			division: businessRow.division,
 			first_seen: businessRow.first_seen,
 			last_seen: businessRow.last_seen,
