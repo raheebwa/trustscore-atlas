@@ -21,6 +21,9 @@ export interface CorrectionInput {
 	field: string;
 	value: string;
 	evidence_url: string;
+	/** The verified claim on this record that the correction is filed from, and its own token. */
+	claim_id?: string;
+	claim_token?: string;
 }
 
 export interface LinkageLabelInput {

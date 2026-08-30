@@ -382,6 +382,47 @@ describe('start_claim execution', () => {
 		expect(calls.map((call) => call.input)).toEqual(['/api/v1/claims']);
 	});
 
+	// A claim with a website carries the string to publish and how long there is to publish it,
+	// because an agent that has to open the claim page to read them has learned nothing.
+	it('carries what to publish and by when, when a website challenge was issued', async () => {
+		const result = await executeStartClaim(
+			{
+				atlas_id: 'atlas-example-1',
+				claimant_role: 'owner or director',
+				verification_method: 'website_string',
+				website_url: 'https://example.co.ug'
+			},
+			{},
+			{
+				fetchJson: async <T>() => ({
+					data: {
+						claim_id: 'claim_example_1',
+						status: 'unconfirmed',
+						confirm_url: '/claim/claim_example_1?token=plain-example-token',
+						expires_at: '2026-08-31T12:00:00.000Z',
+						verification_steps: [],
+						verification: {
+							challenge_id: 'chal_1',
+							method: 'website_string',
+							target: 'https://example.co.ug',
+							challenge_value: 'atlas-verify-abcdefgh12345678',
+							expires_at: '2026-09-06T12:00:00.000Z',
+							instructions: ['Publish atlas-verify-abcdefgh12345678 at the address above.']
+						}
+					} as T,
+					status: 201
+				}),
+				confirm: () => true
+			}
+		);
+
+		expect(parsed(result)).toMatchObject({
+			status: 'confirmation_required',
+			challenge_expires_at: '2026-09-06T12:00:00.000Z',
+			next_steps: ['Publish atlas-verify-abcdefgh12345678 at the address above.']
+		});
+	});
+
 	it('creates and immediately confirms after in-page confirmation', async () => {
 		const calls: { input: string; init?: RequestInit }[] = [];
 		let confirmationText = '';

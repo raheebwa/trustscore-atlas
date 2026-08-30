@@ -259,7 +259,12 @@
 					scoped({
 						...START_CLAIM_TOOL,
 						async execute(
-							input: { atlas_id: string; claimant_role: string },
+							input: {
+								atlas_id: string;
+								claimant_role: string;
+								verification_method?: string;
+								website_url?: string;
+							},
 							context?: ToolExecutionContext
 						): Promise<ToolTextResult> {
 							return executeStartClaim(input, context, {

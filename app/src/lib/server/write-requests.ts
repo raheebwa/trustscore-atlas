@@ -135,13 +135,77 @@ function eventInsert(
 		);
 }
 
+/**
+ * The claim a correction is filed from.
+ *
+ * A correction outranks a register at the next regeneration, so it stands on a claim that was
+ * verified, about this record, held by whoever holds that claim's own link. Everything else is
+ * refused with the same word, so the endpoint cannot be used to learn which claims exist.
+ */
+async function claimBehindCorrection(
+	db: D1Database,
+	atlasId: string,
+	claimId: unknown,
+	claimToken: unknown
+): Promise<{ ok: true; claimId: string } | { ok: false; error: string; message: string }> {
+	if (!validText(claimId, 200) || !validText(claimToken, 512)) {
+		return {
+			ok: false,
+			error: 'claim_required',
+			message:
+				'A correction is filed from a verified claim on this record. Claim the business first, prove it, then file the correction from the link you were given.'
+		};
+	}
+	const claim = await db
+		.prepare(
+			`SELECT claim_id, atlas_id, status, verified_at, confirmation_token
+			 FROM claims WHERE claim_id = ?`
+		)
+		.bind(claimId.trim())
+		.first<{
+			claim_id: string;
+			atlas_id: string;
+			status: string;
+			verified_at: string | null;
+			confirmation_token: string | null;
+		}>();
+	const presented = await hashConfirmationToken(claimToken.trim());
+	if (
+		!claim ||
+		!claim.confirmation_token ||
+		claim.confirmation_token !== presented ||
+		claim.atlas_id !== atlasId ||
+		claim.status !== 'confirmed'
+	) {
+		return {
+			ok: false,
+			error: 'claim_required',
+			message: 'That claim is not one this record can be corrected from.'
+		};
+	}
+	if (!claim.verified_at) {
+		return {
+			ok: false,
+			error: 'claim_not_verified',
+			message:
+				'This claim is not verified yet. Publish the string Atlas gave you, or open the link it mailed you, and file the correction afterwards.'
+		};
+	}
+	return { ok: true, claimId: claim.claim_id };
+}
+
 export async function createCorrectionEndpoint({
 	platform,
 	request
 }: EndpointEvent): Promise<Response> {
 	try {
 		const value = await readObject(request);
-		const input = value as Partial<CorrectionInput> | null;
+		const input = value as
+			| (Partial<CorrectionInput> & {
+					claim_id?: unknown;
+					claim_token?: unknown;
+			  })
+			| null;
 		if (typeof input?.field === 'string' && !isCorrectableField(input.field)) {
 			return json(
 				{ error: 'field_not_correctable', message: FIELD_AUTHORITY_MESSAGE },
@@ -169,12 +233,25 @@ export async function createCorrectionEndpoint({
 			.first<{ atlas_id: string }>();
 		if (!business) return apiNotFound('business_not_found');
 
+		const claim = await claimBehindCorrection(db, atlasId, input.claim_id, input.claim_token);
+		if (!claim.ok) {
+			return json(
+				{
+					error: claim.error,
+					message: claim.message,
+					claim_url: `/claim/${encodeURIComponent(atlasId)}`
+				},
+				{ status: 403 }
+			);
+		}
+
 		const metadata = await pendingMetadata('correction');
 		const payload = {
 			atlas_id: atlasId,
 			field,
 			value: correctionValue,
 			evidence_url: evidenceUrl,
+			claim_id: claim.claimId,
 			status: 'unconfirmed',
 			expires_at: metadata.expiresAt
 		};
@@ -182,13 +259,14 @@ export async function createCorrectionEndpoint({
 			db
 				.prepare(
 					`INSERT INTO corrections
-					 (correction_id, atlas_id, field, value, evidence_url, status,
+					 (correction_id, atlas_id, claim_id, field, value, evidence_url, status,
 					  requested_at, expires_at, confirmed_at, confirmation_token_hash)
-					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 				)
 				.bind(
 					metadata.requestId,
 					atlasId,
+					claim.claimId,
 					field,
 					correctionValue,
 					evidenceUrl,

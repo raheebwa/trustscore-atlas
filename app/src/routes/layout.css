@@ -89,8 +89,8 @@
 
 /**
  * Self-hosted latin subsets, copied from the fontsource packages into static/fonts so the paths
- * are stable enough to preload: no third-party font host, and 136 KB for the four files. Inter
- * and JetBrains Mono are variable; Newsreader ships only the two weights the design uses.
+ * are stable enough to preload: no third-party font host, and three files. Inter and JetBrains
+ * Mono are variable; Newsreader ships the one weight the headings paint in.
  */
 @font-face {
 	font-family: 'InterVariable';
@@ -106,14 +106,6 @@
 	font-display: swap;
 	font-weight: 500;
 	src: url('/fonts/newsreader-latin-500-normal.woff2') format('woff2');
-}
-
-@font-face {
-	font-family: 'Newsreader';
-	font-style: normal;
-	font-display: swap;
-	font-weight: 600;
-	src: url('/fonts/newsreader-latin-600-normal.woff2') format('woff2');
 }
 
 @font-face {

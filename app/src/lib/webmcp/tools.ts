@@ -216,7 +216,7 @@ export const FIND_SEGMENT_TOOL = {
 export const START_CLAIM_TOOL = {
 	name: 'start_claim',
 	description:
-		'Record a request to claim a business. Confirms in the page when supported, otherwise returns a 24-hour page-confirmation URL. It does not verify the claim.',
+		'Record a request to claim a business, and ask for a website challenge with it. Confirms in the page when supported, otherwise returns a 24-hour page-confirmation URL. Recording a claim does not verify it: publishing the returned string on the site does.',
 	inputSchema: {
 		type: 'object',
 		properties: {
@@ -229,6 +229,19 @@ export const START_CLAIM_TOOL = {
 				type: 'string',
 				maxLength: 100,
 				description: 'Role of the person requesting the claim.'
+			},
+			verification_method: {
+				type: 'string',
+				enum: ['website_string'],
+				description:
+					'How the claim will be proved. Only website_string is issued with a claim; a mailed link is asked for afterwards.'
+			},
+			website_url: {
+				type: 'string',
+				format: 'uri',
+				maxLength: 300,
+				description:
+					'Public https address of the business website. Atlas returns a string to publish on it.'
 			}
 		},
 		required: ['atlas_id', 'claimant_role']
@@ -239,7 +252,7 @@ export const START_CLAIM_TOOL = {
 export const SUBMIT_CORRECTION_TOOL = {
 	name: 'submit_correction',
 	description:
-		'Record a field correction request with supporting evidence. Confirms in the page when supported, otherwise returns a 24-hour page-confirmation URL. Published records do not change until review.',
+		'Record a field correction, filed from a verified claim on the same record. Confirms in the page when supported, otherwise returns a 24-hour page-confirmation URL. Published records do not change until a maintainer approves and the next regeneration runs.',
 	inputSchema: {
 		type: 'object',
 		properties: {
@@ -263,9 +276,19 @@ export const SUBMIT_CORRECTION_TOOL = {
 				format: 'uri',
 				maxLength: 1000,
 				description: 'Public evidence URL supporting the correction.'
+			},
+			claim_id: {
+				type: 'string',
+				maxLength: 200,
+				description: 'The verified claim on this record that the correction is filed from.'
+			},
+			claim_token: {
+				type: 'string',
+				maxLength: 512,
+				description: "That claim's own token, from the link the claimant was given."
 			}
 		},
-		required: ['atlas_id', 'field', 'value', 'evidence_url']
+		required: ['atlas_id', 'field', 'value', 'evidence_url', 'claim_id', 'claim_token']
 	},
 	annotations: { readOnlyHint: false }
 } as const;
@@ -498,19 +521,34 @@ export function shapeClaimResult(response: ClaimResponse): ToolTextResult {
 	return textResult(response);
 }
 
+/** What a claim came back with, when it asked for a website challenge. */
+interface IssuedChallengeResponse {
+	challenge_value?: string;
+	expires_at?: string;
+	instructions?: string[];
+}
+
 export async function executeStartClaim(
-	input: { atlas_id: string; claimant_role: string },
+	input: {
+		atlas_id: string;
+		claimant_role: string;
+		verification_method?: string;
+		website_url?: string;
+	},
 	context: StartClaimExecutionContext | undefined,
 	dependencies: StartClaimDependencies
 ): Promise<ToolTextResult> {
 	const signal = context?.signal ?? dependencies.signal;
 	const createClaim = () =>
-		dependencies.fetchJson<ClaimResponse>('/api/v1/claims', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(input),
-			signal
-		});
+		dependencies.fetchJson<ClaimResponse & { verification?: IssuedChallengeResponse }>(
+			'/api/v1/claims',
+			{
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(input),
+				signal
+			}
+		);
 
 	if (typeof context?.requestUserInteraction !== 'function') {
 		const claimResult = await createClaim();
@@ -523,7 +561,8 @@ export async function executeStartClaim(
 			confirm_url: claimResult.data.confirm_url,
 			expires_at: claimResult.data.expires_at,
 			message:
-				'Open confirm_url in this browser to confirm the claim request; it expires in 24 hours.'
+				'Open confirm_url in this browser to confirm the claim request; it expires in 24 hours.',
+			...challengeFields(claimResult.data.verification)
 		});
 	}
 
@@ -571,9 +610,23 @@ export async function executeStartClaim(
 		? textResult({
 				status: 'confirmed',
 				claim_id: confirmationResult.data.claim_id,
-				verification_steps: confirmationResult.data.verification_steps
+				verification_steps: confirmationResult.data.verification_steps,
+				// The claim carried the string to publish; the confirmation does not, so it travels
+				// from where it was issued rather than being fetched again.
+				...challengeFields(claimResult.data.verification)
 			})
 		: shapeToolError('claim_confirmation_failed');
+}
+
+/** What a caller needs next when a challenge was issued: what to publish, and by when. */
+function challengeFields(
+	verification: IssuedChallengeResponse | undefined
+): Record<string, unknown> {
+	if (!verification?.instructions?.length) return {};
+	return {
+		next_steps: verification.instructions,
+		...(verification.expires_at ? { challenge_expires_at: verification.expires_at } : {})
+	};
 }
 
 interface PendingWriteResponse {
