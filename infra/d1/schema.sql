@@ -22,6 +22,17 @@ CREATE INDEX businesses_name_normalised ON businesses (name_normalised);
 CREATE INDEX businesses_division ON businesses (division);
 CREATE INDEX businesses_sector ON businesses (sector_category, sector_nature);
 
+CREATE TABLE segments (
+  sector_category TEXT,
+  sector_nature TEXT,
+  district TEXT,
+  division TEXT,
+  register TEXT,
+  business_count INTEGER NOT NULL
+);
+CREATE INDEX segments_lookup
+ON segments (sector_category, sector_nature, district, division, register);
+
 CREATE TABLE identifiers (
   atlas_id  TEXT NOT NULL,
   scheme    TEXT NOT NULL,

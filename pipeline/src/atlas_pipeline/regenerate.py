@@ -11,7 +11,7 @@ import pyarrow.parquet as pq
 import yaml
 
 from .adapters import STATEMENT_ARROW_SCHEMA, accepted_run
-from .d1 import regeneration_sql, swap_sql
+from .d1 import regeneration_sql, segment_rows, swap_sql
 from .linkage import name_candidates
 from .resolve import pack_sources, resolve
 from .score import load_rubric, score
@@ -22,7 +22,7 @@ PHASE0_RUBRICS = ("formality", "activity", "compliance_signals", "procurement_re
 # The main database also drops statements and refs so a layout from before the split can
 # never inflate a load.
 PRELUDE_DROPS = {
-    "DB": ("scores", "businesses_fts", "statements", "refs"),
+    "DB": ("scores", "segments", "businesses_fts", "statements", "refs"),
     "DB_STATEMENTS": ("statements",),
     "DB_SCORES": ("scores",),
 }
@@ -288,6 +288,23 @@ def regenerate(
         ),
         out / "scores.parquet",
     )
+    segments = segment_rows(resolution.businesses)
+    pq.write_table(
+        pa.Table.from_pylist(
+            segments,
+            schema=pa.schema(
+                [
+                    ("sector_category", pa.string()),
+                    ("sector_nature", pa.string()),
+                    ("district", pa.string()),
+                    ("division", pa.string()),
+                    ("register", pa.string()),
+                    ("business_count", pa.int64()),
+                ]
+            ),
+        ),
+        out / "segments.parquet",
+    )
 
     finished = datetime.now(UTC)
     regeneration = {
@@ -319,6 +336,7 @@ def regenerate(
             database=database,
             candidates=candidates,
             aliases=resolution.aliases,
+            segments=segments,
         )
         (out / f"{prefix}prelude.sql").write_text(
             "\n".join(f"DROP TABLE IF EXISTS {t};" for t in PRELUDE_DROPS[database]) + "\n"
@@ -341,6 +359,7 @@ def regenerate(
             "businesses": len(resolution.businesses),
             "statements": len(resolution.statements),
             "scores": len(scores),
+            "segments": len(segments),
             "linkage_candidates": len(candidates),
             "aliases": len(resolution.aliases),
             "stage_statements": sum(1 for _ in open(out / "stage.sql"))

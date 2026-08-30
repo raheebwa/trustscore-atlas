@@ -19,6 +19,7 @@ _TARGET = 90_000
 DATABASES = {
     "DB": (
         "businesses",
+        "segments",
         "identifiers",
         "aliases",
         "linkage_candidates",
@@ -35,6 +36,9 @@ BUSINESS_COLUMNS = [
     "atlas_id", "country", "canonical_name", "name_normalised", "name_variants", "entity_kind",
     "sector_category", "sector_nature", "district", "division", "first_seen", "last_seen",
     "coverage", "scores",
+]  # fmt: skip
+SEGMENT_COLUMNS = [
+    "sector_category", "sector_nature", "district", "division", "register", "business_count",
 ]  # fmt: skip
 STATEMENT_COLUMNS = [
     "statement_id", "atlas_id", "entity_id", "country", "field", "value", "source", "ref_id",
@@ -196,6 +200,41 @@ def business_rows(businesses: list[dict], scores: list[dict]) -> list[dict]:
     return rows
 
 
+def segment_rows(businesses: list[dict]) -> list[dict]:
+    counts: dict[tuple[str | None, str | None, str | None, str | None, str | None], int] = {}
+    for business in businesses:
+        sector, location = business.get("sector", {}), business.get("location", {})
+        category = sector.get("source_category")
+        nature = sector.get("source_nature")
+        district = location.get("district")
+        division = location.get("division_or_subcounty")
+        for register in sorted(set(business.get("coverage", {}).get("found_in", []))):
+            for row_nature, row_register in (
+                (nature, register),
+                (None, register),
+                (nature, None),
+                (None, None),
+            ):
+                key = (category, row_nature, district, division, row_register)
+                counts[key] = counts.get(key, 0) + 1
+
+    out: list[dict] = []
+    for category, nature, district, division, register in sorted(
+        counts, key=lambda k: tuple(v or "" for v in k)
+    ):
+        out.append(
+            {
+                "sector_category": category,
+                "sector_nature": nature,
+                "district": district,
+                "division": division,
+                "register": register,
+                "business_count": counts[(category, nature, district, division, register)],
+            }
+        )
+    return out
+
+
 def regeneration_sql(
     schema_path: Path,
     regeneration: dict,
@@ -206,6 +245,7 @@ def regeneration_sql(
     database: str = "DB",
     candidates: list[dict] | None = None,
     aliases: list[dict] | None = None,
+    segments: list[dict] | None = None,
 ) -> list[str]:
     """Staged tables and inserts for one database (see DATABASES)."""
     rid = _check_regeneration_id(regeneration["id"])
@@ -250,6 +290,7 @@ def regeneration_sql(
     out += insert_statements(
         f"businesses__{rid}", BUSINESS_COLUMNS, business_rows(businesses, scores)
     )
+    out += insert_statements(f"segments__{rid}", SEGMENT_COLUMNS, segments or [])
     out += insert_statements(
         f"identifiers__{rid}",
         ["atlas_id", "scheme", "value", "source"],

@@ -1,0 +1,22 @@
+# Table schema for records.parquet after applying the adapter posture.
+fields:
+  - name: record_id
+    type: string
+    description: Deterministic key of one institution row.
+    constraints: { required: true, pattern: "^[0-9a-f]{16}$" }
+  - name: name
+    type: string
+    description: Name published by the Central Bank of Kenya.
+    constraints: { required: true }
+  - name: category
+    type: string
+    description: commercial_bank or microfinance_bank.
+    constraints: { required: true, pattern: "^(commercial_bank|microfinance_bank)$" }
+  - name: licence_number
+    type: string
+    description: Optional licence or reference number from the directory row.
+    constraints: { required: false }
+  - name: source_ref
+    type: string
+    description: The page URL from which the row was parsed.
+    constraints: { required: true }

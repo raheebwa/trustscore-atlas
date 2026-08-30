@@ -94,6 +94,7 @@ def test_regenerate_writes_a_prelude_that_frees_the_largest_live_table(tmp_path:
     prelude = (out.directory / "prelude.sql").read_text().splitlines()
     assert prelude == [
         "DROP TABLE IF EXISTS scores;",
+        "DROP TABLE IF EXISTS segments;",
         "DROP TABLE IF EXISTS businesses_fts;",
         "DROP TABLE IF EXISTS statements;",
         "DROP TABLE IF EXISTS refs;",
@@ -102,6 +103,65 @@ def test_regenerate_writes_a_prelude_that_frees_the_largest_live_table(tmp_path:
     assert statements_prelude == ["DROP TABLE IF EXISTS statements;"]
     order = json.loads((out.directory / "regeneration.json").read_text())["load_order"]
     assert order["DB"] == ["prelude.sql", "stage.sql", "swap.sql"]
+
+
+def test_regenerate_writes_precomputed_segments_for_kcca(tmp_path: Path):
+    spec = load_adapter(ADAPTER)
+    pages = {
+        spec.module.query_url(n): (ADAPTER / "fixtures" / "raw" / f"{_slug(n)}.html").read_bytes()
+        for n in EXPECTED["natures"]
+    }
+    run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=lambda url, **_: pages[url],
+        salt=SALT,
+        params={"natures": EXPECTED["natures"]},
+    )
+    out = regenerate(
+        pack_dir=PACKS / "ug",
+        data_root=tmp_path,
+        regeneration_id="20260829T210000Z",
+        computed_at="2026-08-29T21:00:00Z",
+        rubrics_dir=PACKS.parent / "rubrics",
+        schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
+    )
+
+    segments = pq.read_table(out.directory / "segments.parquet").to_pylist()
+    assert {row["sector_category"] for row in segments} == {"GENERAL"}
+    assert {row["district"] for row in segments} == {"Kampala"}
+    assert {row["register"] for row in segments} == {"kcca.businesses", None}
+    assert {row["business_count"] for row in segments} == {1}
+    assert len(segments) == 12
+    expected = {
+        ("GENERAL", "Bakery", "Kampala", "Central Division", "kcca.businesses"),
+        ("GENERAL", None, "Kampala", "Central Division", "kcca.businesses"),
+        ("GENERAL", "Bakery", "Kampala", "Central Division", None),
+        ("GENERAL", None, "Kampala", "Central Division", None),
+        ("GENERAL", "Bakery", "Kampala", "Nakawa Division", "kcca.businesses"),
+        ("GENERAL", None, "Kampala", "Nakawa Division", "kcca.businesses"),
+        ("GENERAL", "Bakery", "Kampala", "Nakawa Division", None),
+        ("GENERAL", None, "Kampala", "Nakawa Division", None),
+        ("GENERAL", "Retailers", "Kampala", "Rubaga Division", "kcca.businesses"),
+        ("GENERAL", None, "Kampala", "Rubaga Division", "kcca.businesses"),
+        ("GENERAL", "Retailers", "Kampala", "Rubaga Division", None),
+        ("GENERAL", None, "Kampala", "Rubaga Division", None),
+    }
+    assert expected == {
+        (
+            row["sector_category"],
+            row["sector_nature"],
+            row["district"],
+            row["division"],
+            row["register"],
+        )
+        for row in segments
+    }
+
+    summary = json.loads((out.directory / "regeneration.json").read_text())
+    assert summary["counts"]["segments"] == 12
 
 
 def test_regenerate_splits_statements_into_a_second_database(tmp_path: Path):

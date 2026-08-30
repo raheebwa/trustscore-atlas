@@ -1,0 +1,21 @@
+# Native column -> canonical field.
+country: KE
+precedence_class: regulator_or_authority
+confidence: official
+record_id:
+  columns: [name, category, licence_number]
+entity_id:
+  columns: [name]
+  normalise: [name]
+source_ref:
+  from: source_ref
+statements:
+  - field: canonical_name
+    from: name
+  - field: sector.source_category
+    from: category
+  - field: status.cbk_licensed
+    value: licensed
+  - field: identifiers
+    identifier: ke:cbk_licence
+    from: licence_number

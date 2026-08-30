@@ -1,0 +1,31 @@
+# Kenya country pack. Kenya demonstrates portability with one regulator directory adapter.
+country: KE
+name: Kenya
+currency: KES
+languages: [en]
+timezone: Africa/Nairobi
+
+identifier_schemes:
+  ke:cbk_licence:
+    title: Central Bank of Kenya licence number
+    issuer: Central Bank of Kenya
+    pattern: "^KE-CBK-(?:CMB|MFB)-[0-9]{3}$"
+    issuer_unique: true
+    org_id_guide: null
+    note: Published on CBK's public register directories for both commercial and microfinance banks.
+
+precedence:
+  operator_verified: 1
+  register_of_record: 2
+  regulator_or_authority: 3
+  derived: 4
+  inferred: 5
+
+boundaries:
+  provider: Central Bank of Kenya / HDX
+  note: Admin boundaries are used for explorer drill-down where names and P-codes are available.
+  levels: [adm1, adm2, adm3, adm4]
+
+sources:
+  - slug: cbk.licensed_banks
+    state: loaded

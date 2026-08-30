@@ -1,0 +1,24 @@
+slug: cbk.licensed_banks
+country: KE
+publisher: Central Bank of Kenya
+title: Licensed banks
+url: https://www.centralbank.go.ke/financial-sector/financial-institutions/
+endpoint: https://www.centralbank.go.ke
+licence: public-record
+rights: public_register
+attribution: Central Bank of Kenya, licensed banks directories (centralbank.go.ke)
+cadence: monthly
+coverage: Licensed commercial banks and microfinance banks shown on public CBK pages.
+precedence_class: regulator_or_authority
+pii:
+  excluded_columns: []
+  hashed_columns: []
+terms:
+  url: https://www.centralbank.go.ke/financial-sector/financial-institutions/
+  checked_on: "2026-08-30"
+  note: >-
+    The pages list active licensed institutions. We follow the robots policy and request only
+    one page per category in normal HTML.
+identifier_schemes: [ke:cbk_licence]
+adapter_version: 0.1.0
+row_count_tolerance: 0.15

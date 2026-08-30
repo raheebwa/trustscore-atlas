@@ -1,0 +1,42 @@
+# Binds the abstract predicates in rubrics/<name>/v1.yml to Kenya registers.
+formality:
+  legal_register_presence:
+    sources: []
+  tax_identity_present:
+    identifier_schemes: [ke:cbk_licence]
+  local_trading_licence:
+    sources: [cbk.licensed_banks]
+  sector_regulator_licence:
+    sources: [cbk.licensed_banks]
+activity:
+  recent_statement:
+    sources: [cbk.licensed_banks]
+  valid_licence_or_permit:
+    expiry_fields: []
+  public_contract_awarded:
+    date_fields: []
+  seen_in_multiple_registers:
+    minimum: 2
+compliance_signals:
+  no_adverse_status:
+    status_fields: []
+  certification_permits_current:
+    status_fields: []
+    current_values: [Valid]
+  property_rates_compliant:
+    sources: []
+  regulator_licence_current:
+    sources: [cbk.licensed_banks]
+procurement_readiness:
+  registered_party:
+    role_fields: []
+  any_award:
+    count_fields: []
+  awards_across_buyers:
+    count_fields: []
+    buyer_fields: []
+  contract_signed_recently:
+    date_fields: []
+  formality_threshold:
+    rubric: formality
+    minimum: 55

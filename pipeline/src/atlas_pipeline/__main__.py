@@ -6,6 +6,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from . import boundaries
 from .adapters import accept_run, load_adapter, run_adapter
 from .conformance import check_run
 from .regenerate import regenerate
@@ -43,6 +44,17 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         help="slug=YYYY-MM-DD for registers returning nothing",
     )
+    boundaries_cmd = sub.add_parser("boundaries", help="simplify and write topojson boundaries")
+    boundaries_cmd.add_argument("--input", required=True)
+    boundaries_cmd.add_argument("--level", required=True)
+    boundaries_cmd.add_argument("--output", required=True)
+    boundaries_cmd.add_argument(
+        "--tolerance",
+        type=float,
+        default=0.0,
+        help="Douglas-Peucker tolerance in degrees",
+    )
+    boundaries_cmd.add_argument("--max-bytes", type=int)
     args = parser.parse_args(argv)
 
     if args.command == "regenerate":
@@ -56,6 +68,20 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(json.dumps(result.summary, indent=2))
         return 0
+    if args.command == "boundaries":
+        return boundaries.main(
+            [
+                "--input",
+                str(args.input),
+                "--level",
+                args.level,
+                "--output",
+                str(args.output),
+                "--tolerance",
+                str(args.tolerance),
+            ]
+            + (["--max-bytes", str(args.max_bytes)] if args.max_bytes is not None else [])
+        )
 
     params = {}
     for item in args.param:

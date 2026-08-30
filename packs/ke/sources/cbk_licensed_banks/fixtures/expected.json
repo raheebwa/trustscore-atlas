@@ -1,0 +1,14 @@
+{
+  "rows": 4,
+  "rows_dropped": 1,
+  "entities": 4,
+  "identifier_statements": 4,
+  "commercial_bank_rows": 2,
+  "microfinance_bank_rows": 2,
+  "raw_files": [
+    "commercial-banks.html",
+    "microfinance-banks.html"
+  ],
+  "commercial_bank": "RURAL INVESTMENT BANK",
+  "microfinance_bank": "COMMUNITY MICROFINANCE BANK"
+}
