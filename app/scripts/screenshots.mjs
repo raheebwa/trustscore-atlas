@@ -38,7 +38,13 @@ const baseOrigin = baseUrl.origin;
 const results = new Map(
 	routes.map((route) => [
 		route,
-		{ consoleErrors: [], pageErrors: [], failedResponses: [], navigationErrors: [] }
+		{
+			consoleErrors: [],
+			pageErrors: [],
+			failedResponses: [],
+			navigationErrors: [],
+			rawTimestamps: []
+		}
 	])
 );
 
@@ -91,6 +97,12 @@ try {
 			try {
 				await page.goto(target.href, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 				await page.screenshot({ path: `${directory}/${slugFor(route)}.png`, fullPage: true });
+				// A machine timestamp is not a sentence: rendered copy carries a human date and keeps
+				// the ISO value in a title attribute, which has no sub-second part to match here.
+				const rendered = await page.content();
+				for (const stamp of rendered.match(/T\d\d:\d\d:\d\d\.\d+Z/g) ?? []) {
+					result.rawTimestamps.push(`${label}: ${stamp}`);
+				}
 			} catch (error) {
 				result.navigationErrors.push(`${label}: ${error.message}`);
 			} finally {
@@ -111,7 +123,8 @@ for (const route of routes) {
 		result.consoleErrors.length +
 		result.pageErrors.length +
 		result.failedResponses.length +
-		result.navigationErrors.length;
+		result.navigationErrors.length +
+		result.rawTimestamps.length;
 	console.log(`${issueCount === 0 ? 'PASS' : 'FAIL'} ${route} (${issueCount} issues)`);
 	if (issueCount > 0) failedRoutes.push([route, result]);
 }
@@ -124,6 +137,7 @@ if (failedRoutes.length > 0) {
 		for (const message of result.pageErrors) console.error(`  page: ${message}`);
 		for (const message of result.failedResponses) console.error(`  response: ${message}`);
 		for (const message of result.navigationErrors) console.error(`  navigation: ${message}`);
+		for (const message of result.rawTimestamps) console.error(`  raw timestamp: ${message}`);
 	}
 	process.exitCode = 1;
 }

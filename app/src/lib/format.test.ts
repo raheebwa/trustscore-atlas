@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCoverageSentence, formatScoreSentence } from './format';
+import { formatCoverageSentence, formatScoreSentence, formatWhen } from './format';
 
 describe('formatCoverageSentence', () => {
 	it('uses checked and pending register counts', () => {
@@ -72,5 +72,49 @@ describe('nextScheduledRun', () => {
 		expect(nextScheduledRun('annual', '2026-08-30T00:48:51Z')).toBe('2027-08-30');
 		expect(nextScheduledRun('irregular', '2026-08-30T03:01:19Z')).toBe('on request');
 		expect(nextScheduledRun('quarterly', null)).toBe('not scheduled');
+	});
+});
+
+describe('formatWhen', () => {
+	const now = new Date('2026-08-30T11:00:00Z');
+
+	it('reads as a sentence in the pack zone, with the relative clause the reader actually uses', () => {
+		const when = formatWhen('2026-08-30T04:00:00Z', { zone: 'Africa/Kampala', now });
+
+		expect(when?.absolute).toBe('30 Aug 2026, 07:00 EAT');
+		expect(when?.relative).toBe('7 hours ago');
+		expect(when?.text).toBe('30 Aug 2026, 07:00 EAT (7 hours ago)');
+		expect(when?.iso).toBe('2026-08-30T04:00:00Z');
+	});
+
+	it('drops the clock when only the day matters', () => {
+		const when = formatWhen('2026-08-28T04:00:00Z', {
+			zone: 'Africa/Kampala',
+			now,
+			showTime: false
+		});
+
+		expect(when?.absolute).toBe('28 Aug 2026');
+		expect(when?.text).toBe('28 Aug 2026 (2 days ago)');
+	});
+
+	it('reads a moment inside the minute as just now, and a future one as ahead', () => {
+		expect(formatWhen('2026-08-30T10:59:30Z', { now })?.relative).toBe('just now');
+		expect(formatWhen('2026-08-30T14:00:00Z', { now })?.relative).toBe('in 3 hours');
+	});
+
+	it('names a zone it knows and falls back to the offset for one it does not', () => {
+		expect(formatWhen('2026-08-30T04:00:00Z', { zone: 'Africa/Nairobi', now })?.absolute).toContain(
+			'EAT'
+		);
+		expect(formatWhen('2026-08-30T04:00:00Z', { zone: 'Europe/Lisbon', now })?.absolute).toContain(
+			'2026'
+		);
+	});
+
+	it('returns nothing for a value it cannot read, so a caller renders nothing', () => {
+		expect(formatWhen(null)).toBeNull();
+		expect(formatWhen('')).toBeNull();
+		expect(formatWhen('not a date')).toBeNull();
 	});
 });

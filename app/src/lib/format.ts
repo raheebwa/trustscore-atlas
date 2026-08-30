@@ -108,3 +108,95 @@ export function nextScheduledRun(cadence: string, lastRunAt: string | null): str
 	else return 'not scheduled';
 	return next.toISOString().slice(0, 10);
 }
+
+/**
+ * How a timestamp reads to a person: an absolute moment in the pack's own zone plus the relative
+ * clause a reader actually uses. Machine-readable values (the ISO stamp, the regeneration id)
+ * belong in a title attribute, a disclosure, the API and tool results, never in a sentence.
+ */
+export interface When {
+	iso: string;
+	absolute: string;
+	relative: string;
+	text: string;
+	zone: string;
+}
+
+/**
+ * ICU renders East Africa Time as "GMT+3", which is not what anyone in Kampala calls it.
+ * A zone the map does not name keeps whatever ICU offers.
+ */
+const ZONE_ABBREVIATIONS: Record<string, string> = {
+	'Africa/Kampala': 'EAT',
+	'Africa/Nairobi': 'EAT',
+	'Africa/Dar_es_Salaam': 'EAT',
+	'Africa/Kigali': 'CAT',
+	'Africa/Addis_Ababa': 'EAT',
+	UTC: 'UTC'
+};
+
+export const DEFAULT_ZONE = 'Africa/Kampala';
+
+const RELATIVE_STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
+	['year', 365 * 24 * 3600],
+	['month', 30 * 24 * 3600],
+	['week', 7 * 24 * 3600],
+	['day', 24 * 3600],
+	['hour', 3600],
+	['minute', 60]
+];
+
+function relativeClause(seconds: number): string {
+	const magnitude = Math.abs(seconds);
+	if (magnitude < 60) return 'just now';
+	const formatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+	// seconds is negative in the past, which is exactly the sign Intl wants.
+	for (const [unit, size] of RELATIVE_STEPS) {
+		if (magnitude >= size) return formatter.format(Math.round(seconds / size), unit);
+	}
+	return 'just now';
+}
+
+export function formatWhen(
+	value: string | null | undefined,
+	options: { zone?: string; now?: Date; showTime?: boolean } = {}
+): When | null {
+	if (!value) return null;
+	const moment = new Date(value);
+	if (Number.isNaN(moment.getTime())) return null;
+
+	const zone = options.zone?.trim() || DEFAULT_ZONE;
+	const showTime = options.showTime !== false;
+	const parts: Intl.DateTimeFormatOptions = {
+		timeZone: zone,
+		day: '2-digit',
+		month: 'short',
+		year: 'numeric'
+	};
+	if (showTime) {
+		parts.hour = '2-digit';
+		parts.minute = '2-digit';
+		parts.hour12 = false;
+	}
+
+	let absolute: string;
+	try {
+		absolute = new Intl.DateTimeFormat('en-GB', parts).format(moment);
+	} catch {
+		// A runtime without this zone still owes the reader a date.
+		absolute = new Intl.DateTimeFormat('en-GB', { ...parts, timeZone: 'UTC' }).format(moment);
+	}
+	if (showTime) {
+		const abbreviation =
+			ZONE_ABBREVIATIONS[zone] ??
+			new Intl.DateTimeFormat('en-GB', { timeZone: zone, timeZoneName: 'short' })
+				.formatToParts(moment)
+				.find((part) => part.type === 'timeZoneName')?.value ??
+			'UTC';
+		absolute = `${absolute} ${abbreviation}`;
+	}
+
+	const now = options.now ?? new Date();
+	const relative = relativeClause((moment.getTime() - now.getTime()) / 1000);
+	return { iso: value, absolute, relative, text: `${absolute} (${relative})`, zone };
+}
