@@ -224,6 +224,7 @@ def test_segment_rows_count_each_business_once_in_the_all_registers_rollup():
     from atlas_pipeline.d1 import segment_rows
 
     business = {
+        "country": "UG",
         "sector": {"source_category": "GENERAL", "source_nature": "Hardware"},
         "location": {"district": "Kampala", "division_or_subcounty": "Central Division"},
         "coverage": {"found_in": ["kcca.businesses", "ura.vat_withholding_agents"]},
@@ -236,3 +237,20 @@ def test_segment_rows_count_each_business_once_in_the_all_registers_rollup():
     assert rows[(None, "kcca.businesses")] == 1
     assert rows[("Hardware", None)] == 1
     assert rows[(None, None)] == 1
+
+
+def test_segment_rows_count_a_business_without_nature_once_and_carry_the_country():
+    from atlas_pipeline.d1 import segment_rows
+
+    business = {
+        "country": "KE",
+        "sector": {"source_category": "GENERAL"},
+        "location": {"district": None, "division_or_subcounty": None},
+        "coverage": {"found_in": ["cbk.licensed_banks"]},
+    }
+    rows = segment_rows([business])
+    assert {r["country"] for r in rows} == {"KE"}
+    assert [(r["sector_nature"], r["register"], r["business_count"]) for r in rows] == [
+        (None, None, 1),
+        (None, "cbk.licensed_banks", 1),
+    ]

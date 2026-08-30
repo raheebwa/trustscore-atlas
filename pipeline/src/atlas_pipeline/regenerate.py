@@ -371,6 +371,7 @@ def regenerate(
             segments,
             schema=pa.schema(
                 [
+                    ("country", pa.string()),
                     ("sector_category", pa.string()),
                     ("sector_nature", pa.string()),
                     ("district", pa.string()),

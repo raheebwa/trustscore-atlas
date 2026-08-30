@@ -38,7 +38,8 @@ BUSINESS_COLUMNS = [
     "coverage", "scores",
 ]  # fmt: skip
 SEGMENT_COLUMNS = [
-    "sector_category", "sector_nature", "district", "division", "register", "business_count",
+    "country", "sector_category", "sector_nature", "district", "division", "register",
+    "business_count",
 ]  # fmt: skip
 STATEMENT_COLUMNS = [
     "statement_id", "atlas_id", "entity_id", "country", "field", "value", "source", "ref_id",
@@ -201,37 +202,37 @@ def business_rows(businesses: list[dict], scores: list[dict]) -> list[dict]:
 
 
 def segment_rows(businesses: list[dict]) -> list[dict]:
-    counts: dict[tuple[str | None, str | None, str | None, str | None, str | None], int] = {}
+    """Precomputed counts per (country, category, nature, district, division, register).
+    Nature and register also get rollup rows (None) that count each business once; a business
+    without a nature has only the rollup row for nature."""
+    Key = tuple[str, str | None, str | None, str | None, str | None, str | None]
+    counts: dict[Key, int] = {}
     for business in businesses:
         sector, location = business.get("sector", {}), business.get("location", {})
+        country = business["country"]
         category = sector.get("source_category")
-        nature = sector.get("source_nature")
         district = location.get("district")
         division = location.get("division_or_subcounty")
-        registers = sorted(set(business.get("coverage", {}).get("found_in", [])))
-        # Per-register rows count the business under each register it appears in; the
-        # all-registers rollup (register None) counts it once.
-        keys = [(category, n, district, division, None) for n in (nature, None)]
-        keys += [
-            (category, n, district, division, register)
-            for register in registers
-            for n in (nature, None)
-        ]
-        for key in keys:
-            counts[key] = counts.get(key, 0) + 1
+        natures = [sector.get("source_nature"), None] if sector.get("source_nature") else [None]
+        registers: list[str | None] = [None]
+        registers += sorted(set(business.get("coverage", {}).get("found_in", [])))
+        for register in registers:
+            for nature in natures:
+                key = (country, category, nature, district, division, register)
+                counts[key] = counts.get(key, 0) + 1
 
     out: list[dict] = []
-    for category, nature, district, division, register in sorted(
-        counts, key=lambda k: tuple(v or "" for v in k)
-    ):
+    for key in sorted(counts, key=lambda k: tuple(v or "" for v in k)):
+        country, category, nature, district, division, register = key
         out.append(
             {
+                "country": country,
                 "sector_category": category,
                 "sector_nature": nature,
                 "district": district,
                 "division": division,
                 "register": register,
-                "business_count": counts[(category, nature, district, division, register)],
+                "business_count": counts[key],
             }
         )
     return out

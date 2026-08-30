@@ -199,18 +199,19 @@ def _quantize(
     return lookup, [scale_x, scale_y], [min_x, min_y]
 
 
-def _encode_delta(points: list[tuple[int, int]]) -> list[int]:
+def _encode_delta(points: list[tuple[int, int]]) -> list[list[int]]:
+    """TopoJSON arcs: the first position absolute, every later one a delta from the previous."""
     if not points:
         return []
-    out: list[int] = [points[0][0], points[0][1]]
+    out: list[list[int]] = [[points[0][0], points[0][1]]]
     for previous, current in zip(points[:-1], points[1:], strict=True):
-        out.extend([current[0] - previous[0], current[1] - previous[1]])
+        out.append([current[0] - previous[0], current[1] - previous[1]])
     return out
 
 
 def _register_arc(
     points: list[tuple[int, int]],
-    arcs: list[list[int]],
+    arcs: list[list[list[int]]],
     lookup: dict[tuple[tuple[int, int], ...], int],
 ) -> int:
     forward = tuple(points)
@@ -234,7 +235,7 @@ def _build_topology(rows: list[FeatureRecord], level: str) -> dict[str, Any]:
 
     lookup, scale, translate = _quantize(all_points, steps=4096)
 
-    arcs: list[list[int]] = []
+    arcs: list[list[list[int]]] = []
     arc_lookup: dict[tuple[tuple[int, int], ...], int] = {}
     geometries: list[dict[str, Any]] = []
     for pcode, name, geometry in rows:
