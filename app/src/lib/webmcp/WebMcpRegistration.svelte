@@ -40,6 +40,7 @@
 	} from '$lib/types';
 	import type { CorrectionInput, IssueInput, LinkageLabelInput } from '$lib/write-requests';
 	import { scopeToBusiness, toolsForRoute } from './routes';
+	import { setPageTools, type PageTool } from './registered.svelte';
 
 	interface ModelContextLike {
 		registerTool: (
@@ -90,19 +91,18 @@
 	}
 
 	async function registerTools() {
-		const mc = modelContext();
-		if (!mc) return;
-
 		controller = new AbortController();
 		const { signal } = controller;
+		const mc = modelContext();
 		const route = toolsForRoute(window.location.pathname + window.location.search);
 		const allowed = new Set(route.names);
 		const scoped = <T extends Parameters<typeof scopeToBusiness>[0]>(tool: T): T =>
 			route.atlasId ? scopeToBusiness(tool, route.atlasId) : tool;
+		const tools: PageTool[] = [];
 
 		try {
 			if (allowed.has(SEARCH_BUSINESSES_TOOL.name))
-				await mc.registerTool(
+				tools.push(
 					scoped({
 						...SEARCH_BUSINESSES_TOOL,
 						async execute(
@@ -131,12 +131,11 @@
 								? shapeSearchResults(result.data)
 								: shapeToolError('search_failed');
 						}
-					}),
-					{ signal }
+					})
 				);
 
 			if (allowed.has(GET_BUSINESS_TOOL.name))
-				await mc.registerTool(
+				tools.push(
 					scoped({
 						...GET_BUSINESS_TOOL,
 						async execute(
@@ -151,12 +150,11 @@
 								? shapeBusinessRecord(result.data)
 								: shapeToolError('business_not_found');
 						}
-					}),
-					{ signal }
+					})
 				);
 
 			if (allowed.has(GET_EVIDENCE_TOOL.name))
-				await mc.registerTool(
+				tools.push(
 					scoped({
 						...GET_EVIDENCE_TOOL,
 						async execute(
@@ -186,12 +184,11 @@
 								? shapeEvidenceResults(result.data)
 								: shapeToolError('evidence_lookup_failed');
 						}
-					}),
-					{ signal }
+					})
 				);
 
 			if (allowed.has(SCORE_BUSINESS_TOOL.name))
-				await mc.registerTool(
+				tools.push(
 					scoped({
 						...SCORE_BUSINESS_TOOL,
 						async execute(
@@ -208,12 +205,11 @@
 								? shapeScoreResult(result.data)
 								: shapeToolError('score_lookup_failed');
 						}
-					}),
-					{ signal }
+					})
 				);
 
 			if (allowed.has(EXPLAIN_SCORE_TOOL.name))
-				await mc.registerTool(
+				tools.push(
 					scoped({
 						...EXPLAIN_SCORE_TOOL,
 						async execute(
@@ -230,12 +226,11 @@
 								? shapeExplanationResult(result.data)
 								: shapeToolError('explanation_failed');
 						}
-					}),
-					{ signal }
+					})
 				);
 
 			if (allowed.has(FIND_SEGMENT_TOOL.name))
-				await mc.registerTool(
+				tools.push(
 					scoped({
 						...FIND_SEGMENT_TOOL,
 						async execute(
@@ -256,12 +251,11 @@
 								? shapeSegmentResult(result.data)
 								: shapeToolError('segment_lookup_failed');
 						}
-					}),
-					{ signal }
+					})
 				);
 
 			if (allowed.has(START_CLAIM_TOOL.name))
-				await mc.registerTool(
+				tools.push(
 					scoped({
 						...START_CLAIM_TOOL,
 						async execute(
@@ -274,12 +268,11 @@
 								signal
 							});
 						}
-					}),
-					{ signal }
+					})
 				);
 
 			if (allowed.has(SUBMIT_CORRECTION_TOOL.name))
-				await mc.registerTool(
+				tools.push(
 					scoped({
 						...SUBMIT_CORRECTION_TOOL,
 						async execute(
@@ -292,12 +285,11 @@
 								signal
 							});
 						}
-					}),
-					{ signal }
+					})
 				);
 
 			if (allowed.has(LABEL_LINKAGE_TOOL.name))
-				await mc.registerTool(
+				tools.push(
 					scoped({
 						...LABEL_LINKAGE_TOOL,
 						async execute(
@@ -310,12 +302,11 @@
 								signal
 							});
 						}
-					}),
-					{ signal }
+					})
 				);
 
 			if (allowed.has(REPORT_ISSUE_TOOL.name))
-				await mc.registerTool(
+				tools.push(
 					scoped({
 						...REPORT_ISSUE_TOOL,
 						async execute(
@@ -328,15 +319,21 @@
 								signal
 							});
 						}
-					}),
-					{ signal }
+					})
 				);
+			// The page offers what it built, whatever the browser can do with it.
+			setPageTools(tools);
+			if (!mc) return;
+			for (const tool of tools) {
+				await mc.registerTool(tool as unknown as Record<string, unknown>, { signal });
+			}
 		} catch {
 			// Registration may be unavailable or denied. The page remains usable.
 		}
 	}
 
 	function unregisterTools() {
+		setPageTools([]);
 		controller?.abort();
 		controller = null;
 	}

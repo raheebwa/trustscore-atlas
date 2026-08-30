@@ -81,7 +81,7 @@ describe('buildCrumbs', () => {
 	it('keeps the global tool surface out of a country', () => {
 		expect(buildCrumbs({ ...base, pathname: '/tools' }).map((crumb) => crumb.label)).toEqual([
 			'Home',
-			'Actions'
+			'Tools'
 		]);
 	});
 

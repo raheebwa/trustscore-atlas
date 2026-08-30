@@ -42,7 +42,7 @@ const SECTIONS: Record<string, string> = {
 	sources: 'Sources',
 	methodology: 'Methodology',
 	downloads: 'Downloads',
-	tools: 'Actions',
+	tools: 'Tools',
 	claim: 'Claim',
 	report: 'Report',
 	correct: 'Correction',
