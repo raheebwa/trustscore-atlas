@@ -57,6 +57,75 @@ describe('buildProvenanceTable', () => {
 		expect(table[0].precedence).toBe(2);
 	});
 
+	/**
+	 * The table says where the published value came from, so it has to start from the published
+	 * value. Deriving a winner from the statements again is how a record came to print Wakiso from
+	 * the standards bureau beside Nakawa Division from the city authority: two sources, one place,
+	 * neither of them what the record actually publishes.
+	 */
+	it('shows the published value and the register that supplied it, not its own winner', () => {
+		const statements = [
+			statement({
+				statement_id: 'unbs',
+				field: 'location.district',
+				source: 'unbs.certified_products',
+				value: 'Wakiso'
+			}),
+			statement({
+				statement_id: 'kcca',
+				field: 'location.district',
+				source: 'kcca.businesses',
+				value: 'Kampala'
+			})
+		];
+
+		const table = buildProvenanceTable(statements, 'atlas-example-1', { district: 'Kampala' });
+
+		const district = table.find((row) => row.field === 'location.district');
+		expect(district?.value).toBe('Kampala');
+		expect(district?.source).toBe('kcca.businesses');
+	});
+
+	it('matches the published value however the register spelled it', () => {
+		const table = buildProvenanceTable(
+			[
+				statement({
+					field: 'location.district',
+					source: 'unbs.certified_products',
+					value: 'Wakiso'
+				}),
+				statement({
+					statement_id: 'kcca',
+					field: 'location.district',
+					source: 'kcca.businesses',
+					value: 'KAMPALA'
+				})
+			],
+			'atlas-example-1',
+			{ district: 'Kampala' }
+		);
+
+		expect(table[0]).toMatchObject({ value: 'KAMPALA', source: 'kcca.businesses' });
+	});
+
+	it('falls back to its own ranking for a field the record carries no column for', () => {
+		const table = buildProvenanceTable(
+			[
+				statement({ field: 'status.nlgrb_licensed', value: 'licensed', precedence: 3 }),
+				statement({
+					statement_id: 'weaker',
+					field: 'status.nlgrb_licensed',
+					value: 'lapsed',
+					precedence: 4
+				})
+			],
+			'atlas-example-1',
+			{ district: 'Kampala' }
+		);
+
+		expect(table[0]).toMatchObject({ field: 'status.nlgrb_licensed', value: 'licensed' });
+	});
+
 	it('uses distinct source-record support before recency', () => {
 		const table = buildProvenanceTable(
 			[

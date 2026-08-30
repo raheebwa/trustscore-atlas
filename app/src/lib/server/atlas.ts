@@ -407,7 +407,50 @@ function toScoreSummary(row: ScoreRowDb, statements: StatementRow[] = []): Score
 	};
 }
 
-function pickWinnerStatement(statements: StatementRow[]): StatementRow | null {
+/**
+ * The published value for a field, where the record publishes one.
+ *
+ * The pipeline resolves a record's fields together, so asking the statements again which value
+ * won can answer differently: a district and a division are chosen as one place, from one source.
+ * Anything the record does not carry as a column, a tax office for instance, is still decided here.
+ */
+export function publishedValueFor(
+	published: PublishedValues | null | undefined,
+	field: string
+): string | null {
+	if (!published) return null;
+	const columns: Record<string, string | null | undefined> = {
+		canonical_name: published.canonical_name,
+		'location.district': published.district,
+		'location.division_or_subcounty': published.division,
+		'sector.source_category': published.sector_category,
+		'sector.source_nature': published.sector_nature
+	};
+	return columns[field] ?? null;
+}
+
+/** The columns of a record that a statement field can correspond to. */
+export interface PublishedValues {
+	canonical_name?: string | null;
+	district?: string | null;
+	division?: string | null;
+	sector_category?: string | null;
+	sector_nature?: string | null;
+}
+
+function pickWinnerStatement(
+	statements: StatementRow[],
+	publishedValue?: string | null
+): StatementRow | null {
+	// When the record publishes a value, the winner is whoever supplied that value: the table says
+	// where the published value came from, not which value would have won on its own.
+	// Registers spell the same place KAMPALA, Kampala and kampala, and the record keeps whichever
+	// spelling won, so the values are compared as a reader would read them.
+	const wanted = publishedValue?.trim().toLowerCase();
+	const carryingPublished = wanted
+		? statements.filter((statement) => statement.value.trim().toLowerCase() === wanted)
+		: [];
+	if (carryingPublished.length > 0) statements = carryingPublished;
 	const [winningValue] = rankValues(statements);
 	if (winningValue === undefined) return null;
 	return statements
@@ -858,7 +901,11 @@ async function fetchStatementsFor(
 	return filterPublishableStatements((results ?? []).map(toStatementRow));
 }
 
-export function buildProvenanceTable(statements: StatementRow[], atlasId: string): ProvenanceRow[] {
+export function buildProvenanceTable(
+	statements: StatementRow[],
+	atlasId: string,
+	published?: PublishedValues | null
+): ProvenanceRow[] {
 	const byField = new Map<string, StatementRow[]>();
 	for (const statement of filterPublishableStatements(statements)) {
 		const list = byField.get(statement.field) ?? [];
@@ -867,7 +914,7 @@ export function buildProvenanceTable(statements: StatementRow[], atlasId: string
 	}
 	const rows: ProvenanceRow[] = [];
 	for (const [field, list] of byField) {
-		const winner = pickWinnerStatement(list);
+		const winner = pickWinnerStatement(list, publishedValueFor(published, field));
 		if (!winner) continue;
 		rows.push({
 			field,
@@ -1006,7 +1053,14 @@ export async function getBusinessDetail(
 	const result = await getBusinessWithStatements(databases, atlasId);
 	if (!result) return null;
 	const { record, statements } = result;
-	const provenance = buildProvenanceTable(statements, atlasId);
+	// The table says where the published values came from, so it starts from the record itself.
+	const provenance = buildProvenanceTable(statements, atlasId, {
+		canonical_name: record.canonical_name,
+		district: record.district,
+		division: record.division,
+		sector_category: record.sector_category,
+		sector_nature: record.sector_nature
+	});
 	const fields = provenance.map((row) => row.field);
 	return { record, provenance, fields };
 }
@@ -1020,6 +1074,33 @@ export interface TraceResult {
 	winnerStatementId: string | null;
 }
 
+/** The columns of a record a statement field can be traced back to. */
+async function publishedValues(db: D1Database, atlasId: string): Promise<PublishedValues | null> {
+	const row = await db
+		.prepare(
+			`SELECT canonical_name, district, division, sector_category, sector_nature
+			 FROM businesses WHERE atlas_id = ?`
+		)
+		.bind(atlasId)
+		.first<{
+			canonical_name: string | null;
+			district: string | null;
+			division: string | null;
+			sector_category: string | null;
+			sector_nature: string | null;
+		}>();
+	if (!row) return null;
+	return {
+		canonical_name: row.canonical_name,
+		// The record shows the district a division implies, so a trace of the district is a trace
+		// of that same value.
+		district: displayDistrict(row.district, row.division),
+		division: row.division,
+		sector_category: row.sector_category,
+		sector_nature: row.sector_nature
+	};
+}
+
 export async function getFieldTrace(
 	databases: AtlasDatabases,
 	atlasId: string,
@@ -1027,7 +1108,13 @@ export async function getFieldTrace(
 	options: Omit<StatementsPageOptions, 'field'> = {}
 ): Promise<TraceResult> {
 	const page = await readStatementsPage(databases, atlasId, { ...options, field }, 'trace');
-	const winner = pickWinnerStatement(page.statements);
+	// The winner on this page is the register that supplied the value the record publishes, which
+	// the pipeline resolved for the record as a whole. Ranking the statements again here would let
+	// a trace disagree with the record it traces.
+	const winner = pickWinnerStatement(
+		page.statements,
+		publishedValueFor(await publishedValues(databases.db, atlasId), field)
+	);
 	return {
 		field,
 		returned: page.returned,
