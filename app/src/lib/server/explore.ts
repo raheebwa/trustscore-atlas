@@ -44,8 +44,6 @@ type RollupMode = 'rollup' | 'each';
 interface FilterOptions {
 	nature?: RollupMode;
 	register?: RollupMode;
-	/** False only while the live table predates the country column (one-release shim). */
-	country?: boolean;
 }
 
 const FILTER_KEYS = ['category', 'nature', 'district', 'division', 'present_in'] as const;
@@ -71,12 +69,8 @@ function cleanFilters(filters: ExploreFilters): ExploreFilters {
 }
 
 function buildClauses(filters: ExploreFilters, options: FilterOptions = {}): ExploreFilterSql {
-	const clauses: string[] = [];
-	const bindings: string[] = [];
-	if (options.country !== false) {
-		clauses.push('country = ?');
-		bindings.push(filters.country ?? DEFAULT_COUNTRY);
-	}
+	const clauses: string[] = ['country = ?'];
+	const bindings: string[] = [filters.country ?? DEFAULT_COUNTRY];
 	const exact = (column: string, value: string | null | undefined, collate = true) => {
 		if (!value) return false;
 		clauses.push(`${column} = ?${collate ? ' COLLATE NOCASE' : ''}`);
@@ -115,18 +109,6 @@ function buildLink(
 	return query ? `${path}?${query}` : path;
 }
 
-/**
- * Compatibility shim for one release: the live segments table may still lack the country
- * column until the next regeneration is loaded. Remove with that load.
- */
-async function segmentsHaveCountry(db: D1Database): Promise<boolean> {
-	const row = await db
-		.prepare("SELECT COUNT(*) AS n FROM pragma_table_info('segments') WHERE name = 'country'")
-		.bind()
-		.first<{ n: number }>();
-	return (row?.n ?? 0) > 0;
-}
-
 async function groupCounts(
 	db: D1Database,
 	column: string,
@@ -151,24 +133,20 @@ export async function exploreSegments(
 ): Promise<ExploreResponse> {
 	const filters = cleanFilters(inputFilters);
 	const liveBefore = await getLiveRegenerationId(db);
-	const country = await segmentsHaveCountry(db);
-	const scoped: FilterOptions = { country };
-	const { whereClause, bindings } = buildClauses(filters, scoped);
+	const { whereClause, bindings } = buildClauses(filters);
 	const [countriesResult, totalRow, districts, divisions, registers, categoriesOrNatures] =
 		await Promise.all([
-			country
-				? db.prepare('SELECT DISTINCT country FROM segments').bind().all<{ country: string }>()
-				: Promise.resolve({ results: [{ country: DEFAULT_COUNTRY }] }),
+			db.prepare('SELECT DISTINCT country FROM segments').bind().all<{ country: string }>(),
 			db
 				.prepare(`SELECT COALESCE(SUM(business_count), 0) AS n FROM segments${whereClause}`)
 				.bind(...bindings)
 				.first<{ n: number }>(),
-			groupCounts(db, 'district', filters, scoped),
-			filters.district ? groupCounts(db, 'division', filters, scoped) : Promise.resolve([]),
-			groupCounts(db, 'register', filters, { ...scoped, register: 'each' }),
+			groupCounts(db, 'district', filters),
+			filters.district ? groupCounts(db, 'division', filters) : Promise.resolve([]),
+			groupCounts(db, 'register', filters, { register: 'each' }),
 			filters.category
-				? groupCounts(db, 'sector_nature', filters, { ...scoped, nature: 'each' })
-				: groupCounts(db, 'sector_category', filters, scoped)
+				? groupCounts(db, 'sector_nature', filters, { nature: 'each' })
+				: groupCounts(db, 'sector_category', filters)
 		]);
 	// The table swap is atomic per database, but these reads are not one snapshot; a swap in
 	// between would mix two regenerations, so the caller retries instead (503).
