@@ -16,6 +16,14 @@ from datetime import UTC, datetime
 LEGAL_SUFFIXES = re.compile(r"\b(LTD|LIMITED|PLC|INC|LLC|CORP|CORPORATION)\b")
 FIELD_GROUPS = {"sector": "sector.", "location": "location."}
 
+# The location fields that describe one place in an administrative hierarchy, coarse to fine.
+# They are resolved together, from a single source, because a district taken from one register
+# beside a division taken from another is a place that does not exist. Any other location field,
+# a tax office for instance, names a different axis and cannot contradict them, so it keeps its
+# own source.
+ADMIN_LOCATION_FIELDS = ("district", "division_or_subcounty")
+GROUP_UNITS = {"location": ADMIN_LOCATION_FIELDS}
+
 
 def normalise_name(name: str) -> str:
     text = name.upper().replace("&", " AND ")
@@ -51,6 +59,33 @@ def rank_values(statements: list[dict]) -> list[str]:
         )
 
     return sorted(groups, key=key)
+
+
+def _winning_source(fields: dict[str, list[dict]], unit: tuple[str, ...]) -> str | None:
+    """The source that wins a set of fields resolved together.
+
+    Precedence decides first, exactly as it does for a single value. A tie goes to the source that
+    knows the place better: one carrying a division says more about where a business is than one
+    carrying only a district. Support, recency and the source name break what is left.
+    """
+    entries: dict[str, list[tuple[str, dict]]] = defaultdict(list)
+    for name in unit:
+        for row in fields.get(name, []):
+            entries[row["source"]].append((name, row))
+    if not entries:
+        return None
+
+    def key(source: str):
+        rows = entries[source]
+        return (
+            min(r["precedence"] for _, r in rows),
+            -max(unit.index(name) for name, _ in rows),
+            -len({r["source_record_id"] for _, r in rows}),
+            -max(_dt(r["asserted_at"]) for _, r in rows).timestamp(),
+            source,
+        )
+
+    return min(entries, key=key)
 
 
 def choose_name(statements: list[dict]) -> tuple[str, list[str]]:
@@ -298,13 +333,24 @@ def resolve(
             },
         }
         for group, prefix in FIELD_GROUPS.items():
-            values = {
-                f.removeprefix(prefix): rank_values(v)
-                for f, v in by_field.items()
-                if f.startswith(prefix)
+            fields = {
+                f.removeprefix(prefix): v for f, v in by_field.items() if f.startswith(prefix)
             }
-            if values:
-                business[group] = {k: v[0] for k, v in values.items()}
+            if not fields:
+                continue
+            unit = GROUP_UNITS.get(group, ())
+            winner = _winning_source(fields, unit)
+            resolved = {}
+            for field_name, field_rows in fields.items():
+                chosen = (
+                    [r for r in field_rows if r["source"] == winner]
+                    if field_name in unit
+                    else field_rows
+                )
+                if chosen:
+                    resolved[field_name] = rank_values(chosen)[0]
+            if resolved:
+                business[group] = resolved
         result.businesses.append(business)
         result.statements.extend({**s, "atlas_id": atlas_id} for s in rows)
     result.businesses.sort(key=lambda b: b["atlas_id"])
