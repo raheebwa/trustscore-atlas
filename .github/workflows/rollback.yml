@@ -244,4 +244,7 @@ jobs:
         with:
           name: rollback-load-log-${{ github.run_id }}
           if-no-files-found: warn
-          path: data/rollback/load-d1.log
+          path: |
+            data/rollback/load-d1.log
+            data/rollback/verify.json
+            data/rollback/guard.json
