@@ -12,6 +12,7 @@ import pytest
 import atlas_pipeline.__main__ as cli
 from atlas_pipeline.__main__ import main
 from atlas_pipeline.maintainer_labels import compile_maintainer_labels
+from atlas_pipeline.operator_statements import compile_operator_statements
 from atlas_pipeline.refresh import (
     due_adapter_directories,
     outcome_sentence,
@@ -27,8 +28,14 @@ def _d1_result(rows: list[dict], *, success: bool = True) -> str:
 
 
 class FakeD1Runner:
-    def __init__(self, labels: list[dict] | None = None, results: list[list[dict]] | None = None):
+    def __init__(
+        self,
+        labels: list[dict] | None = None,
+        results: list[list[dict]] | None = None,
+        statements: list[dict] | None = None,
+    ):
         self.labels = labels or []
+        self.statements = statements or []
         self.results = list(results or [])
         self.compiled: set[str] = set()
         self.commands: list[list[str]] = []
@@ -55,6 +62,19 @@ class FakeD1Runner:
         self.sql.append(statement)
         if statement.startswith("SELECT m.label_id"):
             rows = [row for row in self.labels if row["label_id"] not in self.compiled]
+        elif statement.startswith("SELECT o.operator_statement_id"):
+            rows = [
+                row for row in self.statements if row["operator_statement_id"] not in self.compiled
+            ]
+        elif statement.startswith("INSERT INTO operator_statement_compilations"):
+            self.compiled.add(
+                next(
+                    row["operator_statement_id"]
+                    for row in self.statements
+                    if f"'{row['operator_statement_id']}'" in statement
+                )
+            )
+            rows = []
         elif statement.startswith("INSERT INTO maintainer_label_compilations"):
             label_id = next(
                 row["label_id"] for row in self.labels if f"'{row['label_id']}'" in statement
@@ -619,3 +639,90 @@ def test_the_summary_line_names_what_failed_and_what_it_means(tmp_path):
     assert "nothing was regenerated" in outcome_sentence(
         run_outcome(_results(tmp_path, [("packs/ug/sources/a", "unknown", "failed")]))
     )
+
+
+def _operator_statement(statement_id: str, asserted_at: str, field: str, value: str) -> dict:
+    return {
+        "operator_statement_id": statement_id,
+        "claim_id": f"claim_{statement_id}",
+        "atlas_id": "atl_example",
+        "field": field,
+        "value": value,
+        "source_ref": f"claim_{statement_id}",
+        "asserted_at": asserted_at,
+    }
+
+
+def test_compile_operator_statements_appends_rows_and_records_compilations(tmp_path: Path):
+    """An approval asserts something; this is where it becomes an input to the next regeneration.
+
+    Until it is compiled, an approved claim has changed nothing that is served, which is the state
+    the ops screen says it is in. Compiling is append-only on both sides: the file grows, and each
+    statement records the regeneration that took it.
+    """
+    path = tmp_path / "data" / "canonical" / "operator_statements.jsonl"
+    runner = FakeD1Runner(
+        statements=[
+            _operator_statement(
+                "os_1", "2026-08-30T05:00:00Z", "status.operator_verified", "verified"
+            ),
+            _operator_statement("os_2", "2026-08-30T05:01:00Z", "location.district", "Wakiso"),
+        ]
+    )
+
+    compiled = compile_operator_statements(
+        data_root=tmp_path / "data",
+        regeneration_id="20260830T051500Z",
+        runner=runner,
+        app_dir=tmp_path / "app",
+        compiled_at="2026-08-30T05:15:01Z",
+    )
+
+    assert [json.loads(line) for line in path.read_text().splitlines()] == compiled
+    assert compiled[0] == {
+        "atlas_id": "atl_example",
+        "field": "status.operator_verified",
+        "value": "verified",
+        "claim_id": "claim_os_1",
+        "source_ref": "claim_os_1",
+        "asserted_at": "2026-08-30T05:00:00Z",
+        "operator_statement_id": "os_1",
+        "row": 1,
+    }
+    inserts = [sql for sql in runner.sql if "INSERT INTO operator_statement_compilations" in sql]
+    assert len(inserts) == 2
+    assert all("'20260830T051500Z'" in sql for sql in inserts)
+
+
+def test_compiling_twice_takes_nothing_the_first_run_already_took(tmp_path: Path):
+    runner = FakeD1Runner(
+        statements=[
+            _operator_statement("os_1", "2026-08-30T05:00:00Z", "location.district", "Wakiso")
+        ]
+    )
+    kwargs = {
+        "data_root": tmp_path / "data",
+        "runner": runner,
+        "app_dir": tmp_path / "app",
+        "compiled_at": "2026-08-30T05:15:01Z",
+    }
+
+    first = compile_operator_statements(regeneration_id="20260830T051500Z", **kwargs)
+    second = compile_operator_statements(regeneration_id="20260830T053000Z", **kwargs)
+
+    assert len(first) == 1
+    assert second == []
+    lines = (tmp_path / "data" / "canonical" / "operator_statements.jsonl").read_text().splitlines()
+    assert len(lines) == 1
+
+
+def test_compiling_nothing_writes_no_file_at_all(tmp_path: Path):
+    compiled = compile_operator_statements(
+        data_root=tmp_path / "data",
+        regeneration_id="20260830T051500Z",
+        runner=FakeD1Runner(),
+        app_dir=tmp_path / "app",
+    )
+
+    assert compiled == []
+    assert not (tmp_path / "data" / "canonical" / "operator_statements.jsonl").exists()

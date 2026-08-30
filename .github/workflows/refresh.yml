@@ -137,6 +137,7 @@ jobs:
               "sources/",
               "canonical/crosswalk.parquet",
               "canonical/labels.jsonl",
+              "canonical/operator_statements.jsonl",
               "canonical/businesses.parquet",
               "canonical/aliases.parquet",
               "datapackage.json",
@@ -250,6 +251,10 @@ jobs:
           pipeline/.venv/bin/python -m atlas_pipeline labels compile \
             --data-root data --regeneration "$regeneration_id" \
             | tee data/refresh/labels-compile.log
+          # What maintainers approved since the last run, as an input this regeneration reads.
+          pipeline/.venv/bin/python -m atlas_pipeline statements compile \
+            --data-root data --regeneration "$regeneration_id" \
+            | tee data/refresh/statements-compile.log
           pipeline/.venv/bin/python -m atlas_pipeline regenerate \
             --pack packs/ug --pack packs/ke --data-root data --id "$regeneration_id" \
             | tee data/refresh/regenerate.log

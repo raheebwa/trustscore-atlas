@@ -181,7 +181,8 @@ jobs:
             # never an empty directory the guard would read as a clean result.
             get_object "atlas-data/bundles/$id/canonical/businesses.parquet" \
               "$RUNNER_TEMP/bundles/$role/canonical/businesses.parquet"
-            for name in canonical/aliases.parquet canonical/labels.jsonl; do
+            for name in canonical/aliases.parquet canonical/labels.jsonl \
+              canonical/operator_statements.jsonl; do
               get_object "atlas-data/bundles/$id/$name" "$RUNNER_TEMP/bundles/$role/$name" || true
             done
           done

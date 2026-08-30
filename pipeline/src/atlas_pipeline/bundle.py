@@ -38,6 +38,17 @@ LABEL_SCHEMA = pa.schema(
         ("decision", pa.string()),
     ]
 )
+OPERATOR_STATEMENT_SCHEMA = pa.schema(
+    [
+        ("atlas_id", pa.string()),
+        ("field", pa.string()),
+        ("value", pa.string()),
+        ("claim_id", pa.string()),
+        ("source_ref", pa.string()),
+        ("asserted_at", pa.string()),
+        ("operator_statement_id", pa.string()),
+    ]
+)
 HASH_CHUNK_BYTES = 1024 * 1024
 
 
@@ -271,6 +282,12 @@ def publish_bundle(
     labels_parquet = canonical_dir / "labels.parquet"
     _write_labels(labels_jsonl_source, labels_parquet)
     parquet_schemas["labels"] = pq.read_schema(labels_parquet)
+    # What maintainers approved travels with the bundle: a restore brings it back, and a rollback
+    # can be compared against what the bundle it is rolling to actually carried.
+    operator_statements_source = data_root / "canonical" / "operator_statements.jsonl"
+    operator_statements = canonical_dir / "operator_statements.jsonl"
+    if operator_statements_source.is_file():
+        _copy(operator_statements_source, operator_statements)
     for name in CSV_TWINS:
         _write_csv(canonical_dir / f"{name}.parquet", canonical_dir / f"{name}.csv")
 
@@ -311,6 +328,15 @@ def publish_bundle(
                 path=labels_jsonl,
                 root=out,
                 schema=LABEL_SCHEMA,
+                licenses=canonical_licenses,
+            )
+        )
+    if operator_statements.is_file():
+        resources.append(
+            _resource(
+                path=operator_statements,
+                root=out,
+                schema=OPERATOR_STATEMENT_SCHEMA,
                 licenses=canonical_licenses,
             )
         )

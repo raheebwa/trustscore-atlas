@@ -60,7 +60,22 @@ def regenerated(tmp_path: Path) -> Path:
     )
     labels = tmp_path / "canonical" / "labels.jsonl"
     labels.write_text(json.dumps(LABEL) + "\n")
+    (tmp_path / "canonical" / "operator_statements.jsonl").write_text(
+        json.dumps(OPERATOR_STATEMENT) + "\n"
+    )
     return tmp_path
+
+
+OPERATOR_STATEMENT = {
+    "atlas_id": "atl_example",
+    "field": "status.operator_verified",
+    "value": "verified",
+    "claim_id": "claim_1",
+    "source_ref": "claim_1",
+    "asserted_at": "2026-08-30T05:00:00Z",
+    "operator_statement_id": "os_1",
+    "row": 1,
+}
 
 
 def _sha256(path: Path) -> str:
@@ -93,6 +108,7 @@ def test_publish_bundle_writes_data_and_self_describing_metadata(regenerated: Pa
         "canonical/crosswalk.parquet",
         "canonical/labels.csv",
         "canonical/labels.jsonl",
+        "canonical/operator_statements.jsonl",
         "canonical/labels.parquet",
         "canonical/linkage_candidates.csv",
         "canonical/linkage_candidates.parquet",
@@ -120,13 +136,18 @@ def test_publish_bundle_writes_data_and_self_describing_metadata(regenerated: Pa
     resources_by_path = {resource["path"]: resource for resource in datapackage["resources"]}
     assert "canonical/crosswalk.parquet" in resources_by_path
     assert "canonical/labels.jsonl" in resources_by_path
+    assert "canonical/operator_statements.jsonl" in resources_by_path
     for resource in datapackage["resources"]:
         resource_path = out / resource["path"]
         assert resource_path.exists()
         assert resource["bytes"] == resource_path.stat().st_size
         assert resource["hash"] == f"sha256:{_sha256(resource_path)}"
         if resource_path.suffix == ".jsonl":
-            assert [field["name"] for field in resource["schema"]["fields"]] == list(LABEL.keys())
+            # Each line file declares its own fields, and both of them are read by name.
+            declared = LABEL if resource["path"].endswith("labels.jsonl") else OPERATOR_STATEMENT
+            assert [field["name"] for field in resource["schema"]["fields"]] == [
+                key for key in declared if key != "row"
+            ]
         else:
             parquet_path = (
                 resource_path.with_suffix(".parquet")
@@ -147,6 +168,11 @@ def test_publish_bundle_writes_data_and_self_describing_metadata(regenerated: Pa
     ).read_bytes()
     assert (out / "canonical" / "labels.jsonl").read_bytes() == (
         regenerated / "canonical" / "labels.jsonl"
+    ).read_bytes()
+    # What maintainers approved travels with the bundle, so a restore brings it back and a
+    # rollback can be compared against it.
+    assert (out / "canonical" / "operator_statements.jsonl").read_bytes() == (
+        regenerated / "canonical" / "operator_statements.jsonl"
     ).read_bytes()
 
     manifest = json.loads((out / "manifest.json").read_text())

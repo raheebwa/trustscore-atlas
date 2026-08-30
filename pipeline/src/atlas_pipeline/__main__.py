@@ -20,6 +20,7 @@ from .bundle import publish_bundle
 from .churn_guard import check_churn, compare_bundles, report_json
 from .conformance import check_run
 from .maintainer_labels import compile_maintainer_labels
+from .operator_statements import compile_operator_statements
 from .refresh import (
     CADENCES,
     due_adapter_directories,
@@ -121,6 +122,13 @@ def main(argv: list[str] | None = None) -> int:
     compile_labels = label_commands.add_parser("compile", help="compile new maintainer labels")
     compile_labels.add_argument("--data-root", type=Path, default=Path("data"))
     compile_labels.add_argument("--regeneration", required=True)
+    statements = sub.add_parser("statements", help="manage canonical operator statements")
+    statement_commands = statements.add_subparsers(dest="statements_command", required=True)
+    compile_statements = statement_commands.add_parser(
+        "compile", help="compile approved operator statements"
+    )
+    compile_statements.add_argument("--data-root", type=Path, default=Path("data"))
+    compile_statements.add_argument("--regeneration", required=True)
     requests = sub.add_parser("requests", help="manage regeneration requests")
     request_commands = requests.add_subparsers(dest="requests_command", required=True)
     next_request = request_commands.add_parser("next", help="print the oldest pending request")
@@ -225,6 +233,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "labels":
         compiled = compile_maintainer_labels(
+            data_root=args.data_root,
+            regeneration_id=args.regeneration,
+        )
+        print(json.dumps({"compiled": len(compiled)}))
+        return 0
+    if args.command == "statements":
+        compiled = compile_operator_statements(
             data_root=args.data_root,
             regeneration_id=args.regeneration,
         )
