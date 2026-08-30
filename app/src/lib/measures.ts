@@ -74,3 +74,35 @@ export function coverageSegments(coverage: CoverageLengths): Segments {
 export function widthOf(percentage: number): string {
 	return `${Math.round(percentage * 100) / 100}%`;
 }
+
+export interface EvidenceLike {
+	predicate: string;
+	points: number;
+	reason?: string;
+}
+
+/**
+ * What a rubric actually rewarded, and what it did not, in the rubric's own words. A bar shows
+ * the proportion; this says which questions it is made of, which is what a reader needs before
+ * deciding whether the missing part matters to them.
+ *
+ * A predicate nobody has checked is marked as such: it is a gap in the evidence, not a finding
+ * against the business.
+ */
+export function scoreEarnedAndMissing(evidence: EvidenceLike[]): {
+	earned: string[];
+	missing: string[];
+} {
+	const words = (predicate: string) => predicate.replace(/[_-]+/g, ' ').trim();
+	const earned: string[] = [];
+	const missing: string[] = [];
+	for (const item of evidence) {
+		if (item.points > 0) {
+			earned.push(words(item.predicate));
+			continue;
+		}
+		const unchecked = (item.reason ?? '').includes('not checked');
+		missing.push(unchecked ? `${words(item.predicate)} (not checked)` : words(item.predicate));
+	}
+	return { earned, missing };
+}

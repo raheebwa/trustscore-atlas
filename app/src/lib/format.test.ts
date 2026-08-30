@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
 import {
+	displayFieldValue,
 	formatCoverageSentence,
 	formatScoreSentence,
 	formatWhen,
-	displayFieldValue
+	summariseIdentifiers
 } from './format';
 
 describe('formatCoverageSentence', () => {
@@ -148,5 +149,32 @@ describe('displayFieldValue', () => {
 
 	it('keeps text that merely looks like JSON rather than dropping it', () => {
 		expect(displayFieldValue('canonical_name', '{not json')).toBe('{not json');
+	});
+});
+
+describe('summariseIdentifiers with a synthetic scheme', () => {
+	it("counts a synthetic key without quoting it, since it is our key and not the register's", () => {
+		const summary = summariseIdentifiers([
+			{ scheme: 'ug:tin', value: '1000026854', source: 'ura.customs_agents' },
+			{
+				scheme: 'ug:kcca_licence',
+				value: '0cd87bcf4a43b58a',
+				source: 'kcca.businesses',
+				synthetic: true
+			}
+		]);
+
+		expect(summary).toContain('ug:tin 1000026854');
+		expect(summary.join(' ')).not.toContain('0cd87bcf4a43b58a');
+		expect(summary.some((line) => line.startsWith('ug:kcca_licence'))).toBe(true);
+	});
+
+	it('says how many listing keys there are when a record carries several', () => {
+		const summary = summariseIdentifiers([
+			{ scheme: 'ug:kcca_licence', value: 'a', source: 'kcca.businesses', synthetic: true },
+			{ scheme: 'ug:kcca_licence', value: 'b', source: 'kcca.businesses', synthetic: true }
+		]);
+
+		expect(summary).toEqual(['ug:kcca_licence x2']);
 	});
 });

@@ -1,5 +1,7 @@
 <script lang="ts">
 	// SPDX-License-Identifier: Apache-2.0
+	import { Popover } from 'bits-ui';
+	import Menu from '@lucide/svelte/icons/menu';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import Search from '@lucide/svelte/icons/search';
@@ -90,7 +92,12 @@
 			>
 		</form>
 
-		<nav aria-label="Sections" class="flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-sm">
+		<!--
+			Below md the sections collapse into one menu button. Four rows of navigation before the
+			page begins is a phone screen spent on chrome, and the two controls that scope the site,
+			search and country, are the ones that stay visible.
+		-->
+		<nav aria-label="Sections" class="hidden min-w-0 flex-wrap gap-x-4 gap-y-1 text-sm md:flex">
 			{#each NAV as item (item.href)}
 				<a
 					href={item.href}
@@ -101,6 +108,31 @@
 				</a>
 			{/each}
 		</nav>
+
+		<Popover.Root>
+			<Popover.Trigger
+				class="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm font-medium text-ink transition-colors duration-120 hover:border-border-strong md:hidden"
+			>
+				<Menu size={20} strokeWidth={1.5} aria-hidden="true" />
+				Sections
+			</Popover.Trigger>
+			<Popover.Portal>
+				<Popover.Content
+					sideOffset={6}
+					class="z-30 flex w-56 flex-col rounded-md border border-border-strong bg-surface p-1 shadow-lg"
+				>
+					{#each NAV as item (item.href)}
+						<a
+							href={item.href}
+							aria-current={isCurrent(item.href) ? 'page' : undefined}
+							class="rounded-sm px-3 py-2 text-base text-ink transition-colors duration-120 hover:bg-panel aria-[current=page]:bg-accent-tint"
+						>
+							{item.label}
+						</a>
+					{/each}
+				</Popover.Content>
+			</Popover.Portal>
+		</Popover.Root>
 
 		{#if packs.length > 1}
 			<form method="get" class="flex shrink-0 items-center gap-2">

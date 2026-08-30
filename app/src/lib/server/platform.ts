@@ -7,6 +7,7 @@ export interface AtlasDatabases {
 	scoresDb: D1Database;
 	coverageMetadata?: Promise<CoverageMetadata>;
 	locationPublishingCountries?: Promise<Set<string>>;
+	syntheticSchemes?: Promise<Set<string>>;
 }
 
 export interface CoverageLists {

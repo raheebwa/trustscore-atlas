@@ -1,7 +1,6 @@
 <script lang="ts">
 	// SPDX-License-Identifier: Apache-2.0
 	import type { Snippet } from 'svelte';
-	import type { ResolvedPathname } from '$app/types';
 
 	/**
 	 * An empty screen teaches the interface: it says what would fill it and gives two real values
@@ -16,8 +15,9 @@
 	}: {
 		title: string;
 		body: string;
-		// A resolved route, optionally carrying a query: an example search is only useful with one.
-		examples?: { label: string; href: ResolvedPathname | `${ResolvedPathname}?${string}` }[];
+		// An example link the caller resolved, usually carrying a query: an example search is only
+		// useful with one, and a query string is not part of a resolved pathname's type.
+		examples?: { label: string; href: string }[];
 		icon?: Snippet;
 		actions?: Snippet;
 	} = $props();

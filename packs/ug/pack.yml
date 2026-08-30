@@ -21,6 +21,7 @@ identifier_schemes:
     issuer: Kampala Capital City Authority
     pattern: "^[0-9a-f]{16}$"
     org_id_guide: null
+    synthetic: true   # our key for the published row, not a number KCCA issued: never shown as an identifier
     note: KCCA publishes no licence number; the key is a deterministic hash of the published row.
   ug:customs_licence:
     title: Uganda Revenue Authority customs agent licence number

@@ -6,6 +6,7 @@
 	import { resolve } from '$app/paths';
 	import { displayFieldValue, formatFieldLabel, formatWhen, identifierKey } from '$lib/format';
 	import { describeRegister } from '$lib/registers';
+	import { scoreEarnedAndMissing } from '$lib/measures';
 	import { INTENTS, intentById, missingFor, uncheckedFor } from '$lib/record-intents';
 	import { showToast } from '$lib/components/toast-state.svelte';
 	import Callout from '$lib/components/Callout.svelte';
@@ -52,6 +53,17 @@
 		{ key: 'asserted_at', label: 'Asserted' },
 		{ key: 'precedence', label: 'Rank', numeric: true, align: 'end' }
 	];
+
+	// A synthetic scheme is our key for a register row. It stays in the API and in the provenance
+	// table, where it is labelled, but a list headed "identifiers on file" may not offer it.
+	const shownIdentifiers = $derived(record.identifiers.filter((entry) => !entry.synthetic));
+	const listingKeys = $derived(record.identifiers.length - shownIdentifiers.length);
+
+	// One evaluation line for the panel: four bars from one regeneration were evaluated at one
+	// moment, and repeating it under each of them says nothing four times.
+	const evaluated = $derived(
+		formatWhen(record.scores[0]?.evaluation_as_of ?? null, { showTime: false })?.text
+	);
 
 	const rubricLabel = (rubric: string) =>
 		rubric.replace(/[_-]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
@@ -170,13 +182,16 @@
 			<h2 class="text-xl font-semibold text-ink">Scores</h2>
 			{#if record.scores.length > 0}
 				<div class="flex flex-col gap-4 rounded-md border border-border bg-surface p-4">
+					<p class="text-xs text-ink-muted">
+						{record.coverage_summary}.{evaluated ? ` Evaluated ${evaluated}.` : ''}
+					</p>
 					{#each record.scores as score (score.rubric + score.version)}
-						<div class="flex flex-col gap-2">
+						{@const parts = scoreEarnedAndMissing(score.evidence)}
+						<div class="flex flex-col gap-1">
 							<ScoreBar {score} />
 							<p class="text-xs text-ink-muted">
-								{score.coverage_summary}. Evaluated {formatWhen(score.evaluation_as_of, {
-									showTime: false
-								})?.text}.
+								{#if parts.earned.length > 0}Earned: {parts.earned.join(', ')}.{/if}
+								{#if parts.missing.length > 0}Missing: {parts.missing.join(', ')}.{/if}
 							</p>
 						</div>
 					{/each}
@@ -345,30 +360,48 @@
 			value. It does not rate, verify or endorse a business.
 		</Callout>
 		<div class="flex flex-col gap-2 rounded-md border border-border bg-surface p-4">
-			<p class="text-xs font-medium text-ink-muted">For this reader</p>
-			<p class="text-base text-ink">{intent.limit}</p>
+			<p class="text-xs font-medium text-ink-muted">
+				{intent.id === 'overview'
+					? 'Reading this for a reason?'
+					: `Reading this for ${intent.label.toLowerCase()}`}
+			</p>
+			<p class="text-base text-ink">
+				{#if intent.id === 'overview'}
+					Pick a view above and this panel says what that reader can and cannot conclude from the
+					record.
+				{:else}
+					{intent.limit}
+				{/if}
+			</p>
 		</div>
-		{#if record.identifiers.length > 0}
+		{#if shownIdentifiers.length > 0}
 			<div class="flex flex-col gap-2 rounded-md border border-border bg-surface p-4">
 				<p class="text-xs font-medium text-ink-muted">
 					Identifiers on file
-					<span class="tnum">({record.identifiers.length})</span>
+					<span class="tnum">({shownIdentifiers.length})</span>
 				</p>
 				<ul class="flex flex-col gap-1 font-mono text-2xs text-ink">
-					{#each record.identifiers.slice(0, 6) as identifier (identifierKey(identifier))}
+					{#each shownIdentifiers.slice(0, 6) as identifier (identifierKey(identifier))}
 						<li>
 							{identifier.scheme}: {identifier.value}
 							<span class="text-ink-muted">({describeRegister(identifier.source).short})</span>
 						</li>
 					{/each}
 				</ul>
-				{#if record.identifiers.length > 6}
+				{#if listingKeys > 0}
+					<p class="text-2xs text-ink-muted">
+						Plus <span class="tnum">{listingKeys}</span>
+						{listingKeys === 1 ? 'listing key' : 'listing keys'}, which are Atlas's keys for
+						register rows rather than numbers a register issued.
+					</p>
+				{/if}
+				{#if shownIdentifiers.length > 6}
 					<details>
 						<summary class="cursor-pointer text-xs text-ink-muted hover:text-ink">
-							Show the other {record.identifiers.length - 6}
+							Show the other {shownIdentifiers.length - 6}
 						</summary>
 						<ul class="mt-2 flex flex-col gap-1 font-mono text-2xs text-ink">
-							{#each record.identifiers.slice(6) as identifier (identifierKey(identifier))}
+							{#each shownIdentifiers.slice(6) as identifier (identifierKey(identifier))}
 								<li>
 									{identifier.scheme}: {identifier.value}
 									<span class="text-ink-muted">({describeRegister(identifier.source).short})</span>

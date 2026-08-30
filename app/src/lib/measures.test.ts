@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { coverageSegments, scoreSegments, widthOf } from './measures';
+import { coverageSegments, scoreEarnedAndMissing, scoreSegments, widthOf } from './measures';
 
 const sum = (segments: { earned: number; unearned: number; unknown: number }) =>
 	segments.earned + segments.unearned + segments.unknown;
@@ -71,5 +71,28 @@ describe('widthOf', () => {
 	it('rounds to a width a browser renders without a seam', () => {
 		expect(widthOf(33.333333)).toBe('33.33%');
 		expect(widthOf(100)).toBe('100%');
+	});
+});
+
+describe('scoreEarnedAndMissing', () => {
+	const evidence = [
+		{ predicate: 'tax_identity', points: 25 },
+		{ predicate: 'trading_licence', points: 25 },
+		{ predicate: 'sector_regulator', points: 20 },
+		{ predicate: 'legal_register', points: 0, reason: 'register not checked yet' },
+		{ predicate: 'procurement_history', points: 0, reason: 'checked, not found' }
+	];
+
+	it("names what earned and what is missing, in the rubric's own words", () => {
+		const line = scoreEarnedAndMissing(evidence);
+
+		expect(line.earned).toEqual(['tax identity', 'trading licence', 'sector regulator']);
+		expect(line.missing).toEqual(['legal register (not checked)', 'procurement history']);
+	});
+
+	it('says nothing rather than an empty list when a rubric earned everything', () => {
+		const line = scoreEarnedAndMissing([{ predicate: 'tax_identity', points: 25 }]);
+		expect(line.missing).toEqual([]);
+		expect(line.earned).toEqual(['tax identity']);
 	});
 });

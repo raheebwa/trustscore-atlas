@@ -34,6 +34,22 @@ function widths(container: HTMLElement): number[] {
 }
 
 describe('ScoreBar', () => {
+	it('reads as earned of checkable with the unknown mass beside it, never as a miss', () => {
+		render(ScoreBar, {
+			score: {
+				rubric: 'formality',
+				value: 70,
+				max: 100,
+				checkable: 70,
+				unknown: 30,
+				unknown_predicates: ['legal_register']
+			}
+		});
+
+		expect(screen.getByText('70')).toBeVisible();
+		expect(screen.getByText(/of 70 checkable/)).toHaveTextContent('30 unknown');
+	});
+
 	it('normalises on the rubric max, never on 100', () => {
 		const { container } = render(ScoreBar, {
 			score: {

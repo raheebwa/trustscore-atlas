@@ -1,9 +1,16 @@
 <script lang="ts">
 	// SPDX-License-Identifier: Apache-2.0
-	import { summariseIdentifiers, formatWhen } from '$lib/format';
 	import { resolve } from '$app/paths';
-	import FilterBar from '$lib/components/FilterBar.svelte';
+	import Search from '@lucide/svelte/icons/search';
+	import BarList from '$lib/components/BarList.svelte';
+	import Callout from '$lib/components/Callout.svelte';
+	import CoverageBar from '$lib/components/CoverageBar.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
+	import FilterBar from '$lib/components/FilterBar.svelte';
+	import IdentifierChips from '$lib/components/IdentifierChips.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import Pagination from '$lib/components/Pagination.svelte';
+	import ScoreBar from '$lib/components/ScoreBar.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -27,47 +34,66 @@
 
 	// Clearing filters keeps the query and the country: it is the same search, unfiltered.
 	const clearHref = $derived(resolve('/search'));
+	const searchHref = $derived(resolve('/search'));
+
+	// "N results for X in District Y": a reader should never have to work out why these results.
+	const countLine = $derived.by(() => {
+		if (!data.results) return null;
+		const total = data.results.total_count.toLocaleString();
+		const noun = data.results.total_count === 1 ? 'result' : 'results';
+		const where = filterValues.district ? ` in ${filterValues.district}` : '';
+		return `${total} ${noun} for "${data.query}"${where}`;
+	});
+
+	const nextHref = $derived(
+		data.results?.next_cursor
+			? `${searchHref}?q=${encodeURIComponent(data.query)}${
+					filterValues.district ? `&district=${encodeURIComponent(filterValues.district)}` : ''
+				}&cursor=${encodeURIComponent(data.results.next_cursor)}`
+			: null
+	);
+
+	const broaderHref = $derived(
+		`${searchHref}?q=${encodeURIComponent(data.query.split(/\s+/)[0] ?? data.query)}`
+	);
 </script>
 
 <svelte:head>
 	<title>TrustScore Atlas: Search</title>
 </svelte:head>
 
-<h1 class="text-2xl font-semibold text-stone-900">Search businesses</h1>
-
-<form method="get" class="mt-4 flex flex-col gap-3">
-	<label class="sr-only" for="q">Search businesses</label>
-	<input
-		id="q"
-		name="q"
-		type="search"
-		value={data.query}
-		placeholder="Search by business name"
-		class="w-full rounded-md border border-border bg-surface px-4 py-2 text-base text-ink transition-colors duration-120 placeholder:text-ink-muted hover:border-border-strong"
+<div class="flex flex-col gap-6">
+	<PageHeader
+		title="Search businesses"
+		lede="Search by name or identifier across every register Atlas has loaded, then narrow by the values the data actually carries."
 	/>
-	<input type="hidden" name="country" value={data.country} />
-	<button
-		type="submit"
-		class="h-10 w-fit rounded-md border border-accent bg-accent px-4 text-base font-medium text-ink transition-colors duration-120 hover:border-accent-ink hover:bg-accent-ink hover:text-canvas"
-	>
-		Search
-	</button>
-</form>
 
-{#if !data.districtCheck.known}
-	<div class="mt-4">
-		<EmptyState
-			title="No district by that name"
-			body={`The data carries no district or division called "${data.district || data.segmentFilters.district}". These are the closest published values.`}
-			examples={data.districtCheck.suggestions.map((value) => ({
-				label: value,
-				href: `${resolve('/search')}?q=${encodeURIComponent(data.query)}&district=${encodeURIComponent(value)}`
-			}))}
-		/>
-	</div>
-{/if}
+	<form method="get" class="flex flex-wrap gap-2">
+		<label class="sr-only" for="q">Search businesses</label>
+		<div class="relative min-w-64 grow">
+			<Search
+				size={20}
+				strokeWidth={1.5}
+				class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-muted"
+			/>
+			<input
+				id="q"
+				name="q"
+				type="search"
+				value={data.query}
+				placeholder="Search by business name"
+				class="h-10 w-full rounded-md border border-border bg-surface pr-3 pl-10 text-base text-ink transition-colors duration-120 placeholder:text-ink-muted hover:border-border-strong"
+			/>
+		</div>
+		<input type="hidden" name="country" value={data.country} />
+		<button
+			type="submit"
+			class="h-10 rounded-md border border-accent bg-accent px-4 text-base font-medium text-ink transition-colors duration-120 hover:border-accent-ink hover:bg-accent-ink hover:text-canvas"
+		>
+			Search
+		</button>
+	</form>
 
-<div class="mt-3 flex flex-col gap-3">
 	<FilterBar
 		fields={FILTER_FIELDS}
 		values={filterValues}
@@ -77,103 +103,136 @@
 		]}
 		{clearHref}
 	/>
-</div>
 
-{#if data.segment}
-	<p class="mt-6 text-sm text-stone-500">
-		{data.segment.total_count} matching business{data.segment.total_count === 1 ? '' : 'es'}
-	</p>
-	{#if data.segment.counts_by_division.length > 0}
-		<ul class="mt-3 flex flex-wrap gap-2 text-sm text-stone-600">
-			{#each data.segment.counts_by_division as row (row.division ?? 'unknown')}
-				<li class="rounded-full bg-stone-100 px-3 py-1">
-					{row.division ?? 'Unknown division'}: {row.count}
-				</li>
-			{/each}
-		</ul>
-	{/if}
-	{#if data.segment.top_candidates.length > 0}
-		<h2 class="mt-6 text-lg font-semibold text-stone-900">Highest Formality values</h2>
-		<ul class="mt-3 flex flex-col gap-3">
-			{#each data.segment.top_candidates as item (item.atlas_id)}
-				<li class="rounded-lg border border-stone-200 bg-white p-4">
-					<a
-						href={resolve('/b/[atlas_id]', { atlas_id: item.atlas_id })}
-						class="font-medium text-stone-900 hover:underline">{item.canonical_name}</a
-					>
-					<p class="mt-1 text-sm text-stone-600">
-						{item.location}
-						&middot; Formality {item.formality.value}/{item.formality.max}
-					</p>
-				</li>
-			{/each}
-		</ul>
-	{/if}
-{:else if data.query.length === 0}
-	<p class="mt-6 text-stone-500">Type a business name above to search the atlas.</p>
-{:else}
-	{#if data.query.length < data.minLength}
-		<p class="mt-4 text-sm text-amber-700">
-			Showing name matches only for short queries. Type {data.minLength} or more characters for full search
-			across names and identifiers.
-		</p>
-	{/if}
-
-	{#if data.results && data.results.results.length > 0}
-		<p class="mt-4 text-sm text-stone-500">
-			{data.results.total_count} result{data.results.total_count === 1 ? '' : 's'} for "{data.query}"
-		</p>
-		<ul class="mt-4 flex flex-col gap-3">
-			{#each data.results.results as item (item.atlas_id)}
-				<li class="rounded-lg border border-stone-200 bg-white p-4">
-					<div class="flex flex-wrap items-baseline justify-between gap-2">
+	{#if !data.districtCheck.known}
+		<EmptyState
+			title="No district by that name"
+			body={`The data carries no district or division called "${data.district || data.segmentFilters.district}". These are the closest published values.`}
+			examples={data.districtCheck.suggestions.map((value) => ({
+				label: value,
+				href: `${searchHref}?q=${encodeURIComponent(data.query)}&district=${encodeURIComponent(value)}`
+			}))}
+		/>
+	{:else if data.segment}
+		<!-- Filters without a query: the answer is the shape of the segment, not a list of names. -->
+		<section class="flex flex-col gap-4">
+			<p class="text-base text-ink">
+				<span class="font-display tnum text-2xl">{data.segment.total_count.toLocaleString()}</span>
+				businesses match these filters
+			</p>
+			{#if data.segment.counts_by_division.length > 0}
+				<div class="flex flex-col gap-2">
+					<h2 class="text-lg font-semibold text-ink">By division</h2>
+					<BarList
+						rows={data.segment.counts_by_division.map((row) => ({
+							key: row.division ?? 'Not published',
+							count: row.count
+						}))}
+						unit="divisions"
+					/>
+				</div>
+			{/if}
+			{#if data.segment.top_candidates.length > 0}
+				<div class="flex flex-col gap-2">
+					<h2 class="text-lg font-semibold text-ink">Highest Formality in this segment</h2>
+					<ul class="flex flex-col gap-2">
+						{#each data.segment.top_candidates as item (item.atlas_id)}
+							<li class="rounded-md border border-border bg-surface">
+								<a
+									href={resolve('/b/[atlas_id]', { atlas_id: item.atlas_id })}
+									class="flex flex-wrap items-baseline justify-between gap-2 p-3 transition-colors duration-120 hover:bg-panel"
+								>
+									<span class="text-base font-medium text-ink">{item.canonical_name}</span>
+									<span class="text-xs text-ink-muted">{item.location}</span>
+									<span class="tnum text-xs text-ink"
+										>Formality {item.formality.value}/{item.formality.max}</span
+									>
+								</a>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
+		</section>
+	{:else if data.query.length === 0}
+		<EmptyState
+			title="Search the register set"
+			body="Type a business name or a tax identifier. Every result carries the registers it was found in and what has not been checked."
+			examples={[
+				{ label: 'Roofings', href: `${searchHref}?q=Roofings` },
+				{ label: 'Tororo Cement', href: `${searchHref}?q=Tororo+Cement` }
+			]}
+		/>
+	{:else if data.results && data.results.results.length > 0}
+		<div class="flex flex-col gap-3">
+			<p class="text-xs text-ink-muted">{countLine}</p>
+			<!-- Rows, not cards: a list of businesses is a list, and the eye scans a column of names. -->
+			<ul
+				class="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border bg-surface"
+			>
+				{#each data.results.results as item (item.atlas_id)}
+					<li>
 						<a
 							href={resolve('/b/[atlas_id]', { atlas_id: item.atlas_id })}
-							class="text-lg font-medium text-stone-900 hover:underline"
+							class="flex flex-col gap-2 p-4 transition-colors duration-120 hover:bg-panel"
 						>
-							{item.canonical_name}
-						</a>
-						{#if item.formality}
-							<span class="max-w-xl rounded-lg bg-stone-100 px-3 py-1 text-sm text-stone-700">
-								<span class="font-medium">{item.formality.summary}</span>
-								<span class="block text-xs text-stone-500">{item.formality.coverage_summary}</span>
-								<span class="block text-xs text-stone-500"
-									>Evaluated {formatWhen(item.formality.evaluation_as_of, { showTime: false })
-										?.absolute}</span
-								>
+							<span class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+								<span class="text-lg font-medium text-ink">{item.canonical_name}</span>
+								<span class="text-xs text-ink-muted">
+									{item.location}
+									{#if item.sector_category}
+										&middot; {item.sector_category}{item.sector_nature
+											? `/${item.sector_nature}`
+											: ''}
+									{/if}
+								</span>
 							</span>
-						{/if}
-					</div>
-					<p class="mt-1 text-sm text-stone-600">
-						{item.location}
-						{#if item.sector_category}
-							&middot; {item.sector_category}{item.sector_nature ? `/${item.sector_nature}` : ''}
-						{/if}
-					</p>
-					{#if item.identifiers.length > 0}
-						<p class="mt-1 text-sm text-stone-500">
-							{summariseIdentifiers(item.identifiers).join(' \u00b7 ')}
-						</p>
-					{/if}
-					<p class="mt-1 text-xs text-stone-500">
-						Register coverage: {item.coverage_summary}.
-					</p>
-				</li>
-			{/each}
-		</ul>
-		{#if data.results.next_cursor}
-			<form method="get" action={resolve('/search')} class="mt-4">
-				<input type="hidden" name="q" value={data.query} />
-				<input type="hidden" name="district" value={data.district} />
-				<input type="hidden" name="cursor" value={data.results.next_cursor} />
-				<button
-					type="submit"
-					class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
-					>Next page</button
-				>
-			</form>
-		{/if}
+							<IdentifierChips identifiers={item.identifiers} />
+							<span class="grid gap-3 md:grid-cols-2">
+								<span class="block max-w-40">
+									<CoverageBar coverage={item.coverage} summary={item.coverage_summary} />
+								</span>
+								{#if item.formality}
+									<span class="block max-w-64">
+										<ScoreBar
+											score={{
+												rubric: item.formality.rubric,
+												value: item.formality.value,
+												max: item.formality.max,
+												checkable: item.formality.checkable,
+												unknown: item.formality.unknown,
+												unknown_predicates: item.formality.unknown_predicates
+											}}
+											compact
+										/>
+									</span>
+								{/if}
+							</span>
+						</a>
+					</li>
+				{/each}
+			</ul>
+			<Pagination
+				returned={data.results.results.length}
+				totalCount={data.results.total_count}
+				{nextHref}
+			/>
+		</div>
 	{:else}
-		<p class="mt-6 text-stone-500">No businesses found for "{data.query}".</p>
+		<div class="flex flex-col gap-3">
+			{#if data.query.length < data.minLength}
+				<Callout tone="warning" title="Short queries match names only">
+					Type {data.minLength} characters or more to search identifiers as well as names.
+				</Callout>
+			{/if}
+			<EmptyState
+				title={`Nothing matches "${data.query}"`}
+				body="No business in the loaded registers carries that name or identifier. Try a shorter name, or clear the filters."
+				examples={[
+					{ label: `Search for "${data.query.split(/\s+/)[0]}"`, href: broaderHref },
+					{ label: 'Clear all filters', href: clearHref }
+				]}
+			/>
+		</div>
 	{/if}
-{/if}
+</div>

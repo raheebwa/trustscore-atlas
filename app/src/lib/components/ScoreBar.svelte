@@ -34,7 +34,9 @@
 			<span class="text-xs font-medium text-ink-muted">{label}</span>
 			<span class="tnum text-base text-ink">
 				<span class="font-display text-lg">{score.value}</span>
-				<span class="text-ink-muted">of {score.max}</span>
+				<span class="text-ink-muted">
+					of {score.checkable} checkable{score.unknown > 0 ? ` · ${score.unknown} unknown` : ''}
+				</span>
 			</span>
 		</figcaption>
 	{/if}

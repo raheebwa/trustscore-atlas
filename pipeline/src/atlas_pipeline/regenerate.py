@@ -240,6 +240,10 @@ def _methodology_meta(rubrics_dir: Path, packs: list[Path]) -> str:
                     "title": spec.get("title"),
                     "issuer": spec.get("issuer"),
                     "issuer_unique": bool(spec.get("issuer_unique")),
+                    # A synthetic scheme is Atlas's own key for a register row, not a number the
+                    # register issued. Publishing it as an identifier invites someone to quote it
+                    # back to the register, which would mean nothing there.
+                    "synthetic": bool(spec.get("synthetic")),
                 }
                 for scheme, spec in (pack.get("identifier_schemes") or {}).items()
             },

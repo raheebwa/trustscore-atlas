@@ -12,6 +12,9 @@ export interface Identifier {
 	scheme: string;
 	value: string;
 	source: string;
+	/** True when the scheme is Atlas's key for a register row rather than a number the register
+	 * issued. The API keeps the value; no page offers it as an identifier. */
+	synthetic?: boolean;
 }
 
 export interface FormalitySummary {
@@ -102,6 +105,7 @@ export interface ScoreSummary {
 
 export interface SourceSummary {
 	slug: string;
+	country: string;
 	publisher: string;
 	title: string;
 	url: string;

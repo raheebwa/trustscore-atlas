@@ -543,6 +543,11 @@ def test_regenerate_publishes_the_methodology_it_scored_with(tmp_path: Path):
     assert payload["packs"]["UG"]["precedence"]["regulator_or_authority"] == 3
     assert "ug:tin" in payload["packs"]["UG"]["identifier_schemes"]
     assert payload["packs"]["UG"]["identifier_schemes"]["ug:tin"]["issuer_unique"] is True
+    # A key we invented for a register row is marked as such, so no surface offers it as an
+    # identifier someone could quote back to the register.
+    schemes = payload["packs"]["UG"]["identifier_schemes"]
+    assert schemes["ug:tin"]["synthetic"] is False
+    assert schemes["ug:kcca_licence"]["synthetic"] is True
     assert payload["packs"]["UG"]["bindings"]["formality"]["local_trading_licence"] == {
         "sources": ["kcca.businesses"]
     }

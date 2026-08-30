@@ -110,6 +110,7 @@ const businessFixture: BusinessRecordResponse = {
 	sources: [
 		{
 			slug: 'kcca.businesses',
+			country: 'UG',
 			publisher: 'KCCA',
 			title: 'KCCA Business Licences',
 			url: 'https://example.org/kcca',

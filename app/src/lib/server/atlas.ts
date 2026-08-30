@@ -277,6 +277,7 @@ function toIdentifier(row: IdentifierRow): Identifier {
 function toSourceSummary(row: SourceRowDb): SourceSummary {
 	return {
 		slug: row.slug,
+		country: row.country,
 		publisher: row.publisher,
 		title: row.title,
 		url: row.url,
@@ -490,6 +491,43 @@ export function getLocationPublishingCountries(databases: AtlasDatabases): Promi
 	return databases.locationPublishingCountries;
 }
 
+/**
+ * Identifier schemes the packs declare synthetic: Atlas's own key for a register row, published
+ * because the row has to be addressable, but never a number anyone can quote back to the
+ * register. The list comes from the published methodology, so a pack marking a new scheme takes
+ * effect at the next regeneration rather than at the next deploy.
+ */
+async function readSyntheticSchemes(db: D1Database): Promise<Set<string>> {
+	const published = await getMetaValue(db, 'methodology');
+	const synthetic = new Set<string>();
+	if (!published) return synthetic;
+	try {
+		const parsed = JSON.parse(published) as {
+			packs?: Record<string, { identifier_schemes?: Record<string, { synthetic?: unknown }> }>;
+		};
+		for (const pack of Object.values(parsed.packs ?? {})) {
+			for (const [scheme, spec] of Object.entries(pack.identifier_schemes ?? {})) {
+				if (spec?.synthetic === true) synthetic.add(scheme);
+			}
+		}
+	} catch {
+		// A malformed methodology row costs the marking, not the page.
+	}
+	return synthetic;
+}
+
+export function getSyntheticSchemes(databases: AtlasDatabases): Promise<Set<string>> {
+	databases.syntheticSchemes ??= readSyntheticSchemes(databases.db);
+	return databases.syntheticSchemes;
+}
+
+function markSynthetic(identifiers: Identifier[], synthetic: Set<string>): Identifier[] {
+	if (synthetic.size === 0) return identifiers;
+	return identifiers.map((identifier) =>
+		synthetic.has(identifier.scheme) ? { ...identifier, synthetic: true } : identifier
+	);
+}
+
 export async function getLiveRegenerationId(db: D1Database): Promise<string | null> {
 	return getMetaValue(db, LIVE_REGENERATION_KEY);
 }
@@ -583,7 +621,8 @@ function toSearchResultItem(
 	identifiers: Identifier[],
 	formality: FormalitySummary | null,
 	coverageMetadata: CoverageMetadata,
-	locationPublishingCountries: Set<string>
+	locationPublishingCountries: Set<string>,
+	syntheticSchemes: Set<string>
 ): SearchResultItem {
 	const lists = coverageFor(coverageMetadata, row.country);
 	const coverage = composeCoverage(row.coverage, lists.applicable, lists.checked);
@@ -598,7 +637,7 @@ function toSearchResultItem(
 		}),
 		sector_category: row.sector_category,
 		sector_nature: row.sector_nature,
-		identifiers,
+		identifiers: markSynthetic(identifiers, syntheticSchemes),
 		formality,
 		coverage,
 		coverage_summary: formatCoverageSentence(coverage)
@@ -746,20 +785,27 @@ export async function searchBusinesses(
 	const hasMore = rows.length > limit;
 	const pageRows = rows.slice(0, limit);
 	const atlasIds = pageRows.map((row) => row.atlas_id);
-	const [identifierMap, formalityMap, coverageMetadata, locationPublishingCountries] =
-		await Promise.all([
-			fetchIdentifiersFor(db, atlasIds),
-			fetchFormalityFor(scoresDb, pageRows, liveRegenerationId),
-			getCoverageMetadata(databases),
-			getLocationPublishingCountries(databases)
-		]);
+	const [
+		identifierMap,
+		formalityMap,
+		coverageMetadata,
+		locationPublishingCountries,
+		syntheticSchemes
+	] = await Promise.all([
+		fetchIdentifiersFor(db, atlasIds),
+		fetchFormalityFor(scoresDb, pageRows, liveRegenerationId),
+		getCoverageMetadata(databases),
+		getLocationPublishingCountries(databases),
+		getSyntheticSchemes(databases)
+	]);
 	const items = pageRows.map((row) =>
 		toSearchResultItem(
 			row,
 			identifierMap.get(row.atlas_id) ?? [],
 			formalityMap.get(row.atlas_id) ?? null,
 			coverageMetadata,
-			locationPublishingCountries
+			locationPublishingCountries,
+			syntheticSchemes
 		)
 	);
 
@@ -868,13 +914,19 @@ async function getBusinessWithStatements(
 	if (!businessRow) return null;
 
 	const liveRegenerationId = await getConsistentLiveRegenerationId(databases);
-	const [identifierMap, statements, coverageMetadata, locationPublishingCountries] =
-		await Promise.all([
-			fetchIdentifiersFor(db, [atlasId]),
-			fetchStatementsFor(statementsDb, atlasId),
-			getCoverageMetadata(databases),
-			getLocationPublishingCountries(databases)
-		]);
+	const [
+		identifierMap,
+		statements,
+		coverageMetadata,
+		locationPublishingCountries,
+		syntheticSchemes
+	] = await Promise.all([
+		fetchIdentifiersFor(db, [atlasId]),
+		fetchStatementsFor(statementsDb, atlasId),
+		getCoverageMetadata(databases),
+		getLocationPublishingCountries(databases),
+		getSyntheticSchemes(databases)
+	]);
 	const scores = await fetchScoresFor(scoresDb, atlasId, statements, liveRegenerationId);
 
 	const sourceSlugs = Array.from(new Set(statements.map((s) => s.source)));
@@ -906,7 +958,7 @@ async function getBusinessWithStatements(
 			}),
 			first_seen: businessRow.first_seen,
 			last_seen: businessRow.last_seen,
-			identifiers: identifierMap.get(atlasId) ?? [],
+			identifiers: markSynthetic(identifierMap.get(atlasId) ?? [], syntheticSchemes),
 			coverage,
 			coverage_summary: formatCoverageSentence(coverage),
 			scores,

@@ -76,19 +76,25 @@ function schemeRank(scheme: string): number {
  * of the same scheme and value from two registers count once. The full list stays on the record.
  */
 export function summariseIdentifiers(
-	identifiers: { scheme: string; value: string; source?: string | null }[]
+	identifiers: { scheme: string; value: string; source?: string | null; synthetic?: boolean }[]
 ): string[] {
 	const values = new Map<string, Set<string>>();
+	const synthetic = new Set<string>();
 	for (const identifier of identifiers) {
 		const set = values.get(identifier.scheme) ?? new Set<string>();
 		set.add(identifier.value);
 		values.set(identifier.scheme, set);
+		if (identifier.synthetic) synthetic.add(identifier.scheme);
 	}
 	return [...values.entries()]
 		.sort((a, b) => schemeRank(a[0]) - schemeRank(b[0]) || a[0].localeCompare(b[0]))
-		.map(([scheme, set]) =>
-			set.size === 1 ? `${scheme} ${[...set][0]}` : `${scheme} x${set.size}`
-		);
+		.map(([scheme, set]) => {
+			// A synthetic scheme is Atlas's key for a register row, not a number the register
+			// issued. Quoting it would invite someone to take it back to the register, where it
+			// means nothing, so the count stands in for the value.
+			if (synthetic.has(scheme)) return `${scheme} x${set.size}`;
+			return set.size === 1 ? `${scheme} ${[...set][0]}` : `${scheme} x${set.size}`;
+		});
 }
 
 /**
