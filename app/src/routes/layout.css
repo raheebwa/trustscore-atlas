@@ -1,1 +1,190 @@
 @import 'tailwindcss';
+
+/**
+ * Atlas design tokens. Values come from the TrustScore brand tokens; the names are Atlas's own
+ * (canvas, surface, panel) because this product layers three neutrals rather than two.
+ *
+ * Colour strategy is restrained: ink and bone carry the page, gold appears only as a fill on the
+ * primary action, the current selection and key numerals. Gold is never text on bone, which is
+ * why accent and accent-ink are separate tokens; scripts/contrast.mjs enforces that.
+ *
+ * Atlas scores never use the TrustScore credit tiers: a tier is a credit verdict and these scores
+ * are not one. Score bars use the neutral ink ramp below; tier colours appear only on register
+ * freshness.
+ */
+@theme {
+	--color-ink: #0b1e3f;
+	/* Two steps darker than the brand's muted ink: #5c6a7a reads at 3.9:1 on panel-2, under the
+	   4.5:1 floor, and captions sit on panels all over this product. */
+	--color-ink-muted: #505c6b;
+	/* Non-text only: rules, hatch, disabled marks. Below 4.5:1 by design. */
+	--color-ink-faint: rgba(11, 30, 63, 0.45);
+	--color-canvas: #f7f1e5;
+	--color-surface: #fcf8f0;
+	--color-panel: #ede5d2;
+	--color-panel-2: #e3d8bf;
+	--color-border: rgba(11, 30, 63, 0.12);
+	--color-border-strong: rgba(11, 30, 63, 0.24);
+	/* Fills only: primary button, selection, numeral underrule. */
+	--color-accent: #d4933f;
+	/* Gold as text, and warning ink. Much deeper than the brief's #a86f26, which measures 3.8:1
+	   on canvas rather than the 4.7:1 it claimed. At 4.5:1 readable gold is a bronze; it clears
+	   the floor on canvas, surface, panel, accent-tint and the warning ground. It is the one
+	   token that may not sit on panel-2, which is why the legend gutter takes muted ink. */
+	--color-accent-ink: #87571b;
+	--color-accent-tint: #f8ecd8;
+
+	--color-error-ink: #8b3a2f;
+	--color-error-surface: #f7e7e2;
+	--color-error-border: #c4623e;
+	--color-warning-surface: #faf0de;
+	--color-warning-border: rgba(212, 147, 63, 0.5);
+	--color-success-ink: #3e6b5b;
+	--color-success-fill: #5a8c7a;
+	--color-success-surface: #e7efea;
+
+	/* Register freshness is the one place tier colours belong. */
+	--color-fresh: #5a8c7a;
+	--color-stale: #87571b;
+	--color-failed: #c4623e;
+
+	/* Score mass: earned is solid ink, checkable but not earned is a wash, unknown is hatched. */
+	--color-score-earned: #0b1e3f;
+	--color-score-unearned: rgba(11, 30, 63, 0.13);
+
+	--font-sans:
+		'InterVariable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-sans--font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+	--font-display: 'Newsreader', 'Source Serif 4', Georgia, serif;
+	--font-mono: 'JetBrainsMonoVariable', 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+	/* Fixed scale, ratio 1.2. Nothing else is allowed. */
+	--text-2xs: 0.6875rem;
+	--text-2xs--line-height: 1rem;
+	--text-xs: 0.8125rem;
+	--text-xs--line-height: 1.15rem;
+	--text-base: 1rem;
+	--text-base--line-height: 1.5rem;
+	--text-lg: 1.1875rem;
+	--text-lg--line-height: 1.6rem;
+	--text-xl: 1.4375rem;
+	--text-xl--line-height: 1.85rem;
+	--text-2xl: 1.75rem;
+	--text-2xl--line-height: 2.1rem;
+	--text-3xl: 2.0625rem;
+	--text-3xl--line-height: 2.4rem;
+	--text-4xl: 2.5rem;
+	--text-4xl--line-height: 2.8rem;
+
+	/* Data pages run wide, prose runs narrow. */
+	--container-data: 1200px;
+	--container-reading: 72ch;
+
+	--ease-enter: cubic-bezier(0.2, 0, 0, 1);
+	--ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+@layer base {
+	html {
+		background-color: var(--color-canvas);
+	}
+
+	body {
+		background-color: var(--color-canvas);
+		color: var(--color-ink);
+		font-family: var(--font-sans);
+		font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+		-webkit-font-smoothing: antialiased;
+	}
+
+	/* Long register names and business names must never overflow their heading. */
+	h1,
+	h2,
+	h3 {
+		text-wrap: balance;
+		min-width: 0;
+	}
+
+	/* One ring everywhere, never removed. Gold reads as a ring on every surface in the palette. */
+	:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+		border-radius: 4px;
+	}
+
+	::selection {
+		background-color: var(--color-accent-tint);
+		color: var(--color-ink);
+	}
+
+	[disabled],
+	[aria-disabled='true'] {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+}
+
+/* Every score, count, percentage, byte size and date carries this. */
+@utility tnum {
+	font-feature-settings:
+		'tnum' 1,
+		'lnum' 1;
+	font-variant-numeric: tabular-nums lining-nums;
+}
+
+/**
+ * Unknown mass on a score or coverage bar. Hatching says "not checked" without inventing a
+ * colour that would read as a value, and it survives greyscale printing of the paper file.
+ */
+@utility hatch {
+	background-image: repeating-linear-gradient(
+		45deg,
+		var(--color-ink-faint) 0,
+		var(--color-ink-faint) 1px,
+		transparent 1px,
+		transparent 6px
+	);
+}
+
+/* Loading is always a skeleton, never a spinner. */
+@utility skeleton {
+	background-color: var(--color-panel);
+	border-radius: 3px;
+	animation: atlas-pulse 1.4s ease-in-out infinite;
+}
+
+/* The gold underrule beneath a stat numeral: a baseline, not a border. */
+@utility underrule {
+	box-shadow: inset 0 -3px 0 0 var(--color-accent);
+}
+
+@keyframes atlas-pulse {
+	0%,
+	100% {
+		opacity: 0.55;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+/**
+ * Motion is colour and size only, never movement, and nothing runs longer than 240 ms. Under
+ * reduced motion every transition collapses and bars paint at their final width, so a static
+ * screenshot of the two modes is identical at rest.
+ */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+
+	.skeleton {
+		animation: none;
+		opacity: 0.8;
+	}
+}
