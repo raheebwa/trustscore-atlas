@@ -2,6 +2,7 @@
 import { error } from '@sveltejs/kit';
 import { hashClaimConfirmationToken } from '$lib/claims';
 import { getDatabase } from '$lib/server/platform';
+import { publishedMailDomains } from '$lib/server/claim-verification';
 import type { PageServerLoad } from './$types';
 
 /** Kept beside the verifier's own limit; the panel counts down from it. */
@@ -35,6 +36,7 @@ interface ClaimConfirmationRow {
  */
 async function loadVerification(
 	db: D1Database,
+	platform: App.Platform | undefined,
 	atlasId: string,
 	claimId: string | null,
 	token: string | null
@@ -94,6 +96,9 @@ async function loadVerification(
 	const base = {
 		claim_id: claim.claim_id,
 		documents: documents.results ?? [],
+		// A mailed link is only ever allowed at a domain a register published for this record, so
+		// the page offers it only where there is one, and names it rather than inviting a guess.
+		mail_domains: await publishedMailDomains(getDatabase(platform, 'statements'), atlasId),
 		token,
 		verified_at: claim.verified_at,
 		verified_domain: claim.verified_domain,
@@ -186,6 +191,6 @@ export const load: PageServerLoad = async ({ platform, params, url }) => {
 		business,
 		confirmation: null,
 		confirmationComplete: url.searchParams.get('confirmation') === 'complete',
-		verification: await loadVerification(db, params.atlas_id, claimId, token)
+		verification: await loadVerification(db, platform, params.atlas_id, claimId, token)
 	};
 };

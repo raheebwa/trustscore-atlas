@@ -146,6 +146,7 @@ async function loadVerificationLink(
 		claim?: Partial<StoredClaim>;
 		challenge?: Partial<StoredChallenge> | null;
 		documents?: { evidence_id: string; content_type: string; uploaded_at: string }[];
+		published?: string[];
 		token?: string;
 		pathAtlasId?: string;
 	} = {}
@@ -159,11 +160,13 @@ async function loadVerificationLink(
 		prepare: (sql: string) => ({
 			bind: (...bindings: unknown[]) => ({
 				all: async () => ({
-					results: sql.includes('FROM claim_evidence')
-						? bindings[0] === claim.claim_id
-							? (options.documents ?? [])
+					results: sql.includes('FROM statements')
+						? (options.published ?? []).map((value) => ({ value }))
+						: sql.includes('FROM claim_evidence')
+							? bindings[0] === claim.claim_id
+								? (options.documents ?? [])
+								: []
 							: []
-						: []
 				}),
 				first: async () => {
 					if (sql.includes('FROM claim_challenges')) {
@@ -195,7 +198,8 @@ async function loadVerificationLink(
 	});
 	const atlasId = options.pathAtlasId ?? claim.atlas_id;
 	const data = await load({
-		platform: { env: { DB: db } },
+		// The page reads the record's published websites, which live in the statements database.
+		platform: { env: { DB: db, DB_STATEMENTS: db, DB_SCORES: db } },
 		params: { atlas_id: atlasId },
 		url: new URL(`https://atlas.example.invalid/claim/${atlasId}?${query.toString()}`)
 	} as never);
@@ -300,5 +304,19 @@ describe('claim verification panel loader', () => {
 
 		expect(data.verification?.documents).toHaveLength(1);
 		expect(data.verification?.documents[0]).toMatchObject({ content_type: 'application/pdf' });
+	});
+
+	// A mailed link may only go to a domain the record itself publishes, so the page is told which
+	// those are rather than inviting a claimant to guess at one.
+	it('names the domains a register published for the record', async () => {
+		const data = await loadVerificationLink({ published: ['https://www.Example.co.ug/about'] });
+
+		expect(data.verification?.mail_domains).toEqual(['example.co.ug']);
+	});
+
+	it('names none when no register published a website for it', async () => {
+		const data = await loadVerificationLink();
+
+		expect(data.verification?.mail_domains).toEqual([]);
 	});
 });

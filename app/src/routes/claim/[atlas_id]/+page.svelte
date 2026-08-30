@@ -16,6 +16,9 @@
 	// another of the five attempts on the same question.
 	let checking = $state(false);
 
+	/** The domains a register published for this record, as a reader would say them. */
+	const mailDomains = $derived((data.verification?.mail_domains ?? []).join(' or '));
+
 	/** What a reader calls the file, rather than the media type it is stored as. */
 	function documentLabel(contentType: string): string {
 		if (contentType === 'application/pdf') return 'PDF document';
@@ -183,6 +186,45 @@
 						Claim the business again with your website address, and Atlas will give you a string to
 						publish.
 					</Callout>
+				{/if}
+
+				{#if data.verification.state !== 'verified' && data.verification.state !== 'closed' && data.verification.mail_domains.length > 0}
+					<div class="flex flex-col gap-3 border-t border-border pt-3">
+						<h3 class="text-base font-semibold text-ink">
+							Or confirm from an address at {mailDomains}
+						</h3>
+						<p class="text-xs text-ink-muted">
+							{data.verification.mail_domains.length > 1
+								? 'These are the websites'
+								: 'This is the website'}
+							a register published for this business, so Atlas will mail a confirmation link to an address
+							there and nowhere else. The link lasts 30 minutes and works once.
+						</p>
+						<form
+							method="post"
+							action={`${resolve('/api/v1/claims/[claim_id]/verify/email', { claim_id: data.verification.claim_id })}`}
+							class="flex flex-col gap-2"
+						>
+							<input type="hidden" name="token" value={data.verification.token} />
+							<input type="hidden" name="from" value="page" />
+							<label class="flex max-w-md flex-col gap-1">
+								<span class="text-xs font-medium text-ink-muted">Your address at that domain</span>
+								<input
+									name="email"
+									type="email"
+									required
+									placeholder="you@{data.verification.mail_domains[0]}"
+									class="h-10 rounded-md border border-border bg-surface px-3 text-base text-ink transition-colors duration-120 hover:border-border-strong"
+								/>
+							</label>
+							<button
+								type="submit"
+								class="h-10 w-fit rounded-md border border-border-strong bg-panel-2 px-4 text-base font-medium text-ink transition-colors duration-120 hover:border-accent-ink hover:bg-accent"
+							>
+								Mail me a link
+							</button>
+						</form>
+					</div>
 				{/if}
 			</section>
 		{/if}

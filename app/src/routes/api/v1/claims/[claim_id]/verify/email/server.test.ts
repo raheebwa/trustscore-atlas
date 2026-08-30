@@ -209,4 +209,25 @@ describe('email verification request', () => {
 		expect(await response.json()).toEqual({ status: 'verified' });
 		expect(mails).toHaveLength(0);
 	});
+
+	// A claimant asking from the claim page is answered on that page, and the answer is the same
+	// whether or not the address was one the record publishes.
+	it.each([
+		['a domain the record publishes', 'owner@example.co.ug'],
+		['a domain it does not', 'owner@somewhere-else.example']
+	])('sends a page claimant back to their own claim for %s', async (_label, email) => {
+		const { response } = await call(
+			{ token: TOKEN, email, from: 'page' },
+			{ published: ['https://example.co.ug'] }
+		);
+
+		expect(response.status).toBe(303);
+		const location = new URL(
+			response.headers.get('location') ?? '',
+			'https://atlas.example.invalid'
+		);
+		expect(location.pathname).toBe('/claim/atlas-example-1');
+		expect(location.searchParams.get('claim')).toBe('claim_1');
+		expect(location.searchParams.get('token')).toBe(TOKEN);
+	});
 });

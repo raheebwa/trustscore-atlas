@@ -11,13 +11,18 @@
  * belongs to the caller: a claim nobody confirmed, a window that has closed, a claim already
  * verified.
  *
- * No page posts here. The claim page offers the website method, because a mailed link is only
- * ever allowed for a domain a register already published for the record, and no pack publishes
- * one yet. This is the door for the API and for an agent holding a claim's own link.
+ * A page claimant asks from the claim page, when their record is one a register published a
+ * website for; an API caller or an agent asks with the claim's own token. Both get the same word.
  */
 
 import { hashClaimConfirmationToken } from '$lib/claims';
-import { apiBadRequest, apiNotFound, apiOptions, apiServerError } from '$lib/server/api';
+import {
+	apiBadRequest,
+	apiNotFound,
+	apiOptions,
+	apiServerError,
+	claimPageRedirect
+} from '$lib/server/api';
 import { claimVerificationMail } from '$lib/server/claim-mail';
 import { emailDomainAllowed, prepareEmailChallenge } from '$lib/server/claim-verification';
 import { resendMailer } from '$lib/server/mail';
@@ -32,6 +37,8 @@ const DAY_SECONDS = 24 * 60 * 60;
 interface EmailInput {
 	token?: unknown;
 	email?: unknown;
+	/** Set by the claim page, so a claimant is sent back to their claim rather than to a body. */
+	from?: unknown;
 }
 
 async function readInput(request: Request): Promise<EmailInput> {
@@ -40,7 +47,7 @@ async function readInput(request: Request): Promise<EmailInput> {
 		return typeof value === 'object' && value !== null ? (value as EmailInput) : {};
 	}
 	const form = await request.formData();
-	return { token: form.get('token'), email: form.get('email') };
+	return { token: form.get('token'), email: form.get('email'), from: form.get('from') };
 }
 
 function valid(value: unknown, maxLength: number): value is string {
@@ -57,8 +64,10 @@ function canonicalOrigin(platform: App.Platform | undefined, request: Request): 
 	return new URL(request.url).origin;
 }
 
-const accepted = () =>
-	json({ status: 'accepted' }, { headers: { 'Access-Control-Allow-Origin': '*' } });
+function accepted(page: { atlasId: string; claimId: string; token: string } | null): Response {
+	if (page) return claimPageRedirect(page.atlasId, page.claimId, page.token);
+	return json({ status: 'accepted' }, { headers: { 'Access-Control-Allow-Origin': '*' } });
+}
 
 export const POST: RequestHandler = async ({ fetch, params, platform, request }) => {
 	try {
@@ -95,7 +104,15 @@ export const POST: RequestHandler = async ({ fetch, params, platform, request })
 		if (!Number.isFinite(closesAt) || closesAt <= Date.now()) {
 			return json({ error: 'claim_window_closed' }, { status: 410 });
 		}
+		// From here the claimant is answered on their own page when they asked from one, and the
+		// answer is the same word whatever happened to the address.
+		const page =
+			input.from === 'page'
+				? { atlasId: claim.atlas_id, claimId: claim.claim_id, token: input.token.trim() }
+				: null;
+
 		if (claim.verified_at) {
+			if (page) return claimPageRedirect(page.atlasId, page.claimId, page.token);
 			return json({ status: 'verified' }, { headers: { 'Access-Control-Allow-Origin': '*' } });
 		}
 
@@ -106,7 +123,7 @@ export const POST: RequestHandler = async ({ fetch, params, platform, request })
 		const cache = platform?.env?.CACHE;
 		const key = `claim-mail:${claim.claim_id}`;
 		const asked = Number((await cache?.get(key)) ?? 0);
-		if (!Number.isFinite(asked) || asked >= MAX_SENDS) return accepted();
+		if (!Number.isFinite(asked) || asked >= MAX_SENDS) return accepted(page);
 		await cache?.put(key, String(asked + 1), { expirationTtl: DAY_SECONDS });
 
 		const mailer = resendMailer({
@@ -114,19 +131,19 @@ export const POST: RequestHandler = async ({ fetch, params, platform, request })
 			from: envValue(platform, 'MAIL_FROM'),
 			fetchImpl: fetch
 		});
-		if (!mailer) return accepted();
+		if (!mailer) return accepted(page);
 
 		const email = input.email.trim();
 		const domain = email.split('@')[1]?.toLowerCase() ?? '';
 		if (!domain || !(await emailDomainAllowed(databases.statementsDb, claim.atlas_id, domain))) {
-			return accepted();
+			return accepted(page);
 		}
 
 		let challenge;
 		try {
 			challenge = await prepareEmailChallenge(databases.db, claim.claim_id, email);
 		} catch {
-			return accepted();
+			return accepted(page);
 		}
 		await databases.db.batch([challenge.statement]);
 
@@ -139,7 +156,7 @@ export const POST: RequestHandler = async ({ fetch, params, platform, request })
 			)
 		);
 
-		return accepted();
+		return accepted(page);
 	} catch (err) {
 		return apiServerError(err);
 	}

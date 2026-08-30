@@ -206,11 +206,25 @@ export async function emailDomainAllowed(
 ): Promise<boolean> {
 	const wanted = bareHost(domain);
 	if (!wanted) return false;
+	return (await publishedMailDomains(statementsDb, atlasId)).includes(wanted);
+}
+
+/**
+ * The domains a register published as this record's website, which are the only domains a mailed
+ * link may go to. Named on the page rather than left to a claimant to guess at.
+ */
+export async function publishedMailDomains(
+	statementsDb: D1Database,
+	atlasId: string
+): Promise<string[]> {
 	const published = await statementsDb
 		.prepare("SELECT value FROM statements WHERE atlas_id = ? AND field = 'website'")
 		.bind(atlasId)
 		.all<{ value: string }>();
-	return (published.results ?? []).some((row) => bareHost(row.value) === wanted);
+	const domains = (published.results ?? [])
+		.map((row) => bareHost(row.value))
+		.filter((host): host is string => Boolean(host));
+	return [...new Set(domains)];
 }
 
 /**
