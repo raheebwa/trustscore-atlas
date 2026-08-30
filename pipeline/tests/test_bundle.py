@@ -89,7 +89,9 @@ def test_publish_bundle_writes_data_and_self_describing_metadata(regenerated: Pa
         "canonical/aliases.parquet",
         "canonical/businesses.csv",
         "canonical/businesses.parquet",
+        "canonical/crosswalk.parquet",
         "canonical/labels.csv",
+        "canonical/labels.jsonl",
         "canonical/labels.parquet",
         "canonical/linkage_candidates.csv",
         "canonical/linkage_candidates.parquet",
@@ -114,25 +116,37 @@ def test_publish_bundle_writes_data_and_self_describing_metadata(regenerated: Pa
     assert datapackage["sources"] == [
         {"title": "Licensed businesses", "path": "https://kcca.go.ug/businesses"}
     ]
+    resources_by_path = {resource["path"]: resource for resource in datapackage["resources"]}
+    assert "canonical/crosswalk.parquet" in resources_by_path
+    assert "canonical/labels.jsonl" in resources_by_path
     for resource in datapackage["resources"]:
         resource_path = out / resource["path"]
         assert resource_path.exists()
         assert resource["bytes"] == resource_path.stat().st_size
         assert resource["hash"] == f"sha256:{_sha256(resource_path)}"
-        parquet_path = (
-            resource_path.with_suffix(".parquet")
-            if resource_path.suffix == ".csv"
-            else resource_path
-        )
-        assert [field["name"] for field in resource["schema"]["fields"]] == list(
-            pq.read_schema(parquet_path).names
-        )
+        if resource_path.suffix == ".jsonl":
+            assert [field["name"] for field in resource["schema"]["fields"]] == list(LABEL.keys())
+        else:
+            parquet_path = (
+                resource_path.with_suffix(".parquet")
+                if resource_path.suffix == ".csv"
+                else resource_path
+            )
+            assert [field["name"] for field in resource["schema"]["fields"]] == list(
+                pq.read_schema(parquet_path).names
+            )
 
     businesses_csv = pacsv.read_csv(out / "canonical" / "businesses.csv")
     businesses_parquet = pq.read_table(out / "canonical" / "businesses.parquet")
     assert businesses_csv.num_rows == businesses_parquet.num_rows
     assert "Kampala Capital City Authority" in (out / "SOURCES.md").read_text()
     assert "public-record" in (out / "SOURCES.md").read_text()
+    assert (out / "canonical" / "crosswalk.parquet").read_bytes() == (
+        regenerated / "canonical" / "crosswalk.parquet"
+    ).read_bytes()
+    assert (out / "canonical" / "labels.jsonl").read_bytes() == (
+        regenerated / "canonical" / "labels.jsonl"
+    ).read_bytes()
 
     manifest = json.loads((out / "manifest.json").read_text())
     assert manifest["regeneration_id"] == REGENERATION_ID

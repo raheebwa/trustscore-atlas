@@ -159,9 +159,10 @@ def _resource(
 ) -> dict:
     metadata = _file_metadata(path, root)
     suffix = path.suffix.removeprefix(".")
-    mediatype = (
-        "application/vnd.apache.parquet" if suffix == "parquet" else "text/csv; charset=utf-8"
-    )
+    mediatype = {
+        "parquet": "application/vnd.apache.parquet",
+        "jsonl": "application/x-ndjson",
+    }.get(suffix, "text/csv; charset=utf-8")
     resource = {
         "name": metadata["path"].replace("/", "-").replace("_", "-").replace(".", "-"),
         "path": metadata["path"],
@@ -259,8 +260,15 @@ def publish_bundle(
         destination = canonical_dir / f"{name}.parquet"
         _copy(regeneration_dir / source_name, destination)
         parquet_schemas[name] = pq.read_schema(destination)
+    crosswalk = canonical_dir / "crosswalk.parquet"
+    _copy(data_root / "canonical" / "crosswalk.parquet", crosswalk)
+    parquet_schemas["crosswalk"] = pq.read_schema(crosswalk)
+    labels_jsonl_source = data_root / "canonical" / "labels.jsonl"
+    labels_jsonl = canonical_dir / "labels.jsonl"
+    if labels_jsonl_source.is_file():
+        _copy(labels_jsonl_source, labels_jsonl)
     labels_parquet = canonical_dir / "labels.parquet"
-    _write_labels(data_root / "canonical" / "labels.jsonl", labels_parquet)
+    _write_labels(labels_jsonl_source, labels_parquet)
     parquet_schemas["labels"] = pq.read_schema(labels_parquet)
     for name in CSV_TWINS:
         _write_csv(canonical_dir / f"{name}.parquet", canonical_dir / f"{name}.csv")
@@ -296,6 +304,15 @@ def publish_bundle(
                     licenses=canonical_licenses,
                 )
             )
+    if labels_jsonl.is_file():
+        resources.append(
+            _resource(
+                path=labels_jsonl,
+                root=out,
+                schema=LABEL_SCHEMA,
+                licenses=canonical_licenses,
+            )
+        )
     for source in sources:
         source_licenses = [{"name": source["licence"]}]
         for filename in ("records.parquet", "statements.parquet"):

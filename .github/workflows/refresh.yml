@@ -1,0 +1,282 @@
+name: Scheduled refresh
+
+on:
+  schedule:
+    - cron: "0 2 * * 1"
+    - cron: "30 2 2 * *"
+    - cron: "0 3 2 1,4,7,10 *"
+    - cron: "30 3 3 1 *"
+  workflow_dispatch:
+    inputs:
+      cadence:
+        description: Sources to refresh
+        required: true
+        default: weekly
+        type: choice
+        options:
+          - weekly
+          - monthly
+          - quarterly
+          - annual
+          - all
+      source:
+        description: Optional adapter directory, for example packs/ug/sources/nlgrb_gaming_operators
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install Python and pipeline dependencies
+        working-directory: pipeline
+        run: |
+          set -euo pipefail
+          uv python install 3.13
+          uv sync
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install app dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      - name: Select refresh inputs
+        id: refresh-inputs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          INPUT_CADENCE: ${{ inputs.cadence }}
+          INPUT_SOURCE: ${{ inputs.source }}
+        run: |
+          set -euo pipefail
+          source_override=""
+          if [[ $EVENT_NAME == workflow_dispatch ]]; then
+            cadence=${INPUT_CADENCE:-weekly}
+            source_override=$INPUT_SOURCE
+          else
+            case $EVENT_SCHEDULE in
+              "0 2 * * 1") cadence=weekly ;;
+              "30 2 2 * *") cadence=monthly ;;
+              "0 3 2 1,4,7,10 *") cadence=quarterly ;;
+              "30 3 3 1 *") cadence=annual ;;
+              *) echo "unsupported schedule" >&2; exit 1 ;;
+            esac
+          fi
+          printf 'cadence=%s\n' "$cadence" >>"$GITHUB_OUTPUT"
+          printf 'source=%s\n' "$source_override" >>"$GITHUB_OUTPUT"
+
+      # Secrets are passed only through step environments. Steps must not print the environment or enable xtrace.
+      - name: Restore the latest published state
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/bundles data/refresh
+          get_object() {
+            local object_path=$1
+            local destination=$2
+            mkdir -p "$(dirname "$destination")"
+            (cd app && pnpm exec wrangler r2 object get "$object_path" --file "$destination" --remote)
+          }
+          get_object "atlas-data/bundles/latest.json" "$GITHUB_WORKSPACE/data/bundles/latest.json"
+          regeneration_id=$(pipeline/.venv/bin/python -c \
+            'import json, re, sys; value = json.load(open(sys.argv[1]))["regeneration_id"]; assert re.fullmatch(r"[0-9]{8}T[0-9]{6}Z", value); print(value)' \
+            data/bundles/latest.json)
+          bundle_dir="$GITHUB_WORKSPACE/data/bundles/$regeneration_id"
+          get_object "atlas-data/bundles/$regeneration_id/manifest.json" "$bundle_dir/manifest.json"
+          pipeline/.venv/bin/python - "$bundle_dir/manifest.json" "$regeneration_id" \
+            >data/refresh/bundle-files.txt <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          manifest = json.load(open(sys.argv[1]))
+          if manifest["regeneration_id"] != sys.argv[2]:
+              raise ValueError("bundle regeneration id does not match latest pointer")
+          # Only what restore needs: per-source runs and the canonical state, not the CSV twins.
+          wanted = ("sources/", "canonical/crosswalk.parquet", "canonical/labels.jsonl", "datapackage.json")
+          for entry in manifest["files"]:
+              path = pathlib.PurePosixPath(entry["path"])
+              if path.is_absolute() or ".." in path.parts or "." in path.parts:
+                  raise ValueError("unsafe path in bundle manifest")
+              if path.as_posix().startswith(wanted):
+                  print(path.as_posix())
+          PY
+          while IFS= read -r relative_path; do
+            [[ -n $relative_path ]] || continue
+            get_object \
+              "atlas-data/bundles/$regeneration_id/$relative_path" \
+              "$bundle_dir/$relative_path"
+          done <data/refresh/bundle-files.txt
+          pipeline/.venv/bin/python -m atlas_pipeline restore \
+            --bundle "$bundle_dir" --data-root data
+
+      - name: Run due sources
+        env:
+          ATLAS_LINKAGE_SALT: ${{ secrets.ATLAS_LINKAGE_SALT }}
+          CADENCE: ${{ steps.refresh-inputs.outputs.cadence }}
+          SOURCE_OVERRIDE: ${{ steps.refresh-inputs.outputs.source }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/refresh/run-logs data/refresh/run-manifests
+          : >data/refresh/source-results.tsv
+          touch data/refresh/run-marker
+          if [[ -n $SOURCE_OVERRIDE ]]; then
+            if [[ ! $SOURCE_OVERRIDE =~ ^packs/[a-z0-9_-]+/sources/[a-z0-9_-]+$ ]] || \
+              [[ ! -f $SOURCE_OVERRIDE/source.yml ]]; then
+              echo "invalid source adapter directory" >&2
+              exit 1
+            fi
+            printf '%s\n' "$SOURCE_OVERRIDE" >data/refresh/due-sources.txt
+          else
+            pipeline/.venv/bin/python -m atlas_pipeline due \
+              --cadence "$CADENCE" --packs-dir packs >data/refresh/due-sources.txt
+          fi
+          failures=0
+          while IFS= read -r adapter_dir; do
+            [[ -n $adapter_dir ]] || continue
+            log_name=${adapter_dir//\//_}
+            run_log="data/refresh/run-logs/$log_name.log"
+            if pipeline/.venv/bin/python -m atlas_pipeline run "$adapter_dir" \
+              --data-root data >"$run_log" 2>&1; then
+              status=ok
+            else
+              status=failed
+              failures=$((failures + 1))
+            fi
+            cat "$run_log"
+            if rows=$(pipeline/.venv/bin/python -c \
+              'import json, sys; print(json.load(open(sys.argv[1]))["manifest"]["rows"])' \
+              "$run_log" 2>/dev/null); then
+              :
+            else
+              rows=unknown
+            fi
+            printf '%s\t%s\t%s\n' "$adapter_dir" "$rows" "$status" \
+              >>data/refresh/source-results.tsv
+          done <data/refresh/due-sources.txt
+          while IFS= read -r -d '' manifest; do
+            relative_path=${manifest#"$GITHUB_WORKSPACE/data/sources/"}
+            destination="data/refresh/run-manifests/$relative_path"
+            mkdir -p "$(dirname "$destination")"
+            cp "$manifest" "$destination"
+          done < <(find "$GITHUB_WORKSPACE/data/sources" -path '*/runs/*/manifest.json' \
+            -newer data/refresh/run-marker -print0)
+          if [[ $failures -ne 0 ]]; then
+            echo "$failures source run(s) failed" >&2
+            exit 1
+          fi
+
+      - name: Regenerate serving data
+        run: |
+          set -euo pipefail
+          regeneration_id=$(date -u +%Y%m%dT%H%M%SZ)
+          printf '%s\n' "$regeneration_id" >data/refresh/regeneration-id.txt
+          pipeline/.venv/bin/python -m atlas_pipeline regenerate \
+            --pack packs/ug --pack packs/ke --data-root data --id "$regeneration_id" \
+            | tee data/refresh/regenerate.log
+
+      - name: Load D1 databases
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          regeneration_id=$(<data/refresh/regeneration-id.txt)
+          infra/scripts/load-d1.sh "$regeneration_id" 2>&1 \
+            | tee "data/regen/$regeneration_id/load-d1.log"
+
+      - name: Build download bundle
+        run: |
+          set -euo pipefail
+          regeneration_id=$(<data/refresh/regeneration-id.txt)
+          pipeline/.venv/bin/python -m atlas_pipeline bundle \
+            --regeneration "$regeneration_id" --data-root data \
+            --out "data/bundles/$regeneration_id"
+
+      - name: Upload download bundle
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          regeneration_id=$(<data/refresh/regeneration-id.txt)
+          infra/scripts/upload-bundle.sh "$regeneration_id"
+
+      - name: Write refresh summary
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            echo "## Scheduled refresh"
+            echo
+            if [[ -f data/refresh/regeneration-id.txt ]]; then
+              echo "Regeneration ID: $(<data/refresh/regeneration-id.txt)"
+            else
+              echo "Regeneration ID: not created"
+            fi
+            echo
+            echo "### Sources run"
+            echo
+            echo "| Adapter | Rows | Status |"
+            echo "| --- | ---: | --- |"
+            if [[ -s data/refresh/source-results.tsv ]]; then
+              while IFS=$'\t' read -r adapter rows status; do
+                printf '| `%s` | %s | %s |\n' "$adapter" "$rows" "$status"
+              done <data/refresh/source-results.tsv
+            else
+              echo "| None | 0 | skipped |"
+            fi
+            echo
+            echo "### Database sizes"
+            echo
+            echo "| Database | Size MB |"
+            echo "| --- | ---: |"
+            load_log=$(find data/regen -name load-d1.log -type f -print -quit 2>/dev/null || true)
+            if [[ -n $load_log ]] && grep -Eq \
+              '^(atlas|atlas-statements|atlas-scores) size_MB ' "$load_log"; then
+              awk '/^(atlas|atlas-statements|atlas-scores) size_MB / { printf "| %s | %s |\n", $1, $3 }' \
+                "$load_log"
+            else
+              echo "| Not loaded | unknown |"
+            fi
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Upload refresh evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: refresh-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            data/regen/*/regeneration.json
+            data/refresh/run-manifests
+            data/regen/*/load-d1.log

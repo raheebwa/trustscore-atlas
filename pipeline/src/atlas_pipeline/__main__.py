@@ -1,4 +1,4 @@
-"""Command line entry point: python -m atlas_pipeline run <adapter_dir> [--data-root DIR]."""
+"""Command line entry point for the Atlas data pipeline."""
 
 import argparse
 import json
@@ -10,6 +10,7 @@ from . import boundaries
 from .adapters import accept_run, load_adapter, run_adapter
 from .bundle import publish_bundle
 from .conformance import check_run
+from .refresh import CADENCES, due_adapter_directories, restore_bundle
 from .regenerate import regenerate
 
 REPO = Path(__file__).resolve().parents[3]
@@ -55,6 +56,12 @@ def main(argv: list[str] | None = None) -> int:
     bundle.add_argument("--regeneration", required=True, help="regeneration id to publish")
     bundle.add_argument("--data-root", type=Path, default=Path("data"))
     bundle.add_argument("--out", type=Path, required=True)
+    due = sub.add_parser("due", help="list adapter directories due for a cadence")
+    due.add_argument("--cadence", required=True, choices=CADENCES)
+    due.add_argument("--packs-dir", type=Path, default=Path("packs"))
+    restore = sub.add_parser("restore", help="restore working state from a download bundle")
+    restore.add_argument("--bundle", type=Path, required=True)
+    restore.add_argument("--data-root", type=Path, required=True)
     boundaries_cmd = sub.add_parser("boundaries", help="simplify and write topojson boundaries")
     boundaries_cmd.add_argument("--input", required=True)
     boundaries_cmd.add_argument("--level", required=True)
@@ -87,6 +94,13 @@ def main(argv: list[str] | None = None) -> int:
             packs_root=REPO / "packs",
         )
         print(json.dumps(result.manifest, indent=2))
+        return 0
+    if args.command == "due":
+        for adapter_dir in due_adapter_directories(args.packs_dir, args.cadence):
+            print(adapter_dir)
+        return 0
+    if args.command == "restore":
+        print(json.dumps(restore_bundle(bundle=args.bundle, data_root=args.data_root), indent=2))
         return 0
     if args.command == "boundaries":
         return boundaries.main(
