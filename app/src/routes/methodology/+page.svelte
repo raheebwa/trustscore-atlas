@@ -89,9 +89,8 @@
 		/>
 
 		<p class="max-w-prose text-base text-ink-muted">
-			Public business registers, harmonised, with every value cited: one record per business, each
-			field carrying the register that published it and the date it said so, with what has not been
-			checked shown as plainly as what has.
+			One record per business, each field carrying the register that published it and the date it
+			said so, with what has not been checked shown as plainly as what has.
 		</p>
 
 		<section id="not" class="flex flex-col gap-3">
