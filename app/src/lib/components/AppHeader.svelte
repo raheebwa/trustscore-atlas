@@ -5,7 +5,6 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import Search from '@lucide/svelte/icons/search';
-	import Globe from '@lucide/svelte/icons/globe';
 	import type { Pack } from '$lib/server/packs';
 
 	/**
@@ -22,11 +21,14 @@
 		{ href: resolve('/sources'), label: 'Sources' },
 		{ href: resolve('/methodology'), label: 'Methodology' },
 		{ href: resolve('/downloads'), label: 'Downloads' },
-		{ href: resolve('/tools'), label: 'Actions' }
+		{ href: resolve('/tools'), label: 'Tools' }
 	] as const;
 
 	let searchInput = $state<HTMLInputElement | null>(null);
 	let query = $state('');
+	// Home leads with its own search field. Two identical boxes on one screen is one too many, so
+	// the header yields there; the shortcut still lands in the hero's field.
+	const onHome = $derived(page.route.id === '/');
 
 	function isCurrent(href: string): boolean {
 		return page.url.pathname === href || page.url.pathname.startsWith(`${href}/`);
@@ -41,7 +43,9 @@
 			return;
 		}
 		event.preventDefault();
-		searchInput?.focus();
+		const field =
+			searchInput ?? (document.getElementById('home-search') as HTMLInputElement | null);
+		field?.focus();
 	}
 
 	// Every other query parameter travels with the switch so a scoped page keeps its filters.
@@ -53,7 +57,9 @@
 <svelte:window onkeydown={onKeydown} />
 
 <header class="border-b border-border bg-panel">
-	<div class="mx-auto flex max-w-data flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
+	<div
+		class="flex w-full flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 lg:px-6 xl:px-8 2xl:px-10"
+	>
 		<a
 			href={resolve('/')}
 			class="flex shrink-0 items-center gap-2 text-lg font-semibold tracking-tight text-ink"
@@ -62,35 +68,39 @@
 			<span>Atlas</span>
 		</a>
 
-		<form
-			method="get"
-			action={resolve('/search')}
-			class="order-last flex min-w-0 grow basis-full items-center gap-2 md:order-none md:basis-64"
-			role="search"
-		>
-			<label class="sr-only" for="site-search">Search businesses</label>
-			<div class="relative w-full">
-				<Search
-					size={20}
-					strokeWidth={1.5}
-					class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-ink-muted"
-				/>
-				<input
-					bind:this={searchInput}
-					bind:value={query}
-					id="site-search"
-					name="q"
-					type="search"
-					placeholder="Search a business name"
-					class="h-10 w-full rounded-md border border-border bg-surface pr-3 pl-9 text-base text-ink transition-colors duration-120 placeholder:text-ink-muted hover:border-border-strong"
-				/>
-			</div>
-			<input type="hidden" name="country" value={country} />
-			<kbd
-				class="hidden h-6 shrink-0 items-center rounded border border-border bg-panel-2 px-1.5 text-2xs text-ink-muted md:inline-flex"
-				>/</kbd
+		{#if !onHome}
+			<form
+				method="get"
+				action={resolve('/search')}
+				class="order-last flex min-w-0 grow basis-full items-center gap-2 md:order-none md:basis-64"
+				role="search"
 			>
-		</form>
+				<label class="sr-only" for="site-search">Search businesses</label>
+				<div class="relative w-full">
+					<Search
+						size={20}
+						strokeWidth={1.5}
+						class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-ink-muted"
+					/>
+					<input
+						bind:this={searchInput}
+						bind:value={query}
+						id="site-search"
+						name="q"
+						type="search"
+						placeholder="Search a business name"
+						class="h-10 w-full rounded-md border border-border bg-surface pr-3 pl-9 text-base text-ink transition-colors duration-120 placeholder:text-ink-muted hover:border-border-strong"
+					/>
+				</div>
+				<input type="hidden" name="country" value={country} />
+				<kbd
+					class="hidden h-6 shrink-0 items-center rounded border border-border bg-panel-2 px-1.5 text-2xs text-ink-muted md:inline-flex"
+					>/</kbd
+				>
+			</form>
+		{:else}
+			<span class="grow"></span>
+		{/if}
 
 		<!--
 			Below md the sections collapse into one menu button. Four rows of navigation before the
@@ -139,7 +149,6 @@
 				{#each carried as [key, value], index (`${key}-${index}`)}
 					<input type="hidden" name={key} {value} />
 				{/each}
-				<Globe size={20} strokeWidth={1.5} class="text-ink-muted" aria-hidden="true" />
 				<label class="sr-only" for="country-switch">Country pack</label>
 				<select
 					id="country-switch"

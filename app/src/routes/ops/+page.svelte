@@ -41,7 +41,7 @@
 {:else}
 	<ul class="mt-6 flex flex-col gap-4">
 		{#each data.queue as item (item.request_type + item.request_id)}
-			<li class="rounded-lg border border-border bg-surface p-4">
+			<li class="rounded-lg border border-border bg-surface p-4 2xl:py-3">
 				<div class="flex flex-wrap items-baseline justify-between gap-2">
 					<span class="font-medium text-ink">{item.request_type.replace('_', ' ')}</span>
 					<span class="font-mono text-xs text-ink-muted">{item.request_id}</span>
@@ -113,12 +113,24 @@
 						/>
 					</label>
 					{#if item.gate.needs_relationship_review}
+						{#if (item.verification?.evidence.length ?? 0) === 0}
+							<p
+								class="max-w-md rounded-md border border-warning-border bg-warning-surface px-3 py-2 text-xs text-accent-ink"
+							>
+								No register published this domain and no document is attached. Approval rests on
+								your reason alone.
+							</p>
+						{/if}
 						<label class="flex max-w-md items-start gap-2 text-xs text-ink">
 							<input type="checkbox" name="domain_relationship_reviewed" class="mt-0.5" />
 							<span>
 								Domain relationship reviewed: I checked what connects
-								<span class="font-mono">{item.verification?.verified_domain}</span> to this business,
-								and the reason above names it.
+								<span class="font-mono">{item.verification?.verified_domain}</span> to this
+								business, and the reason above names it.
+								<span class="text-ink-muted">
+									({item.verification?.evidence.length ?? 0}
+									{(item.verification?.evidence.length ?? 0) === 1 ? 'document' : 'documents'} attached)
+								</span>
 							</span>
 						</label>
 					{/if}

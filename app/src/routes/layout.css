@@ -79,8 +79,8 @@
 	--text-4xl: 2.5rem;
 	--text-4xl--line-height: 2.8rem;
 
-	/* Data pages run wide, prose runs narrow. */
-	--container-data: 1200px;
+	/* Prose keeps a measure; data pages take the whole window. A boxed 1200px column on a wide
+	   screen wastes the room a dense table needs, so only reading surfaces are bounded. */
 	--container-reading: 72ch;
 
 	--ease-enter: cubic-bezier(0.2, 0, 0, 1);

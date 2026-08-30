@@ -80,9 +80,10 @@
 <div class="flex min-h-screen flex-col bg-canvas text-ink">
 	<AppHeader {packs} country={scopedCountry} />
 	<main
-		class="mx-auto flex w-full flex-1 flex-col gap-4 px-4 py-6 {width === 'reading'
+		class="flex w-full flex-1 flex-col gap-4 px-4 py-6 lg:px-6 xl:px-8 2xl:px-10 {width ===
+		'reading'
 			? 'max-w-reading'
-			: 'max-w-data'}"
+			: ''}"
 	>
 		<Breadcrumbs {crumbs} />
 		{@render children()}

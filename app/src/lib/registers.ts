@@ -4,6 +4,10 @@
  * it. The slug stays the identifier everywhere (API, tools, trace), but "ura.vat_withholding_agents"
  * is a key, not a label, and a row of keys reads as noise.
  *
+ * Every short name is at one level: the body that publishes the register, qualified only where a
+ * body publishes more than one. A row that mixed institutions with topics would read as a list of
+ * different kinds of thing.
+ *
  * A slug this map has never seen still renders: it falls back to the publisher prefix, so a new
  * register appears in the interface the day its pack lands rather than the day someone edits
  * this file.
@@ -21,17 +25,17 @@ export interface RegisterDescription {
 const REGISTERS: Record<string, { short: string; kind: RegisterKind }> = {
 	'bou.supervised_institutions': { short: 'Bank of Uganda', kind: 'regulator' },
 	'cbk.licensed_banks': { short: 'Central Bank of Kenya', kind: 'regulator' },
-	'cma.licensed_firms': { short: 'Capital Markets', kind: 'regulator' },
-	'kcca.businesses': { short: 'KCCA trading licence', kind: 'municipal' },
+	'cma.licensed_firms': { short: 'Capital Markets Authority', kind: 'regulator' },
+	'kcca.businesses': { short: 'KCCA trading licences', kind: 'municipal' },
 	'kcca.property_rates': { short: 'KCCA property rates', kind: 'municipal' },
 	'nlgrb.gaming_operators': { short: 'Gaming board', kind: 'permit' },
-	'ppda.ocds': { short: 'Public procurement', kind: 'procurement' },
-	'ucc.broadcasters': { short: 'Communications', kind: 'permit' },
+	'ppda.ocds': { short: 'Procurement authority', kind: 'procurement' },
+	'ucc.broadcasters': { short: 'Communications commission', kind: 'permit' },
 	'unbs.certified_products': { short: 'Standards bureau', kind: 'standards' },
 	'ura.customs_agents': { short: 'URA customs agents', kind: 'tax' },
 	'ura.vat_withholding_agents': { short: 'URA VAT agents', kind: 'tax' },
 	'ura.wht_exemptions': { short: 'URA tax exemptions', kind: 'tax' },
-	'urbra.licensed_schemes': { short: 'Retirement benefits', kind: 'regulator' }
+	'urbra.licensed_schemes': { short: 'Retirement benefits authority', kind: 'regulator' }
 };
 
 const PREFIX_KINDS: Record<string, RegisterKind> = {
@@ -51,4 +55,27 @@ export function describeRegister(slug: string): RegisterDescription {
 		short: `${prefix.toUpperCase()} ${words}`.trim(),
 		kind: PREFIX_KINDS[prefix] ?? 'regulator'
 	};
+}
+
+/** The freshness of a pack as a whole: the worst state among the registers it has loaded. */
+export interface PackFreshness {
+	state: 'fresh' | 'stale' | 'failed' | 'none';
+	label: string;
+}
+
+export function packFreshness(
+	sources: { country: string; status: string }[],
+	code: string
+): PackFreshness {
+	const loaded = sources.filter(
+		(source) => source.country === code && source.status !== 'not_loaded'
+	);
+	if (loaded.some((source) => source.status === 'failed')) {
+		return { state: 'failed', label: 'A register last failed' };
+	}
+	if (loaded.some((source) => source.status === 'stale')) {
+		return { state: 'stale', label: 'A register is overdue' };
+	}
+	if (loaded.length === 0) return { state: 'none', label: 'Nothing loaded yet' };
+	return { state: 'fresh', label: 'Every register is current' };
 }

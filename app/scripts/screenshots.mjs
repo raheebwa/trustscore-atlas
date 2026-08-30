@@ -59,6 +59,8 @@ const expectedStatus = new Map(
 	routeSpecs.filter((spec) => typeof spec !== 'string').map((spec) => [spec.route, spec.expect])
 );
 const viewports = [
+	{ width: 1920, height: 1080 },
+	{ width: 1536, height: 960 },
 	{ width: 1280, height: 900 },
 	{ width: 390, height: 844 }
 ];

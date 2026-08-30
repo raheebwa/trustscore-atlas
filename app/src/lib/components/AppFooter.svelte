@@ -7,7 +7,7 @@
 
 <footer class="border-t border-border bg-panel">
 	<div
-		class="mx-auto flex max-w-data flex-col gap-4 px-4 py-6 text-sm text-ink-muted md:flex-row md:items-start md:justify-between"
+		class="flex w-full flex-col gap-4 px-4 py-6 text-sm text-ink-muted md:flex-row md:items-start md:justify-between lg:px-6 xl:px-8 2xl:px-10"
 	>
 		<div class="flex max-w-prose flex-col gap-2">
 			<img src="/brand/trustscore-wordmark.svg" alt="TrustScore" class="h-5 w-auto self-start" />

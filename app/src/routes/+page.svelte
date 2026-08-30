@@ -6,9 +6,9 @@
 	import Map from '@lucide/svelte/icons/map';
 	import Scale from '@lucide/svelte/icons/scale';
 	import Terminal from '@lucide/svelte/icons/terminal';
-	import Plus from '@lucide/svelte/icons/plus';
 	import FreshnessBadge from '$lib/components/FreshnessBadge.svelte';
 	import RegisterBadge from '$lib/components/RegisterBadge.svelte';
+	import { packFreshness } from '$lib/registers';
 	import StatTile from '$lib/components/StatTile.svelte';
 	import { formatWhen, nextScheduledRun } from '$lib/format';
 	import type { PageProps } from './$types';
@@ -17,12 +17,26 @@
 	const stats = $derived(data.stats);
 
 	// Copy never names a country: adding a pack changes these numbers, not any sentence here.
-	const packCount = $derived(data.packs.length);
-	const loadedForCountry = $derived(
-		stats.sources.filter(
-			(source) => source.status !== 'not_loaded' && source.country === data.country
-		)
+	// Everything on this page above the pack list is the country in the header switch and nothing
+	// else, because a register from another pack sitting beside this one reads as belonging to it.
+	const forCountry = $derived(stats.sources.filter((source) => source.country === data.country));
+	const loadedForCountry = $derived(forCountry.filter((source) => source.status !== 'not_loaded'));
+	const notLoadedForCountry = $derived(
+		forCountry.filter((source) => source.status === 'not_loaded')
 	);
+	const pack = $derived(data.packs.find((entry) => entry.code === data.country));
+	const packLoaded = (code: string) =>
+		stats.sources.filter((source) => source.country === code && source.status !== 'not_loaded')
+			.length;
+	const packRegisters = (code: string) =>
+		stats.sources.filter((source) => source.country === code).length;
+	/** One dot per pack, so a pack with a stale or failed register says so beside its number. */
+	const DOT_TONES: Record<string, string> = {
+		fresh: 'bg-fresh',
+		stale: 'bg-accent-ink',
+		failed: 'bg-error-ink',
+		none: 'bg-border-strong'
+	};
 	const dueDate = (source: { cadence: string; last_run_at: string | null }) => {
 		const next = nextScheduledRun(source.cadence, source.last_run_at);
 		return formatWhen(next, { showTime: false })?.absolute ?? next;
@@ -94,28 +108,53 @@
 		<div class="flex flex-col gap-6 rounded-md border border-border bg-surface p-6">
 			<StatTile
 				label="Businesses"
-				value={stats.businessCount}
-				caption={`Across ${packCount} country ${packCount === 1 ? 'pack' : 'packs'} and ${stats.loadedSourceCount} of ${stats.sourceCount} registers.`}
+				value={pack?.businesses ?? 0}
+				caption={`${loadedForCountry.length} of ${forCountry.length} ${
+					forCountry.length === 1 ? 'register' : 'registers'
+				} loaded.`}
 				emphasis="lead"
 			/>
-			<div class="flex flex-col gap-2">
-				<p class="text-xs font-medium text-ink-muted">Registers loaded, across all country packs</p>
-				<ul class="flex flex-wrap gap-2">
-					{#each stats.sources as source (source.slug)}
-						<li>
-							<RegisterBadge slug={source.slug} muted={source.status === 'not_loaded'} />
-						</li>
-					{/each}
-				</ul>
-			</div>
+			<p class="text-base text-ink-muted">
+				Every value on a record carries the register that published it and the date it said so.
+			</p>
 		</div>
 	</section>
 
-	<!-- One tile per loaded pack. At a hundred packs this becomes a list; the page does not change. -->
+	<!--
+		The registers behind the number above, in one band across the page, said in two rows rather
+		than one row of chips some of which are dimmer than others: muted on its own says nothing.
+	-->
+	<section class="flex flex-col gap-3">
+		<h2 class="text-xl font-semibold text-ink">Registers in this pack</h2>
+		<div class="flex flex-col gap-2">
+			<p class="text-xs font-medium text-ink-muted">Loaded</p>
+			<ul class="flex flex-wrap gap-2">
+				{#each loadedForCountry as source (source.slug)}
+					<li><RegisterBadge slug={source.slug} /></li>
+				{/each}
+			</ul>
+		</div>
+		{#if notLoadedForCountry.length > 0}
+			<div class="flex flex-col gap-2">
+				<p class="text-xs font-medium text-ink-muted">Not yet loaded</p>
+				<ul class="flex flex-wrap gap-2">
+					{#each notLoadedForCountry as source (source.slug)}
+						<li><RegisterBadge slug={source.slug} muted /></li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
+	</section>
+
+	<!--
+		One tile per loaded pack, and the only place a cross-pack total belongs: above this section
+		every number is the country in the switch.
+	-->
 	<section class="flex flex-col gap-3">
 		<h2 class="text-xl font-semibold text-ink">Country packs</h2>
 		<ul class="flex gap-3 overflow-x-auto pb-2">
 			{#each data.packs as pack (pack.code)}
+				{@const freshness = packFreshness(stats.sources, pack.code)}
 				<li
 					class="flex min-w-56 flex-col gap-1 rounded-md border border-border bg-surface p-4 {pack.code ===
 					data.country
@@ -125,23 +164,26 @@
 					<p class="flex items-baseline gap-2">
 						<span class="font-mono text-2xs text-ink-muted">{pack.code}</span>
 						<span class="text-base font-medium text-ink">{pack.name}</span>
+						<span
+							class="ml-auto size-2 rounded-full {DOT_TONES[freshness.state]}"
+							title={freshness.label}
+							aria-hidden="true"
+						></span>
+						<span class="sr-only">{freshness.label}</span>
 					</p>
 					<p class="font-display tnum text-2xl text-ink">{pack.businesses.toLocaleString()}</p>
-					<p class="text-xs text-ink-muted">businesses in the published regeneration</p>
+					<p class="text-xs text-ink-muted">businesses published</p>
+					<p class="text-xs text-ink-muted">
+						{packLoaded(pack.code)} of {packRegisters(pack.code)}
+						{packRegisters(pack.code) === 1 ? 'register' : 'registers'} loaded
+					</p>
 				</li>
 			{/each}
-			<li
-				class="flex min-w-56 flex-col justify-center gap-2 rounded-md border border-dashed border-border bg-panel p-4"
-			>
-				<p class="flex items-center gap-2 text-base text-ink-muted">
-					<Plus size={20} strokeWidth={1.5} aria-hidden="true" />
-					Add a country pack
-				</p>
-				<a href={resolve('/methodology')} class="text-xs text-ink-muted underline hover:text-ink">
-					What a pack has to declare
-				</a>
-			</li>
 		</ul>
+		<p class="text-xs text-ink-muted">
+			{stats.businessCount.toLocaleString()} businesses across every pack, from
+			{stats.loadedSourceCount} of {stats.sourceCount} registers.
+		</p>
 	</section>
 
 	<!-- How current the data is, said once, in words. -->
@@ -154,7 +196,7 @@
 			Registers are pulled on their own cadence. Each one says when it last succeeded and when it is
 			next due, so a stale register is visible before anyone leans on what it published.
 		</p>
-		<ul class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+		<ul class="grid gap-3 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
 			{#each loadedForCountry as source (source.slug)}
 				<li class="flex flex-col gap-2 rounded-md border border-border bg-surface p-3">
 					<RegisterBadge slug={source.slug} />

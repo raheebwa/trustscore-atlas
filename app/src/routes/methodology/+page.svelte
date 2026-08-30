@@ -134,6 +134,9 @@
 				it here, and a predicate with no binding is not a zero: it is a question this pack cannot
 				ask yet, which is what the hatched mass on a score bar means.
 			</p>
+			<p class="text-base text-ink-muted">
+				Registers are added as code, in the repository, not through this site.
+			</p>
 			{#if pack}
 				{#each Object.entries(pack.bindings) as [rubricName, predicates] (rubricName)}
 					<div class="flex flex-col gap-2">

@@ -191,12 +191,14 @@
 								</span>
 							</span>
 							<IdentifierChips identifiers={item.identifiers} />
-							<span class="grid gap-3 md:grid-cols-2">
-								<span class="block max-w-40">
+							<!-- Wide enough and the two readings sit side by side rather than in half-width
+							     columns with a gulf between them. -->
+							<span class="grid gap-3 md:grid-cols-2 2xl:flex 2xl:flex-wrap 2xl:gap-8">
+								<span class="block max-w-40 2xl:max-w-64">
 									<CoverageBar coverage={item.coverage} summary={item.coverage_summary} />
 								</span>
 								{#if item.formality}
-									<span class="block max-w-64">
+									<span class="block max-w-64 2xl:max-w-96">
 										<ScoreBar
 											score={{
 												rubric: item.formality.rubric,

@@ -55,7 +55,8 @@
 
 	function classesFor(column: Column): string {
 		return [
-			'px-3 py-2',
+			// Tighter at the widest step: more rows in view, with the same type size.
+			'px-3 py-2 2xl:py-1.5',
 			column.align === 'end' ? 'text-right' : 'text-left',
 			column.numeric ? 'tnum' : '',
 			column.mono ? 'font-mono text-2xs' : ''
@@ -66,7 +67,7 @@
 </script>
 
 <div class="hidden overflow-x-auto rounded-md border border-border bg-surface md:block">
-	<table class="w-full border-collapse text-base">
+	<table class="w-full border-collapse text-base 2xl:leading-snug">
 		<caption class="sr-only">{caption}</caption>
 		<thead class="border-b border-border-strong bg-panel text-xs text-ink-muted">
 			<tr>
