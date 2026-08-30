@@ -3,14 +3,16 @@
  * What the shell needs on every route: the loaded country packs behind the header switch, the
  * country in scope, and the live regeneration for the footer line.
  *
- * The country comes from the URL first so a shared link always opens on the country it was
- * shared for, then from the visitor's last choice, then from the largest pack. Nothing in the
- * interface names a country in copy; adding a pack changes these numbers, not any sentence.
+ * The country comes from the record on a record's own pages, because a record belongs to one
+ * pack and is addressed by its own id. Everywhere else it comes from the URL first so a shared
+ * link always opens on the country it was shared for, then from the visitor's last choice, then
+ * from the largest pack. Nothing in the interface names a country in copy; adding a pack changes
+ * these numbers, not any sentence.
  */
 
 import { getLiveRegenerationId, getSources } from '$lib/server/atlas';
 import { deploymentVersion } from '$lib/server/cache-scope';
-import { listPacksCached, resolveCountry } from '$lib/server/packs';
+import { listPacksCached, resolveScopeCountry } from '$lib/server/packs';
 import { requireDatabases } from '$lib/server/platform';
 import type { LayoutServerLoad } from './$types';
 
@@ -22,16 +24,16 @@ export const load: LayoutServerLoad = async ({ cookies, platform, url }) => {
 		getLiveRegenerationId(databases.db),
 		getSources(databases.db)
 	]);
-	const country = await resolveCountry(
-		databases,
-		platform?.env?.CACHE,
-		url.searchParams.get('country'),
-		cookies.get('country'),
-		version
-	);
+	const { country, fromRecord } = await resolveScopeCountry(databases, platform?.env?.CACHE, {
+		pathname: url.pathname,
+		requested: url.searchParams.get('country'),
+		remembered: cookies.get('country'),
+		versionId: version
+	});
 	// A country chosen in the URL becomes the visitor's default for a year; a link shared with
-	// ?country= still wins for whoever opens it.
-	if (url.searchParams.get('country') && cookies.get('country') !== country) {
+	// ?country= still wins for whoever opens it. A record moves the scope the same way, so a
+	// reader who opens a Ugandan record leaves scoped to Uganda rather than to what they had.
+	if ((fromRecord || url.searchParams.get('country')) && cookies.get('country') !== country) {
 		cookies.set('country', country, {
 			path: '/',
 			maxAge: 31536000,

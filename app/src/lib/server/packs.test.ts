@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { listPacks, listPacksCached } from './packs';
+import { listPacks, listPacksCached, resolveScopeCountry } from './packs';
 import type { AtlasDatabases } from './platform';
 
 function fakeDatabases(published: unknown = undefined): AtlasDatabases {
@@ -72,4 +72,78 @@ describe('listPacksCached', () => {
 		const second = await listPacksCached(fakeDatabases(), cache, 'deploy-1');
 		expect(second[0].code).toBe('ZZ');
 	});
+});
+
+/**
+ * A record is addressed by its atlas_id and belongs to exactly one pack, so the record decides the
+ * country on its own pages. Everywhere else the header switch is the authority.
+ */
+function fakeRecordDatabases(country: string | null): AtlasDatabases {
+	const base = fakeDatabases();
+	const db = {
+		prepare: (sql: string) => ({
+			bind: (...bindings: unknown[]) => ({
+				first: async () =>
+					sql.includes('FROM businesses')
+						? country
+							? { country }
+							: null
+						: base.db
+								.prepare(sql)
+								.bind(bindings[0] as string)
+								.first(),
+				all: async () => base.db.prepare(sql).bind().all()
+			})
+		})
+	} as unknown as D1Database;
+	return { db, statementsDb: db, scoresDb: db };
+}
+
+describe('resolveScopeCountry', () => {
+	it.each([
+		['/b/atl_example', 'UG', 'KE'],
+		['/b/atl_example/trace/canonical_name', 'UG', 'KE'],
+		['/claim/atl_example', 'KE', 'UG']
+	])('scopes %s to the record rather than to the switch', async (pathname, record, asked) => {
+		const scope = await resolveScopeCountry(fakeRecordDatabases(record), undefined, {
+			pathname,
+			requested: asked,
+			remembered: asked
+		});
+
+		expect(scope).toEqual({ country: record, fromRecord: true });
+	});
+
+	it('keeps the switch on a record that is not there to disagree', async () => {
+		const scope = await resolveScopeCountry(fakeRecordDatabases(null), undefined, {
+			pathname: '/b/atl_missing',
+			requested: 'KE',
+			remembered: null
+		});
+
+		expect(scope).toEqual({ country: 'KE', fromRecord: false });
+	});
+
+	it('ignores a country a record claims that no pack publishes', async () => {
+		const scope = await resolveScopeCountry(fakeRecordDatabases('ZZ'), undefined, {
+			pathname: '/b/atl_example',
+			requested: 'KE',
+			remembered: null
+		});
+
+		expect(scope).toEqual({ country: 'KE', fromRecord: false });
+	});
+
+	it.each(['/search', '/explore', '/sources', '/downloads', '/'])(
+		'keeps the switch as the authority on %s',
+		async (pathname) => {
+			const scope = await resolveScopeCountry(fakeRecordDatabases('UG'), undefined, {
+				pathname,
+				requested: 'KE',
+				remembered: null
+			});
+
+			expect(scope).toEqual({ country: 'KE', fromRecord: false });
+		}
+	);
 });

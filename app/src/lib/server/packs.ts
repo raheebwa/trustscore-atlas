@@ -101,6 +101,64 @@ export async function resolveCountry(
 	return packs[0]?.code ?? 'UG';
 }
 
+/**
+ * The atlas_id a record-shaped route is about, or null on every other surface. These routes are
+ * addressed by the record itself, so they are the ones where the record can outrank the switch.
+ */
+function recordAtlasId(pathname: string): string | null {
+	const [, section, id] = pathname.split('/');
+	if (!id || (section !== 'b' && section !== 'claim')) return null;
+	try {
+		return decodeURIComponent(id);
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * The country a page is scoped to.
+ *
+ * A record belongs to exactly one pack, so on its own pages the record decides: a link to a
+ * Ugandan record opens in Uganda whatever the reader was last reading, and a country in the URL
+ * that disagrees is ignored rather than refused. Every other surface keeps the switch as the
+ * authority. `fromRecord` tells the caller the scope moved, which is what makes the switch and
+ * the remembered country follow it instead of quietly disagreeing with the page.
+ */
+export async function resolveScopeCountry(
+	databases: AtlasDatabases,
+	cache: KVNamespace | undefined,
+	options: {
+		pathname: string;
+		requested?: string | null;
+		remembered?: string | null;
+		versionId?: string | null;
+	}
+): Promise<{ country: string; fromRecord: boolean }> {
+	const atlasId = recordAtlasId(options.pathname);
+	if (atlasId) {
+		const record = await databases.db
+			.prepare('SELECT country FROM businesses WHERE atlas_id = ?')
+			.bind(atlasId)
+			.first<{ country: string | null }>();
+		const code = record?.country?.trim().toUpperCase();
+		if (code) {
+			const packs = await listPacksCached(databases, cache, options.versionId ?? null);
+			if (packs.some((pack) => pack.code === code)) return { country: code, fromRecord: true };
+		}
+	}
+
+	return {
+		country: await resolveCountry(
+			databases,
+			cache,
+			options.requested,
+			options.remembered,
+			options.versionId ?? null
+		),
+		fromRecord: false
+	};
+}
+
 export interface BoundaryMap {
 	level: string;
 	asset: string;
