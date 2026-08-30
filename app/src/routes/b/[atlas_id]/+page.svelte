@@ -4,6 +4,7 @@
 	import Copy from '@lucide/svelte/icons/copy';
 	import Flag from '@lucide/svelte/icons/flag';
 	import BadgeCheck from '@lucide/svelte/icons/badge-check';
+	import Turnstile from '$lib/components/Turnstile.svelte';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { organizationJsonLd } from '$lib/structured-data';
@@ -375,6 +376,7 @@
 							class="w-full rounded-md border border-border bg-surface px-3 py-2 text-base text-ink transition-colors duration-120 hover:border-border-strong"
 						></textarea>
 					</label>
+					<Turnstile />
 					<button
 						type="submit"
 						class="h-10 w-fit rounded-md border border-accent bg-accent px-4 text-base font-medium text-ink transition-colors duration-120 hover:border-accent-ink hover:bg-accent-ink hover:text-canvas"

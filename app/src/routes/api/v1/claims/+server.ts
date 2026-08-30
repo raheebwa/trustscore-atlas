@@ -12,7 +12,8 @@ import {
 	type IssuedChallenge
 } from '$lib/server/claim-verification';
 import { apiBadRequest, apiNotFound, apiServerError, claimPageRedirect } from '$lib/server/api';
-import { getDatabase } from '$lib/server/platform';
+import { envValue, getDatabase } from '$lib/server/platform';
+import { verifyTurnstile } from '$lib/server/turnstile';
 import type { ClaimResponse } from '$lib/types';
 import type { RequestHandler } from './$types';
 
@@ -23,6 +24,8 @@ interface ClaimInput {
 	verification_method?: unknown;
 	website_url?: unknown;
 	email?: unknown;
+	/** The solved challenge a page form carries. Never present on an API call. */
+	turnstile_token?: unknown;
 }
 
 interface ParsedClaimInput {
@@ -45,7 +48,8 @@ async function readInput(request: Request): Promise<ParsedClaimInput> {
 			claimant_role: form.get('claimant_role'),
 			verification_method: form.get('verification_method'),
 			website_url: form.get('website_url'),
-			email: form.get('email')
+			email: form.get('email'),
+			turnstile_token: form.get('cf-turnstile-response')
 		},
 		isPageForm: true
 	};
@@ -59,9 +63,21 @@ function newId(prefix: string): string {
 	return `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
 }
 
-export const POST: RequestHandler = async ({ platform, request }) => {
+export const POST: RequestHandler = async ({ fetch, platform, request }) => {
 	try {
 		const { input, isPageForm } = await readInput(request);
+		// A form a stranger can submit carries the challenge, when this deployment sets one.
+		if (isPageForm) {
+			const passed = await verifyTurnstile({
+				secret: envValue(platform, 'TURNSTILE_SECRET_KEY'),
+				token: typeof input.turnstile_token === 'string' ? input.turnstile_token : null,
+				remoteIp: request.headers.get('cf-connecting-ip'),
+				fetchImpl: fetch
+			});
+			if (!passed.ok) {
+				return apiBadRequest('the check on this form did not pass; reload the page and try again');
+			}
+		}
 		if (!validText(input.atlas_id, 200) || !validText(input.claimant_role, 100)) {
 			return apiBadRequest('invalid claim request');
 		}

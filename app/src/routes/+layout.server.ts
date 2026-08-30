@@ -13,7 +13,7 @@
 import { getLiveRegenerationId, getSources } from '$lib/server/atlas';
 import { deploymentVersion } from '$lib/server/cache-scope';
 import { listPacksCached, resolveScopeCountry } from '$lib/server/packs';
-import { requireDatabases } from '$lib/server/platform';
+import { envValue, requireDatabases } from '$lib/server/platform';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ cookies, platform, url }) => {
@@ -43,6 +43,9 @@ export const load: LayoutServerLoad = async ({ cookies, platform, url }) => {
 	}
 	const pack = packs.find((entry) => entry.code === country);
 	return {
+		// Public by design: the widget in the page is what it is for. Absent on a deployment that
+		// sets none, which is what leaves those pages ungated on both sides.
+		turnstileSiteKey: envValue(platform, 'TURNSTILE_SITE_KEY') ?? null,
 		packs,
 		country,
 		countryName: pack?.name ?? country,

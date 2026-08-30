@@ -9,7 +9,8 @@ import {
 	type LinkageLabelInput
 } from '$lib/write-requests';
 import { apiBadRequest, apiNotFound, apiServerError } from './api';
-import { getDatabase } from './platform';
+import { envValue, getDatabase } from './platform';
+import { verifyTurnstile } from './turnstile';
 import { confirmWriteRequest, type WriteRequestKind } from './write-confirmation';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -26,6 +27,8 @@ interface PendingMetadata {
 interface EndpointEvent {
 	platform?: App.Platform;
 	request: Request;
+	/** The request's own fetch, so a test can answer the challenge provider without a network. */
+	fetch?: typeof fetch;
 }
 
 interface ConfirmEndpointEvent extends EndpointEvent {
@@ -52,6 +55,31 @@ async function pendingMetadata(prefix: string): Promise<PendingMetadata> {
 function isPageForm(request: Request): boolean {
 	const type = request.headers.get('content-type') ?? '';
 	return type.includes('application/x-www-form-urlencoded') || type.includes('multipart/form-data');
+}
+
+/**
+ * The challenge a page form carries, when this deployment sets one.
+ *
+ * Only the forms a stranger can submit are gated: a form that already carries a claim's own token
+ * is bounded by that token, and a second gate on it would be friction with nothing behind it. A
+ * deployment with no secret configured is not gated at all, so a fork and a local checkout work
+ * exactly as before.
+ */
+async function passesChallenge(
+	platform: App.Platform | undefined,
+	request: Request,
+	input: Record<string, unknown> | null,
+	fetchImpl?: typeof fetch
+): Promise<boolean> {
+	if (!isPageForm(request)) return true;
+	const token = input?.['cf-turnstile-response'];
+	const result = await verifyTurnstile({
+		secret: envValue(platform, 'TURNSTILE_SECRET_KEY'),
+		token: typeof token === 'string' ? token : null,
+		remoteIp: request.headers.get('cf-connecting-ip'),
+		fetchImpl
+	});
+	return result.ok;
 }
 
 /** JSON from tools and API clients; form fields from the page's own declarative forms. */
@@ -351,10 +379,17 @@ export async function createLinkageLabelEndpoint({
 	}
 }
 
-export async function createIssueEndpoint({ platform, request }: EndpointEvent): Promise<Response> {
+export async function createIssueEndpoint({
+	fetch: fetchImpl,
+	platform,
+	request
+}: EndpointEvent): Promise<Response> {
 	try {
 		const value = await readObject(request);
 		const input = value as Partial<IssueInput> | null;
+		if (!(await passesChallenge(platform, request, value, fetchImpl))) {
+			return apiBadRequest('the check on this form did not pass; reload the page and try again');
+		}
 		if (
 			(input?.atlas_id !== undefined && !validText(input.atlas_id, 200)) ||
 			(input?.source !== undefined && !validText(input.source, 200)) ||

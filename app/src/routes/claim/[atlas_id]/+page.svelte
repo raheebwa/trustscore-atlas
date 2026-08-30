@@ -5,6 +5,7 @@
 	import { CLAIM_VERIFICATION_STEPS } from '$lib/claims';
 	import { formatWhen } from '$lib/format';
 	import Callout from '$lib/components/Callout.svelte';
+	import Turnstile from '$lib/components/Turnstile.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import type { PageProps } from './$types';
@@ -354,6 +355,7 @@
 					<option value="authorised representative">Authorised representative</option>
 				</select>
 			</label>
+			<Turnstile />
 			<button
 				type="submit"
 				class="h-10 w-fit rounded-md border border-accent bg-accent px-4 text-base font-medium text-ink transition-colors duration-120 hover:border-accent-ink hover:bg-accent-ink hover:text-canvas"

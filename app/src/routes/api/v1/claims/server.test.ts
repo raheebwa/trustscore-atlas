@@ -198,4 +198,60 @@ describe('claims API', () => {
 		expect(body.error).toContain('verify/email');
 		expect(batches).toHaveLength(0);
 	});
+
+	/**
+	 * The challenge is only on the door a stranger can walk through. A deployment that sets no
+	 * secret is not gated at all, which is what keeps a fork and a local checkout working.
+	 */
+	it('refuses a page form when the deployment sets a secret and the challenge is unsolved', async () => {
+		const { db, batches } = database();
+		const form = new FormData();
+		form.set('atlas_id', 'atlas-example-1');
+		form.set('claimant_role', 'owner or director');
+		const response = await POST({
+			platform: { env: { DB: db, TURNSTILE_SECRET_KEY: 'a-secret' } },
+			request: new Request('https://atlas.example.invalid/api/v1/claims', {
+				method: 'POST',
+				body: form
+			}),
+			fetch: async () => new Response(JSON.stringify({ success: true }), { status: 200 })
+		} as never);
+
+		expect(response.status).toBe(400);
+		expect(batches).toHaveLength(0);
+	});
+
+	it('records the claim when the challenge was solved', async () => {
+		const { db, batches } = database();
+		const form = new FormData();
+		form.set('atlas_id', 'atlas-example-1');
+		form.set('claimant_role', 'owner or director');
+		form.set('cf-turnstile-response', 'a-solved-token');
+		const response = await POST({
+			platform: { env: { DB: db, TURNSTILE_SECRET_KEY: 'a-secret' } },
+			request: new Request('https://atlas.example.invalid/api/v1/claims', {
+				method: 'POST',
+				body: form
+			}),
+			fetch: async () => new Response(JSON.stringify({ success: true }), { status: 200 })
+		} as never);
+
+		expect(response.status).toBe(303);
+		expect(batches).toHaveLength(1);
+	});
+
+	it('leaves an API call alone, challenge or no challenge', async () => {
+		const { db, batches } = database();
+		const response = await POST({
+			platform: { env: { DB: db, TURNSTILE_SECRET_KEY: 'a-secret' } },
+			request: new Request('https://atlas.example.invalid/api/v1/claims', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ atlas_id: 'atlas-example-1', claimant_role: 'owner or director' })
+			})
+		} as never);
+
+		expect(response.status).toBe(201);
+		expect(batches).toHaveLength(1);
+	});
 });
