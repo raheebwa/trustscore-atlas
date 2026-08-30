@@ -32,13 +32,26 @@ pnpm exec wrangler d1 execute atlas-statements --local --file seed/dev-statement
 pnpm exec wrangler d1 execute atlas-scores --local --file ../infra/d1/schema.sql
 pnpm exec wrangler d1 execute atlas-scores --local --file seed/dev-scores.sql
 pnpm exec wrangler d1 execute atlas --local --file migrations/0001_ops_tables.sql
+pnpm exec wrangler d1 execute atlas --local --file migrations/0002_claim_confirmation.sql
 ```
 
 Apply the operations migration to the remote main database with:
 
 ```sh
 pnpm exec wrangler d1 execute atlas --remote --file migrations/0001_ops_tables.sql
+pnpm exec wrangler d1 execute atlas --remote --file migrations/0002_claim_confirmation.sql
 ```
+
+## Claim confirmation
+
+When the browser provides `requestUserInteraction`, `start_claim` asks for confirmation in the
+page, creates the request, and confirms it immediately. Otherwise it returns a confirmation URL
+that expires after 24 hours. Opening that URL shows the exact request and a plain HTML confirmation
+form. A request started directly from the claim page is confirmed when submitted.
+
+The current WebMCP draft temporarily omits the client object that carries
+`requestUserInteraction`, as tracked in WebMCP PR 205. Chrome 152 therefore takes the page
+confirmation path.
 
 The three seed files form one small, entirely fictional dataset: five businesses across
 three Kampala divisions, a `kcca.businesses` source row, one Formality score per
@@ -59,4 +72,4 @@ root by the `wrangler d1 execute --local` commands above, so seed once and eithe
 sees the data.
 
 To reset the local databases, delete `.wrangler/state/v3/d1` from the repository root
-and re-run the seven `wrangler d1 execute` commands above.
+and re-run the eight `wrangler d1 execute` commands above.

@@ -1,5 +1,9 @@
 import { json } from '@sveltejs/kit';
-import { CLAIM_VERIFICATION_STEPS } from '$lib/claims';
+import {
+	CLAIM_VERIFICATION_STEPS,
+	createClaimConfirmationToken,
+	hashClaimConfirmationToken
+} from '$lib/claims';
 import { apiBadRequest, apiNotFound, apiServerError } from '$lib/server/api';
 import { getDatabase } from '$lib/server/platform';
 import type { ClaimResponse } from '$lib/types';
@@ -10,15 +14,26 @@ interface ClaimInput {
 	claimant_role?: unknown;
 }
 
-async function readInput(request: Request): Promise<ClaimInput> {
+interface ParsedClaimInput {
+	input: ClaimInput;
+	isPageForm: boolean;
+}
+
+async function readInput(request: Request): Promise<ParsedClaimInput> {
 	if (request.headers.get('content-type')?.includes('application/json')) {
 		const value: unknown = await request.json();
-		return typeof value === 'object' && value !== null ? (value as ClaimInput) : {};
+		return {
+			input: typeof value === 'object' && value !== null ? (value as ClaimInput) : {},
+			isPageForm: false
+		};
 	}
 	const form = await request.formData();
 	return {
-		atlas_id: form.get('atlas_id'),
-		claimant_role: form.get('claimant_role')
+		input: {
+			atlas_id: form.get('atlas_id'),
+			claimant_role: form.get('claimant_role')
+		},
+		isPageForm: true
 	};
 }
 
@@ -30,9 +45,16 @@ function newId(prefix: string): string {
 	return `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
 }
 
+function claimPageRedirect(atlasId: string): Response {
+	return new Response(null, {
+		status: 303,
+		headers: { Location: `/claim/${encodeURIComponent(atlasId)}?confirmation=complete` }
+	});
+}
+
 export const POST: RequestHandler = async ({ platform, request }) => {
 	try {
-		const input = await readInput(request);
+		const { input, isPageForm } = await readInput(request);
 		if (!validText(input.atlas_id, 200) || !validText(input.claimant_role, 100)) {
 			return apiBadRequest('invalid claim request');
 		}
@@ -48,14 +70,33 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 		const claimId = newId('claim');
 		const eventId = newId('claim_event');
 		const requestedAt = new Date().toISOString();
+		const status = isPageForm ? 'confirmed' : 'unconfirmed';
+		const expiresAt = isPageForm
+			? null
+			: new Date(Date.parse(requestedAt) + 24 * 60 * 60 * 1000).toISOString();
+		const confirmedAt = isPageForm ? requestedAt : null;
+		const plainToken = isPageForm ? null : createClaimConfirmationToken();
+		const tokenHash = plainToken ? await hashClaimConfirmationToken(plainToken) : null;
+
 		await db.batch([
 			db
 				.prepare(
 					`INSERT INTO claims
-					 (claim_id, atlas_id, claimant_role, requested_at, status, verification_method)
-					 VALUES (?, ?, ?, ?, ?, ?)`
+					 (claim_id, atlas_id, claimant_role, requested_at, status, verification_method,
+					  expires_at, confirmed_at, confirmation_token)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 				)
-				.bind(claimId, atlasId, claimantRole, requestedAt, 'requested', null),
+				.bind(
+					claimId,
+					atlasId,
+					claimantRole,
+					requestedAt,
+					status,
+					null,
+					expiresAt,
+					confirmedAt,
+					tokenHash
+				),
 			db
 				.prepare(
 					`INSERT INTO claim_events
@@ -65,20 +106,25 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 				.bind(
 					eventId,
 					claimId,
-					'requested',
+					status,
 					requestedAt,
 					JSON.stringify({
 						atlas_id: atlasId,
 						canonical_name: business.canonical_name,
 						claimant_role: claimantRole,
-						status: 'requested'
+						status,
+						...(expiresAt ? { expires_at: expiresAt } : {})
 					})
 				)
 		]);
 
+		if (isPageForm) return claimPageRedirect(atlasId);
+
 		const response: ClaimResponse = {
 			claim_id: claimId,
-			status: 'requested',
+			status: 'unconfirmed',
+			confirm_url: `/claim/${encodeURIComponent(claimId)}?token=${encodeURIComponent(plainToken!)}`,
+			expires_at: expiresAt!,
 			verification_steps: [...CLAIM_VERIFICATION_STEPS]
 		};
 		return json(response, { status: 201 });

@@ -8,6 +8,7 @@ import {
 	SCORE_BUSINESS_TOOL,
 	SEARCH_BUSINESSES_TOOL,
 	START_CLAIM_TOOL,
+	executeStartClaim,
 	shapeBusinessRecord,
 	shapeEvidenceResults,
 	shapeExplanationResult,
@@ -168,6 +169,101 @@ describe('definitions', () => {
 			'find_segment',
 			'start_claim'
 		]);
+	});
+});
+
+describe('start_claim execution', () => {
+	it('returns the page-confirmation result when in-page confirmation is unavailable', async () => {
+		const calls: { input: string; init?: RequestInit }[] = [];
+		const modelContext = {};
+		const result = await executeStartClaim(
+			{ atlas_id: 'atlas-example-1', claimant_role: 'authorised representative' },
+			modelContext,
+			{
+				fetchJson: async <T>(input: RequestInfo, init?: RequestInit) => {
+					calls.push({ input: String(input), init });
+					return {
+						data: {
+							claim_id: 'claim_example_1',
+							status: 'unconfirmed',
+							confirm_url: '/claim/claim_example_1?token=plain-example-token',
+							expires_at: '2026-08-31T12:00:00.000Z',
+							verification_steps: []
+						} as T,
+						status: 201
+					};
+				},
+				confirm: () => true
+			}
+		);
+
+		expect(parsed(result)).toEqual({
+			status: 'confirmation_required',
+			claim_id: 'claim_example_1',
+			confirm_url: '/claim/claim_example_1?token=plain-example-token',
+			expires_at: '2026-08-31T12:00:00.000Z',
+			message:
+				'Open confirm_url in this browser to confirm the claim request; it expires in 24 hours.'
+		});
+		expect(calls.map((call) => call.input)).toEqual(['/api/v1/claims']);
+	});
+
+	it('creates and immediately confirms after in-page confirmation', async () => {
+		const calls: { input: string; init?: RequestInit }[] = [];
+		let confirmationText = '';
+		const modelContext = {
+			async requestUserInteraction<T>(callback: () => T | Promise<T>): Promise<T> {
+				return callback();
+			}
+		};
+		const result = await executeStartClaim(
+			{ atlas_id: 'atlas-example-1', claimant_role: 'owner or director' },
+			modelContext,
+			{
+				fetchJson: async <T>(input: RequestInfo, init?: RequestInit) => {
+					const url = String(input);
+					calls.push({ input: url, init });
+					if (url.includes('/businesses/')) return { data: businessFixture as T, status: 200 };
+					if (url.endsWith('/confirm')) {
+						return {
+							data: {
+								claim_id: 'claim_example_2',
+								status: 'confirmed',
+								verification_steps: ['Example verification route.']
+							} as T,
+							status: 200
+						};
+					}
+					return {
+						data: {
+							claim_id: 'claim_example_2',
+							status: 'unconfirmed',
+							confirm_url: '/claim/claim_example_2?token=plain-example-token',
+							expires_at: '2026-08-31T12:00:00.000Z',
+							verification_steps: ['Example verification route.']
+						} as T,
+						status: 201
+					};
+				},
+				confirm: (message) => {
+					confirmationText = message;
+					return true;
+				}
+			}
+		);
+
+		expect(parsed(result)).toEqual({
+			status: 'confirmed',
+			claim_id: 'claim_example_2',
+			verification_steps: ['Example verification route.']
+		});
+		expect(confirmationText).toContain('Example Hardware Supplies Ltd');
+		expect(calls.map((call) => call.input)).toEqual([
+			'/api/v1/businesses/atlas-example-1',
+			'/api/v1/claims',
+			'/api/v1/claims/claim_example_2/confirm'
+		]);
+		expect(JSON.parse(String(calls[2].init?.body))).toEqual({ token: 'plain-example-token' });
 	});
 });
 

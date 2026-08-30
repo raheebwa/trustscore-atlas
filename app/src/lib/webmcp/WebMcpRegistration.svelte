@@ -3,7 +3,6 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
 	import { browser } from '$app/environment';
-	import { buildClaimConfirmationText } from '$lib/claims';
 	import {
 		EXPLAIN_SCORE_TOOL,
 		FIND_SEGMENT_TOOL,
@@ -12,8 +11,8 @@
 		SCORE_BUSINESS_TOOL,
 		SEARCH_BUSINESSES_TOOL,
 		START_CLAIM_TOOL,
+		executeStartClaim,
 		shapeBusinessRecord,
-		shapeClaimResult,
 		shapeEvidenceResults,
 		shapeExplanationResult,
 		shapeHttpToolError,
@@ -25,7 +24,6 @@
 	} from './tools';
 	import type {
 		BusinessRecordResponse,
-		ClaimResponse,
 		EvidenceResponse,
 		ScoreExplanationResponse,
 		ScoreSummary,
@@ -238,38 +236,11 @@
 						input: { atlas_id: string; claimant_role: string },
 						context?: ToolExecutionContext
 					): Promise<ToolTextResult> {
-						if (typeof context?.requestUserInteraction !== 'function') {
-							return shapeToolError('confirmation_unavailable');
-						}
-						const businessResult = await fetchJson<BusinessRecordResponse>(
-							`/api/v1/businesses/${encodeURIComponent(input.atlas_id)}`,
-							{ signal: context.signal ?? signal }
-						);
-						if (!businessResult.data) return shapeToolError('business_not_found');
-						const confirmationText = buildClaimConfirmationText({
-							atlasId: input.atlas_id,
-							canonicalName: businessResult.data.canonical_name,
-							claimantRole: input.claimant_role
+						return executeStartClaim(input, context, {
+							fetchJson,
+							confirm: (message) => window.confirm(message),
+							signal
 						});
-						let confirmed: boolean;
-						try {
-							confirmed = await context.requestUserInteraction(async () =>
-								window.confirm(confirmationText)
-							);
-						} catch {
-							return shapeToolError('confirmation_failed');
-						}
-						if (!confirmed) return shapeToolError('claim_cancelled');
-
-						const claimResult = await fetchJson<ClaimResponse>('/api/v1/claims', {
-							method: 'POST',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify(input),
-							signal: context.signal ?? signal
-						});
-						return claimResult.data
-							? shapeClaimResult(claimResult.data)
-							: shapeToolError('claim_request_failed');
 					}
 				},
 				{ signal }

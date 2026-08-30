@@ -1,6 +1,7 @@
 import type {
 	BusinessRecordResponse,
 	ClaimResponse,
+	ConfirmedClaimResponse,
 	EvidenceResponse,
 	ScoreExplanationResponse,
 	ScoreSummary,
@@ -8,11 +9,26 @@ import type {
 	SegmentResponse
 } from '$lib/types';
 import { CURSOR_MAX_OFFSET, buildSearchCursor } from '$lib/pagination';
+import { buildClaimConfirmationText } from '$lib/claims';
 
 export const MAX_TOOL_RESULT_CHARS = 1500;
 
 export interface ToolTextResult {
 	content: { type: 'text'; text: string }[];
+}
+
+export interface StartClaimExecutionContext {
+	signal?: AbortSignal;
+	requestUserInteraction?: <T>(callback: () => T | Promise<T>) => Promise<T>;
+}
+
+export interface StartClaimDependencies {
+	fetchJson: <T>(
+		input: RequestInfo,
+		init?: RequestInit
+	) => Promise<{ data: T | null; status: number }>;
+	confirm: (message: string) => boolean;
+	signal?: AbortSignal;
 }
 
 export const SEARCH_BUSINESSES_TOOL = {
@@ -180,7 +196,7 @@ export const FIND_SEGMENT_TOOL = {
 export const START_CLAIM_TOOL = {
 	name: 'start_claim',
 	description:
-		'After explicit browser confirmation, record a request to claim a business. This stores only a requested claim and returns the verification routes. It does not verify the claim.',
+		'Record a request to claim a business. Confirms in the page when supported, otherwise returns a 24-hour page-confirmation URL. It does not verify the claim.',
 	inputSchema: {
 		type: 'object',
 		properties: {
@@ -340,6 +356,84 @@ export function shapeSegmentResult(response: SegmentResponse): ToolTextResult {
 
 export function shapeClaimResult(response: ClaimResponse): ToolTextResult {
 	return textResult(response);
+}
+
+export async function executeStartClaim(
+	input: { atlas_id: string; claimant_role: string },
+	context: StartClaimExecutionContext | undefined,
+	dependencies: StartClaimDependencies
+): Promise<ToolTextResult> {
+	const signal = context?.signal ?? dependencies.signal;
+	const createClaim = () =>
+		dependencies.fetchJson<ClaimResponse>('/api/v1/claims', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(input),
+			signal
+		});
+
+	if (typeof context?.requestUserInteraction !== 'function') {
+		const claimResult = await createClaim();
+		if (!claimResult.data || claimResult.data.status !== 'unconfirmed') {
+			return shapeToolError('claim_request_failed');
+		}
+		return textResult({
+			status: 'confirmation_required',
+			claim_id: claimResult.data.claim_id,
+			confirm_url: claimResult.data.confirm_url,
+			expires_at: claimResult.data.expires_at,
+			message:
+				'Open confirm_url in this browser to confirm the claim request; it expires in 24 hours.'
+		});
+	}
+
+	const businessResult = await dependencies.fetchJson<BusinessRecordResponse>(
+		`/api/v1/businesses/${encodeURIComponent(input.atlas_id)}`,
+		{ signal }
+	);
+	if (!businessResult.data) return shapeToolError('business_not_found');
+	const confirmationText = buildClaimConfirmationText({
+		atlasId: input.atlas_id,
+		canonicalName: businessResult.data.canonical_name,
+		claimantRole: input.claimant_role
+	});
+
+	let confirmed: boolean;
+	try {
+		confirmed = await context.requestUserInteraction(async () =>
+			dependencies.confirm(confirmationText)
+		);
+	} catch {
+		return shapeToolError('confirmation_failed');
+	}
+	if (!confirmed) return shapeToolError('claim_cancelled');
+
+	const claimResult = await createClaim();
+	if (!claimResult.data || claimResult.data.status !== 'unconfirmed') {
+		return shapeToolError('claim_request_failed');
+	}
+	const token = new URL(
+		claimResult.data.confirm_url,
+		'https://atlas.example.invalid'
+	).searchParams.get('token');
+	if (!token) return shapeToolError('claim_confirmation_failed');
+
+	const confirmationResult = await dependencies.fetchJson<ConfirmedClaimResponse>(
+		`/api/v1/claims/${encodeURIComponent(claimResult.data.claim_id)}/confirm`,
+		{
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ token }),
+			signal
+		}
+	);
+	return confirmationResult.data?.status === 'confirmed'
+		? textResult({
+				status: 'confirmed',
+				claim_id: confirmationResult.data.claim_id,
+				verification_steps: confirmationResult.data.verification_steps
+			})
+		: shapeToolError('claim_confirmation_failed');
 }
 
 export function shapeSearchResults(response: SearchResponse): ToolTextResult {

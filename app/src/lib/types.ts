@@ -221,8 +221,18 @@ export interface SegmentResponse {
 	search_link: string;
 }
 
-export interface ClaimResponse {
+export interface UnconfirmedClaimResponse {
 	claim_id: string;
-	status: 'requested';
+	status: 'unconfirmed';
+	confirm_url: string;
+	expires_at: string;
 	verification_steps: string[];
 }
+
+export interface ConfirmedClaimResponse {
+	claim_id: string;
+	status: 'confirmed';
+	verification_steps: string[];
+}
+
+export type ClaimResponse = UnconfirmedClaimResponse | ConfirmedClaimResponse;
