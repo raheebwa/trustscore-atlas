@@ -34,7 +34,7 @@
 	<meta property="og:title" content="TrustScore Atlas" />
 	<meta
 		property="og:description"
-		content="Public business registers, harmonised, with every value cited: one record per business, field-level provenance, deterministic scores, and tools any agent can call."
+		content="Check any business against the public registers: which registers know it, its licences and permits, its scores, and the date each fact was published. Free and open, for people and AI agents."
 	/>
 	<meta property="og:image" content="https://atlas.trustscorehq.com/og.png" />
 	<meta property="og:image:width" content="1200" />

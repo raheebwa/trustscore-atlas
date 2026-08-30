@@ -73,11 +73,11 @@
 	<section class="grid gap-8 lg:grid-cols-2 lg:items-start">
 		<div class="flex flex-col gap-4">
 			<h1 class="font-display text-3xl text-ink">
-				Public business registers, harmonised, with every value cited.
+				Check any business against the public registers.
 			</h1>
 			<p class="max-w-prose text-base text-ink-muted">
-				One record per business, each field carrying the register that published it and the date it
-				said so, with what has not been checked shown as plainly as what has.
+				Type a name or tax number. See which government registers know it, its licences and permits,
+				its scores, and the date each fact was published. Free and open, for people and AI agents.
 			</p>
 			<form method="get" action={resolve('/search')} class="flex flex-wrap gap-2">
 				<label class="sr-only" for="home-search">Search businesses</label>
@@ -114,9 +114,7 @@
 				} loaded.`}
 				emphasis="lead"
 			/>
-			<p class="text-base text-ink-muted">
-				Every value on a record carries the register that published it and the date it said so.
-			</p>
+			<p class="text-base text-ink-muted">Every fact links to the register that published it.</p>
 		</div>
 	</section>
 

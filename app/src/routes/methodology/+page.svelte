@@ -88,6 +88,12 @@
 			meta={[scopeLine('Bindings for', data.countryName, data.registersLoaded)]}
 		/>
 
+		<p class="max-w-prose text-base text-ink-muted">
+			Public business registers, harmonised, with every value cited: one record per business, each
+			field carrying the register that published it and the date it said so, with what has not been
+			checked shown as plainly as what has.
+		</p>
+
 		<section id="not" class="flex flex-col gap-3">
 			<Callout tone="warning" title="What a score is not">
 				A score counts public-register facts against a published rubric. It is not a credit
