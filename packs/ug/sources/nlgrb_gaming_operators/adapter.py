@@ -57,11 +57,33 @@ def _latest_package(body: bytes) -> tuple[str, int, str]:
     return slug, package_id, str(year)
 
 
+HEADER_KEYS = {
+    "operator": "company_name",
+    "company name": "company_name",
+    "trade name": "trade_name",
+    "website": "website",
+    "license type": "licence_type",
+    "licence type": "licence_type",
+    "mode of operation": "mode_of_operation",
+    "license number": "licence_number",
+    "licence number": "licence_number",
+}
+
+
+def _header_order(cells: list[str]) -> list[str] | None:
+    """Map a header row to column keys; None when the row is not a header."""
+    keys = [HEADER_KEYS.get(c.strip().lower()) for c in cells]
+    if all(keys) and len(set(keys)) == len(keys):
+        return keys
+    return None
+
+
 def _emit_pdf_rows(ctx, pdf_bytes: bytes, year: str, source_ref: str) -> None:
     """One record per licence. The register prints one row per licence, but only the first
     row of an operator carries the operator's name, trade name and website; the rows that
     follow belong to the same operator until the next numbered row."""
     current: dict | None = None
+    order = list(COLUMNS)  # replaced by the header row when the register prints one
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         for page in pdf.pages:
             for table in page.extract_tables():
@@ -71,9 +93,11 @@ def _emit_pdf_rows(ctx, pdf_bytes: bytes, year: str, source_ref: str) -> None:
                         if any(cells):
                             ctx.drop_row("malformed operator row")
                         continue
-                    index, values = cells[0], dict(zip(COLUMNS, cells[1:], strict=True))
-                    if values["company_name"].upper() in {"OPERATOR", "COMPANY NAME"}:
-                        continue  # header row
+                    header = _header_order(cells[1:])
+                    if header:
+                        order = header  # the register's own column order wins
+                        continue
+                    index, values = cells[0], dict(zip(order, cells[1:], strict=True))
                     if values["company_name"]:
                         current = {
                             "company_name": values["company_name"],
