@@ -30,7 +30,9 @@ const USER_AGENT = 'TrustScoreAtlasVerifier/1.0 (+https://atlas.trustscorehq.com
 const DNS_NAME =
 	/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
-function hasValidHost(url: URL): boolean {
+/** The hosts this verifier will fetch. Exported so a challenge is never issued for a host it
+ * would refuse on sight. */
+export function hasValidHost(url: URL): boolean {
 	const host = url.hostname.toLowerCase();
 	if (url.protocol !== 'https:' || url.username || url.password) return false;
 	if (url.port && url.port !== '443') return false;
@@ -150,6 +152,8 @@ export async function verifyWebsiteString({
 	fetchImpl?: typeof fetch;
 }): Promise<VerificationResult> {
 	if (attempts >= 5) return failure('attempts_exhausted');
+	// An empty needle matches an empty file, so it would verify anything that answers at all.
+	if (challengeValue.trim() === '') return failure('string_not_found');
 
 	let claimedUrl: URL;
 	try {

@@ -71,3 +71,16 @@ export function apiServerError(err: unknown): Response {
 export function apiOptions(): Response {
 	return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
+
+/**
+ * Send a page claimant back to their own claim. The link carries the claim and its token because
+ * there is no account behind it: this address is the only way back to the claim, on the business
+ * the claim is for.
+ */
+export function claimPageRedirect(atlasId: string, claimId: string, token: string): Response {
+	const query = new URLSearchParams({ confirmation: 'complete', claim: claimId, token });
+	return new Response(null, {
+		status: 303,
+		headers: { Location: `/claim/${encodeURIComponent(atlasId)}?${query.toString()}` }
+	});
+}

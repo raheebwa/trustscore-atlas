@@ -1,4 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
+/**
+ * How long a claim stays actionable. It bounds both the link a page claimant is sent away with and
+ * the challenge issued against it, so the promise on the page ("it stops working when the claim
+ * window closes") is one number rather than two that drift apart.
+ */
+export const CLAIM_WINDOW_DAYS = 7;
+
 export const CLAIM_VERIFICATION_STEPS = [
 	'Place a verification string on the registered website or official social profile.',
 	'Reply from an email address on the domain named in a register.',

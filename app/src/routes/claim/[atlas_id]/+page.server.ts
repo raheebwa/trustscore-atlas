@@ -4,6 +4,15 @@ import { hashClaimConfirmationToken } from '$lib/claims';
 import { getDatabase } from '$lib/server/platform';
 import type { PageServerLoad } from './$types';
 
+/** Kept beside the verifier's own limit; the panel counts down from it. */
+const MAX_ATTEMPTS = 5;
+
+/** A window is open only when it can be read and has not passed. An unreadable date is closed. */
+function isOpen(at: string | null): boolean {
+	const closesAt = at ? Date.parse(at) : Number.NaN;
+	return Number.isFinite(closesAt) && closesAt > Date.now();
+}
+
 interface ClaimConfirmationRow {
 	claim_id: string;
 	atlas_id: string;
@@ -14,11 +23,93 @@ interface ClaimConfirmationRow {
 	expires_at: string | null;
 }
 
+/**
+ * What the claimant needs to finish verifying: the string to publish, where to publish it, how
+ * long they have and how many attempts remain. It is readable only with the claim's own token,
+ * which is the whole of the authorisation, and only on the business the claim is actually for:
+ * the page names one business in its header and would otherwise show it above another's claim.
+ *
+ * A challenge is offered as checkable only while it can still be checked. Anything consumed,
+ * expired, unreadable, or past the claim's own window is closed rather than live, so the page
+ * never invites a check that the verifier would refuse.
+ */
+async function loadVerification(
+	db: D1Database,
+	atlasId: string,
+	claimId: string | null,
+	token: string | null
+) {
+	if (!claimId || !token) return null;
+	const tokenHash = await hashClaimConfirmationToken(token);
+	const claim = await db
+		.prepare(
+			`SELECT claim_id, atlas_id, expires_at, verified_at, verified_domain FROM claims
+			 WHERE claim_id = ? AND confirmation_token = ?`
+		)
+		.bind(claimId, tokenHash)
+		.first<{
+			claim_id: string;
+			atlas_id: string;
+			expires_at: string | null;
+			verified_at: string | null;
+			verified_domain: string | null;
+		}>();
+	if (!claim || claim.atlas_id !== atlasId) return null;
+
+	const challenge = await db
+		.prepare(
+			`SELECT challenge_id, method, target, challenge_value, expires_at, attempts, outcome,
+			        consumed_at
+			 FROM claim_challenges WHERE claim_id = ? ORDER BY created_at DESC LIMIT 1`
+		)
+		.bind(claimId)
+		.first<{
+			challenge_id: string;
+			method: string;
+			target: string;
+			challenge_value: string | null;
+			expires_at: string;
+			attempts: number;
+			outcome: string | null;
+			consumed_at: string | null;
+		}>();
+
+	const base = {
+		claim_id: claim.claim_id,
+		token,
+		verified_at: claim.verified_at,
+		verified_domain: claim.verified_domain
+	};
+	if (claim.verified_at) return { ...base, state: 'verified' as const, challenge: null };
+	if (!challenge) return { ...base, state: 'none' as const, challenge: null };
+	if (!isOpen(claim.expires_at) || challenge.consumed_at || !isOpen(challenge.expires_at)) {
+		return { ...base, state: 'closed' as const, challenge: null };
+	}
+
+	return {
+		...base,
+		state: 'live' as const,
+		challenge: {
+			challenge_id: challenge.challenge_id,
+			method: challenge.method,
+			target: challenge.target,
+			challenge_value: challenge.challenge_value,
+			expires_at: challenge.expires_at,
+			attempts_left: Math.max(0, MAX_ATTEMPTS - challenge.attempts),
+			outcome: challenge.outcome
+		}
+	};
+}
+
 export const load: PageServerLoad = async ({ platform, params, url }) => {
 	const db = getDatabase(platform, 'businesses');
 	const token = url.searchParams.get('token');
+	const claimId = url.searchParams.get('claim');
 
-	if (token) {
+	// Two links reach this page and both carry a token. The confirmation link names the claim in
+	// the path; the verification link names the business and carries the claim beside the token,
+	// so the claim parameter is what tells them apart.
+	if (token && !claimId) {
 		const tokenHash = await hashClaimConfirmationToken(token);
 		const request = await db
 			.prepare(
@@ -71,9 +162,11 @@ export const load: PageServerLoad = async ({ platform, params, url }) => {
 		.bind(params.atlas_id)
 		.first<{ atlas_id: string; canonical_name: string }>();
 	if (!business) error(404, 'Business not found.');
+
 	return {
 		business,
 		confirmation: null,
-		confirmationComplete: url.searchParams.get('confirmation') === 'complete'
+		confirmationComplete: url.searchParams.get('confirmation') === 'complete',
+		verification: await loadVerification(db, params.atlas_id, claimId, token)
 	};
 };

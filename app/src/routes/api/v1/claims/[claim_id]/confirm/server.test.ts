@@ -121,4 +121,34 @@ describe('claim confirmation API', () => {
 		expect(claim.status).toBe('unconfirmed');
 		expect(batches).toHaveLength(0);
 	});
+
+	/**
+	 * Confirming from the page is the moment the claimant is handed back their claim. Without the
+	 * token in that address they land on a page that cannot read their claim, so the verification
+	 * panel they were confirming for never appears.
+	 */
+	it('sends a page confirmation back to the claim page with the claim and its token', async () => {
+		const token = 'page-confirmation-token';
+		const claim = await claimState(token, '2999-01-01T00:00:00.000Z');
+		const { db } = database(claim);
+		const form = new FormData();
+		form.set('token', token);
+		const response = await POST({
+			params: { claim_id: claim.claim_id },
+			platform: { env: { DB: db } },
+			request: new Request('https://atlas.example.invalid/api/v1/claims/claim_example/confirm', {
+				method: 'POST',
+				body: form
+			})
+		} as never);
+
+		expect(response.status).toBe(303);
+		const location = new URL(
+			response.headers.get('location') ?? '',
+			'https://atlas.example.invalid'
+		);
+		expect(location.pathname).toBe('/claim/atlas-example-1');
+		expect(location.searchParams.get('claim')).toBe('claim_example');
+		expect(location.searchParams.get('token')).toBe(token);
+	});
 });

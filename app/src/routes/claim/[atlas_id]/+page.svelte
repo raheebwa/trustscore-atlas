@@ -12,6 +12,12 @@
 	let { data }: PageProps = $props();
 	const record = $derived(data.confirmation?.record);
 	const requested = $derived(formatWhen(record?.requested_at ?? null));
+	// A check can take several seconds against a slow site, and a second click would spend
+	// another of the five attempts on the same question.
+	let checking = $state(false);
+	const challengeCloses = $derived(
+		formatWhen(data.verification?.challenge?.expires_at ?? null, { showTime: false })?.text
+	);
 </script>
 
 <svelte:head>
@@ -83,6 +89,81 @@
 			<Callout tone="success" title="Request recorded">
 				It is confirmed and waiting for verification.
 			</Callout>
+			{#if data.verification}
+				<Callout tone="warning" title="Keep this link">
+					The address in your browser is the only way back to this claim. There is no account and no
+					password: the link is what proves it is yours. Save it now. It stops working when the
+					claim window closes.
+				</Callout>
+			{/if}
+		{/if}
+
+		{#if data.verification}
+			<section class="flex flex-col gap-3 rounded-md border border-border bg-surface p-4">
+				<h2 class="text-xl font-semibold text-ink">Verify this claim</h2>
+				{#if data.verification.state === 'verified'}
+					<Callout tone="success" title="Website control proved">
+						Atlas found the string on {data.verification.verified_domain}. That proves you control
+						that website. A maintainer reviews the claim itself before anything about the record
+						changes.
+					</Callout>
+				{:else if data.verification.state === 'live' && data.verification.challenge}
+					{@const challenge = data.verification.challenge}
+					<p class="text-base text-ink-muted">
+						Publish this string on {challenge.target}, either way round, then ask Atlas to check.
+					</p>
+					<p
+						class="rounded-md border border-border-strong bg-panel-2 p-3 font-mono text-2xs text-ink"
+					>
+						{challenge.challenge_value}
+					</p>
+					<ol class="flex flex-col gap-2 text-base text-ink">
+						<li>
+							Put it in a file at <span class="font-mono text-2xs"
+								>{challenge.target}/.well-known/atlas-claim.txt</span
+							>, as the whole file.
+						</li>
+						<li>
+							Or add <span class="font-mono text-2xs"
+								>&lt;meta name="atlas-claim" content="{challenge.challenge_value}"&gt;</span
+							>
+							to the head of {challenge.target}.
+						</li>
+					</ol>
+					<p class="text-xs text-ink-muted">
+						{challenge.attempts_left} of 5 checks left.
+						{#if challengeCloses}The challenge expires {challengeCloses}.{/if}
+						{#if challenge.outcome && !challenge.outcome.startsWith('verified')}
+							The last check said: {challenge.outcome.replaceAll('_', ' ')}.
+						{/if}
+					</p>
+					<form
+						method="post"
+						action={`${resolve('/api/v1/claims/[claim_id]/verify/website', { claim_id: data.verification.claim_id })}`}
+						onsubmit={() => (checking = true)}
+					>
+						<input type="hidden" name="token" value={data.verification.token} />
+						<input type="hidden" name="challenge_id" value={challenge.challenge_id} />
+						<button
+							type="submit"
+							disabled={checking || challenge.attempts_left === 0}
+							class="h-10 rounded-md border border-accent bg-accent px-4 text-base font-medium text-ink transition-colors duration-120 hover:border-accent-ink hover:bg-accent-ink hover:text-canvas"
+						>
+							{checking ? 'Checking your website' : 'Check my website now'}
+						</button>
+					</form>
+				{:else if data.verification.state === 'closed'}
+					<Callout tone="warning" title="This check has closed">
+						The claim window has passed, or the check was already used. Claim the business again to
+						start a new one.
+					</Callout>
+				{:else}
+					<Callout tone="info" title="No challenge on this claim yet">
+						Claim the business again with your website address, and Atlas will give you a string to
+						publish.
+					</Callout>
+				{/if}
+			</section>
 		{/if}
 
 		<!--
@@ -94,7 +175,7 @@
 			action={resolve('/api/v1/claims')}
 			class="flex flex-col gap-4"
 			toolname="claim_business_form"
-			tooldescription="Record a confirmed claim request for the business on this page. Submitting this form asserts the claimant's role; verification happens afterwards through the listed routes."
+			tooldescription="Record a confirmed claim request for the business on this page. Submitting this form asserts the claimant's role, and issues a website string to publish when a website address is given. A maintainer reviews the claim before anything about the record changes."
 		>
 			<input
 				type="hidden"
@@ -102,6 +183,29 @@
 				value={data.business.atlas_id}
 				toolparamdescription="Opaque atlas_id of the business on this page."
 			/>
+			<input
+				type="hidden"
+				name="verification_method"
+				value="website_string"
+				toolparamdescription="How the claimant will prove the claim. Only website_string is offered here, and it applies only when a website address is given."
+			/>
+			<label class="flex max-w-md flex-col gap-1">
+				<span class="text-xs font-medium text-ink-muted"
+					>Your business website, if you have one</span
+				>
+				<span class="text-2xs text-ink-muted">
+					Atlas gives you a short string to publish on it. Publishing it proves you control the
+					site, which is what turns a claim into a verified claim. You can leave this blank and
+					verify another way later.
+				</span>
+				<input
+					name="website_url"
+					type="url"
+					placeholder="https://example.co.ug"
+					toolparamdescription="Optional public https address of the claimed business. Giving one issues a string to publish on that site; leaving it empty records the claim without a website challenge."
+					class="h-10 rounded-md border border-border bg-surface px-3 text-base text-ink transition-colors duration-120 hover:border-border-strong"
+				/>
+			</label>
 			<label class="flex max-w-sm flex-col gap-1">
 				<span class="text-xs font-medium text-ink-muted">Your role</span>
 				<select

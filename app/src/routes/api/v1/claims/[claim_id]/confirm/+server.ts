@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { json } from '@sveltejs/kit';
 import { CLAIM_VERIFICATION_STEPS, hashClaimConfirmationToken } from '$lib/claims';
-import { apiBadRequest, apiServerError } from '$lib/server/api';
+import { apiBadRequest, apiServerError, claimPageRedirect } from '$lib/server/api';
 import { getDatabase } from '$lib/server/platform';
 import type { ConfirmedClaimResponse } from '$lib/types';
 import type { RequestHandler } from './$types';
@@ -44,13 +44,6 @@ function confirmedResponse(claimId: string): ConfirmedClaimResponse {
 	};
 }
 
-function claimPageRedirect(atlasId: string): Response {
-	return new Response(null, {
-		status: 303,
-		headers: { Location: `/claim/${encodeURIComponent(atlasId)}?confirmation=complete` }
-	});
-}
-
 export const POST: RequestHandler = async ({ params, platform, request }) => {
 	try {
 		const { token, isPageForm } = await readToken(request);
@@ -70,7 +63,7 @@ export const POST: RequestHandler = async ({ params, platform, request }) => {
 
 		if (claim.status === 'confirmed') {
 			return isPageForm
-				? claimPageRedirect(claim.atlas_id)
+				? claimPageRedirect(claim.atlas_id, claim.claim_id, token)
 				: json(confirmedResponse(claim.claim_id));
 		}
 
@@ -120,7 +113,9 @@ export const POST: RequestHandler = async ({ params, platform, request }) => {
 				)
 		]);
 
-		return isPageForm ? claimPageRedirect(claim.atlas_id) : json(confirmedResponse(claim.claim_id));
+		return isPageForm
+			? claimPageRedirect(claim.atlas_id, claim.claim_id, token)
+			: json(confirmedResponse(claim.claim_id));
 	} catch (err) {
 		return apiServerError(err);
 	}
