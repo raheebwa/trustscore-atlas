@@ -37,6 +37,7 @@ function makeResult(index: number): SearchResultItem {
 		country: 'UG',
 		division: 'Nakawa',
 		district: 'Kampala',
+		location: 'Nakawa, Kampala',
 		sector_category: 'Trade',
 		sector_nature: 'Hardware',
 		identifiers: [{ scheme: 'ug:kcca_licence', value: `KCCA-${index}`, source: 'kcca.businesses' }],
@@ -71,6 +72,7 @@ const businessFixture: BusinessRecordResponse = {
 	sector_nature: 'Hardware',
 	district: 'Kampala',
 	division: 'Nakawa',
+	location: 'Nakawa, Kampala',
 	first_seen: '2026-08-01',
 	last_seen: '2026-08-12',
 	identifiers: [{ scheme: 'ug:kcca_licence', value: 'KCCA-1', source: 'kcca.businesses' }],
@@ -483,7 +485,8 @@ describe('shapeSearchResults', () => {
 			canonical_name: 'Example Bank of Kenya Limited',
 			country: 'KE',
 			district: null,
-			division: null
+			division: null,
+			location: 'Kenya'
 		};
 		const value = parsed(
 			shapeSearchResults({
@@ -619,7 +622,8 @@ describe('shapeBusinessRecord', () => {
 				...businessFixture,
 				country: 'KE',
 				district: null,
-				division: null
+				division: null,
+				location: 'Kenya'
 			})
 		);
 
@@ -677,6 +681,7 @@ describe('new tool result budgets', () => {
 				country: 'UG',
 				district: 'Example District',
 				division: 'Example Division',
+				location: 'Example Division, Example District',
 				sector_category: 'Trade',
 				sector_nature: 'Hardware',
 				formality: {

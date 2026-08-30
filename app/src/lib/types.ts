@@ -38,6 +38,8 @@ export interface SearchResultItem {
 	country: string | null;
 	division: string | null;
 	district: string | null;
+	/** The one line a page or a tool shows for where this business is. */
+	location: string;
 	sector_category: string | null;
 	sector_nature: string | null;
 	identifiers: Identifier[];
@@ -124,6 +126,8 @@ export interface BusinessRecordResponse {
 	sector_nature: string | null;
 	district: string | null;
 	division: string | null;
+	/** The one line a page or a tool shows for where this business is. */
+	location: string;
 	first_seen: string;
 	last_seen: string;
 	identifiers: Identifier[];
@@ -203,6 +207,8 @@ export interface SegmentCandidate {
 	country: string | null;
 	district: string | null;
 	division: string | null;
+	/** The one line a page or a tool shows for where this business is. */
+	location: string;
 	sector_category: string | null;
 	sector_nature: string | null;
 	formality: {

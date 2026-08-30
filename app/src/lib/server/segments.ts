@@ -1,4 +1,5 @@
-import { getConsistentLiveRegenerationId } from './atlas';
+import { getConsistentLiveRegenerationId, getLocationPublishingCountries } from './atlas';
+import { displayLocation } from '$lib/location';
 import type { AtlasDatabases } from './platform';
 import type { SegmentFilters, SegmentResponse } from '$lib/types';
 
@@ -95,7 +96,8 @@ function cachedFormalityVersion(json: string): number | null {
 async function topSegmentCandidates(
 	scoresDb: D1Database,
 	liveRegenerationId: string | null,
-	businesses: CandidateBusinessRow[]
+	businesses: CandidateBusinessRow[],
+	locationPublishingCountries: Set<string>
 ): Promise<SegmentResponse['top_candidates']> {
 	if (!liveRegenerationId || businesses.length === 0) return [];
 	const expectedVersions = new Map(
@@ -133,6 +135,9 @@ async function topSegmentCandidates(
 			country: business.country,
 			district: business.district,
 			division: business.division,
+			location: displayLocation(business.district, business.division, business.country, {
+				countryPublishesFinerLocation: locationPublishingCountries.has(business.country ?? '')
+			}),
 			sector_category: business.sector_category,
 			sector_nature: business.sector_nature,
 			formality: {
@@ -181,7 +186,8 @@ export async function findSegment(
 	const topCandidates = await topSegmentCandidates(
 		scoresDb,
 		liveRegenerationId,
-		businessesResult.results ?? []
+		businessesResult.results ?? [],
+		await getLocationPublishingCountries(databases)
 	);
 
 	return {

@@ -14,7 +14,7 @@ import {
 	shouldUseFts
 } from './search';
 import { formatCoverageSentence, formatScoreSentence } from '$lib/format';
-import { displayDistrict } from '$lib/location';
+import { displayDistrict, displayLocation } from '$lib/location';
 import { rankValues } from '$lib/ordering';
 import type { AtlasDatabases, CoverageLists, CoverageMetadata } from './platform';
 import {
@@ -467,6 +467,27 @@ export function getCoverageMetadata(databases: AtlasDatabases): Promise<Coverage
 	return databases.coverageMetadata;
 }
 
+/**
+ * The countries whose registers publish a district or a division for at least one business. A
+ * record from a pack that is absent here has no finer location to miss, so its country is the
+ * whole of what is known; a record from a pack that is present here is simply missing one.
+ */
+async function readLocationPublishingCountries(db: D1Database): Promise<Set<string>> {
+	const { results } = await db
+		.prepare(
+			`SELECT DISTINCT country FROM segments
+			 WHERE district IS NOT NULL OR division IS NOT NULL`
+		)
+		.bind()
+		.all<{ country: string }>();
+	return new Set((results ?? []).map((row) => row.country));
+}
+
+export function getLocationPublishingCountries(databases: AtlasDatabases): Promise<Set<string>> {
+	databases.locationPublishingCountries ??= readLocationPublishingCountries(databases.db);
+	return databases.locationPublishingCountries;
+}
+
 export async function getLiveRegenerationId(db: D1Database): Promise<string | null> {
 	return getMetaValue(db, LIVE_REGENERATION_KEY);
 }
@@ -559,7 +580,8 @@ function toSearchResultItem(
 	row: BusinessRow,
 	identifiers: Identifier[],
 	formality: FormalitySummary | null,
-	coverageMetadata: CoverageMetadata
+	coverageMetadata: CoverageMetadata,
+	locationPublishingCountries: Set<string>
 ): SearchResultItem {
 	const lists = coverageFor(coverageMetadata, row.country);
 	const coverage = composeCoverage(row.coverage, lists.applicable, lists.checked);
@@ -569,6 +591,9 @@ function toSearchResultItem(
 		country: row.country,
 		division: row.division,
 		district: displayDistrict(row.district, row.division),
+		location: displayLocation(row.district, row.division, row.country, {
+			countryPublishesFinerLocation: locationPublishingCountries.has(row.country)
+		}),
 		sector_category: row.sector_category,
 		sector_nature: row.sector_nature,
 		identifiers,
@@ -719,17 +744,20 @@ export async function searchBusinesses(
 	const hasMore = rows.length > limit;
 	const pageRows = rows.slice(0, limit);
 	const atlasIds = pageRows.map((row) => row.atlas_id);
-	const [identifierMap, formalityMap, coverageMetadata] = await Promise.all([
-		fetchIdentifiersFor(db, atlasIds),
-		fetchFormalityFor(scoresDb, pageRows, liveRegenerationId),
-		getCoverageMetadata(databases)
-	]);
+	const [identifierMap, formalityMap, coverageMetadata, locationPublishingCountries] =
+		await Promise.all([
+			fetchIdentifiersFor(db, atlasIds),
+			fetchFormalityFor(scoresDb, pageRows, liveRegenerationId),
+			getCoverageMetadata(databases),
+			getLocationPublishingCountries(databases)
+		]);
 	const items = pageRows.map((row) =>
 		toSearchResultItem(
 			row,
 			identifierMap.get(row.atlas_id) ?? [],
 			formalityMap.get(row.atlas_id) ?? null,
-			coverageMetadata
+			coverageMetadata,
+			locationPublishingCountries
 		)
 	);
 
@@ -833,11 +861,13 @@ async function getBusinessWithStatements(
 	if (!businessRow) return null;
 
 	const liveRegenerationId = await getConsistentLiveRegenerationId(databases);
-	const [identifierMap, statements, coverageMetadata] = await Promise.all([
-		fetchIdentifiersFor(db, [atlasId]),
-		fetchStatementsFor(statementsDb, atlasId),
-		getCoverageMetadata(databases)
-	]);
+	const [identifierMap, statements, coverageMetadata, locationPublishingCountries] =
+		await Promise.all([
+			fetchIdentifiersFor(db, [atlasId]),
+			fetchStatementsFor(statementsDb, atlasId),
+			getCoverageMetadata(databases),
+			getLocationPublishingCountries(databases)
+		]);
 	const scores = await fetchScoresFor(scoresDb, atlasId, statements, liveRegenerationId);
 
 	const sourceSlugs = Array.from(new Set(statements.map((s) => s.source)));
@@ -864,6 +894,9 @@ async function getBusinessWithStatements(
 			sector_nature: businessRow.sector_nature,
 			district: displayDistrict(businessRow.district, businessRow.division),
 			division: businessRow.division,
+			location: displayLocation(businessRow.district, businessRow.division, businessRow.country, {
+				countryPublishesFinerLocation: locationPublishingCountries.has(businessRow.country)
+			}),
 			first_seen: businessRow.first_seen,
 			last_seen: businessRow.last_seen,
 			identifiers: identifierMap.get(atlasId) ?? [],

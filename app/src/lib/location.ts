@@ -35,17 +35,24 @@ export function countryName(code: string | null | undefined): string | null {
 }
 
 /**
- * One display line for a record's location. Kenyan registers publish no district or division
- * (the CBK lists carry neither), so showing "Unknown division, Unknown district" would read as
- * missing Ugandan data rather than a register that never published it. Fall back to the country.
+ * One display line for a record's location. A pack whose registers publish no district or
+ * division anywhere (Kenya's regulator directories today) can only say which country a record
+ * sits in, and that is worth saying. Where the pack does publish locations, a record without one
+ * is a gap in the data, not a country-level fact: 14,689 Ugandan records come from registers that
+ * carry no address, and naming the country there would read as a published location.
  */
 export function displayLocation(
 	district: string | null | undefined,
 	division: string | null | undefined,
-	country: string | null | undefined
+	country: string | null | undefined,
+	options: { countryPublishesFinerLocation?: boolean } = {}
 ): string {
 	const resolvedDistrict = displayDistrict(district, division)?.trim() || null;
 	const resolvedDivision = division?.trim() || null;
 	if (resolvedDivision && resolvedDistrict) return `${resolvedDivision}, ${resolvedDistrict}`;
-	return resolvedDivision ?? resolvedDistrict ?? countryName(country) ?? 'Location not published';
+	if (resolvedDivision || resolvedDistrict) return (resolvedDivision ?? resolvedDistrict) as string;
+	if (options.countryPublishesFinerLocation === false) {
+		return countryName(country) ?? 'Location not published';
+	}
+	return 'Location not published';
 }
