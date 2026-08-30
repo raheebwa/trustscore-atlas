@@ -193,7 +193,7 @@ for (const c of cases) {
 	if (!c.tool) {
 		const errors = [...pageErrors];
 		const verdict = c.demo
-			? `${list.length} tools, ${errors.length} page errors${errors.length ? ': ' + errors.join(' | ') : ''}`
+			? `${list.length} tools (imperative plus declarative forms), ${errors.length} page errors${errors.length ? ': ' + errors.join(' | ') : ''}`
 			: 'tools: ' + list.join(', ');
 		rows.push({
 			...c,
@@ -201,7 +201,7 @@ for (const c of cases) {
 			verdict,
 			ms: 0,
 			bytes: 0,
-			ok: c.demo ? list.length === 9 && errors.length === 0 : true
+			ok: c.demo ? list.length >= 9 && errors.length === 0 : true
 		});
 		continue;
 	}
