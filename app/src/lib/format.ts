@@ -39,3 +39,15 @@ export function formatScoreSentence(score: ScoreSentenceInput): string {
 			: '';
 	return `${label} ${score.value} of ${score.checkable} checkable; ${score.unknown} unknown${unknownList}`;
 }
+
+/**
+ * List key for an identifier row: the same scheme and value can come from two registers
+ * (a TIN on both URA lists), so the source is part of the identity.
+ */
+export function identifierKey(identifier: {
+	scheme: string;
+	value: string;
+	source?: string | null;
+}): string {
+	return [identifier.scheme, identifier.value, identifier.source ?? ''].join(' ');
+}

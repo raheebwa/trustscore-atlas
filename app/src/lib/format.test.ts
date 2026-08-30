@@ -28,3 +28,13 @@ describe('formatScoreSentence', () => {
 		);
 	});
 });
+
+describe('identifierKey', () => {
+	it('keeps the same identifier from two registers apart', async () => {
+		const { identifierKey } = await import('./format');
+		const customs = { scheme: 'ug:tin', value: '1000000000', source: 'ura.customs_agents' };
+		const vat = { scheme: 'ug:tin', value: '1000000000', source: 'ura.vat_withholding_agents' };
+		expect(identifierKey(customs)).not.toBe(identifierKey(vat));
+		expect(identifierKey(customs)).toBe('ug:tin 1000000000 ura.customs_agents');
+	});
+});
