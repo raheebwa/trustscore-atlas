@@ -16,6 +16,7 @@
 	for a decision, oldest first. A decision is recorded once and never edits the request.
 	<a href={resolve('/ops/sources')} class="underline">Sources</a>
 	<a href={resolve('/ops/linkage')} class="underline">Linkage review</a>
+	<a href={resolve('/ops/regeneration')} class="underline">Regeneration</a>
 </p>
 
 {#if form?.message}
