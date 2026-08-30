@@ -19,6 +19,7 @@
 			>
 			<nav class="flex gap-6 text-sm font-medium text-stone-600">
 				<a href={resolve('/search')} class="hover:text-stone-900">Search</a>
+				<a href={resolve('/explore')} class="hover:text-stone-900">Explore</a>
 				<a href={resolve('/sources')} class="hover:text-stone-900">Sources</a>
 				<a href={resolve('/tools')} class="hover:text-stone-900">Actions</a>
 			</nav>
