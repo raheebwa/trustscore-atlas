@@ -18,18 +18,45 @@ try {
 	process.exit(1);
 }
 
-const routes = [
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+// scripts/ lives inside app/, and the repository's data directory is its sibling's parent.
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+const routeSpecs = [
 	'/',
+	'/search',
 	'/search?q=hardware',
+	'/search?q=hardware&district=KAMPALA',
+	'/search?q=nothingmatchesthisname',
+	'/search?q=bank&district=Kampala%20District',
 	'/explore',
+	'/explore?district=KAMPALA',
+	'/explore?country=KE',
 	'/sources',
 	'/methodology',
 	'/downloads',
 	'/tools',
 	'/b/atl_11bf115c93cd7870',
+	'/b/atl_6307e13f9040f449',
 	'/b/atl_11bf115c93cd7870/trace/canonical_name',
-	'/claim/atl_11bf115c93cd7870'
+	{ route: '/b/atl_does_not_exist', expect: 404 },
+	'/claim/atl_11bf115c93cd7870',
+	'/claim/atl_11bf115c93cd7870?token=not-a-real-token',
+	'/report/issue_does_not_exist?token=not-a-real-token',
+	'/correct/correction_does_not_exist?token=not-a-real-token',
+	'/label/label_does_not_exist?token=not-a-real-token',
+	{ route: '/ops', expect: 403 },
+	{ route: '/not-a-route', expect: 404 }
 ];
+
+// A route may declare the status it is meant to answer with, so an error page can be swept for
+// how it reads without the sweep calling its own status a failure.
+const routes = routeSpecs.map((spec) => (typeof spec === 'string' ? spec : spec.route));
+const expectedStatus = new Map(
+	routeSpecs.filter((spec) => typeof spec !== 'string').map((spec) => [spec.route, spec.expect])
+);
 const viewports = [
 	{ width: 1280, height: 900 },
 	{ width: 390, height: 844 }
@@ -68,7 +95,7 @@ try {
 try {
 	for (const viewport of viewports) {
 		const context = await browser.newContext({ viewport });
-		const directory = `data/runs/screens/${viewport.width}`;
+		const directory = path.join(REPO_ROOT, 'data', 'runs', 'screens', String(viewport.width));
 		await mkdir(directory, { recursive: true });
 
 		for (const route of routes) {
@@ -77,9 +104,16 @@ try {
 			const label = `${viewport.width}x${viewport.height}`;
 			const target = new URL(route, baseUrl);
 
+			// A route that exists to show an error answers with one: the sweep still checks how it
+			// reads, it just does not call the expected status a failure.
+			const allowedStatus = expectedStatus.get(route);
+
 			page.on('console', (message) => {
-				if (message.type() === 'error') {
-					result.consoleErrors.push(`${label}: ${message.text()}`);
+				const text = message.text();
+				const echoesExpectedStatus =
+					allowedStatus !== undefined && text.includes(`status of ${allowedStatus}`);
+				if (message.type() === 'error' && !echoesExpectedStatus) {
+					result.consoleErrors.push(`${label}: ${text}`);
 				}
 			});
 			page.on('pageerror', (error) => {
@@ -87,7 +121,7 @@ try {
 			});
 			page.on('response', (response) => {
 				const status = response.status();
-				if (status < 400) return;
+				if (status < 400 || status === allowedStatus) return;
 				const responseUrl = new URL(response.url());
 				if (responseUrl.origin === baseOrigin) {
 					result.failedResponses.push(`${label}: ${status} ${response.url()}`);

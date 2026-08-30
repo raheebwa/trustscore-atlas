@@ -26,7 +26,10 @@
 		/>
 	{:else}
 		{#if data.confirmation.state === 'unconfirmed'}
-			<p class="mt-3 text-stone-700">Review this exact record before confirming the request.</p>
+			<Callout tone="info" title="Not confirmed yet"
+				>Check that this is what you meant to send. Confirming stores it for review; it does not
+				change a published record.</Callout
+			>
 		{:else if data.confirmation.state === 'expired'}
 			<Callout tone="warning" title="This correction request has expired."
 				>Start again from the record for a fresh link.</Callout
