@@ -421,3 +421,63 @@ def test_regenerate_applies_maintainer_labels_from_the_canonical_labels_file(tmp
     assert aliases == [{"atlas_id": merged, "canonical_atlas_id": kept, "reason": "label:match"}]
     assert second.summary["counts"]["aliases"] == 1
     assert second.summary["labels"] == 1
+
+
+def test_regenerate_merges_two_packs_and_keeps_coverage_per_country(tmp_path: Path):
+    """One regeneration serves several country packs: businesses carry their country, each
+    pack is resolved and scored with its own bindings, and the pack-wide coverage lists are
+    written per country so a Kenyan record is never judged against Ugandan registers."""
+    spec = load_adapter(ADAPTER)
+    pages = {
+        spec.module.query_url(n): (ADAPTER / "fixtures" / "raw" / f"{_slug(n)}.html").read_bytes()
+        for n in EXPECTED["natures"]
+    }
+    run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=lambda url, **_: pages[url],
+        salt=SALT,
+        params={"natures": EXPECTED["natures"]},
+    )
+    cbk_dir = PACKS / "ke" / "sources" / "cbk_licensed_banks"
+    cbk = load_adapter(cbk_dir)
+    cbk_pages = {
+        cbk.module.COMMERCIAL_URL: (cbk_dir / "fixtures" / "raw" / "commercial-banks.html"),
+        cbk.module.MICROFINANCE_URL: (cbk_dir / "fixtures" / "raw" / "microfinance-banks.html"),
+    }
+    run_adapter(
+        cbk,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=lambda url, **_: cbk_pages[url].read_bytes(),
+        salt=SALT,
+    )
+    out = regenerate(
+        pack_dirs=[PACKS / "ug", PACKS / "ke"],
+        data_root=tmp_path,
+        regeneration_id="20260830T040000Z",
+        computed_at="2026-08-30T04:00:00Z",
+        rubrics_dir=PACKS.parent / "rubrics",
+        schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
+    )
+    businesses = pq.read_table(out.directory / "businesses.parquet").to_pylist()
+    by_country = {}
+    for b in businesses:
+        by_country.setdefault(b["country"], []).append(b)
+    assert set(by_country) == {"UG", "KE"}
+    kenyan = json.loads(by_country["KE"][0]["coverage"])
+    assert kenyan["applicable"] == ["cbk.licensed_banks"]
+    assert kenyan["found_in"] == ["cbk.licensed_banks"]
+    scores = pq.read_table(out.directory / "scores.parquet").to_pylist()
+    assert {s["atlas_id"] for s in scores} >= {b["atlas_id"] for b in by_country["KE"]}
+    assert out.summary["packs"] == ["UG", "KE"]
+    assert {s["slug"] for s in out.summary["sources"]} >= {"kcca.businesses", "cbk.licensed_banks"}
+    assert out.summary["inputs"]["cbk.licensed_banks"] == RUN_ID
+    swap = (out.directory / "swap.sql").read_text()
+    assert "'coverage_applicable:KE'" in swap and '"cbk.licensed_banks"' in swap
+    assert "'coverage_applicable:UG'" in swap and "'coverage_applicable'" in swap
+    stage = (out.directory / "stage.sql").read_text()
+    assert "'KE'" in stage

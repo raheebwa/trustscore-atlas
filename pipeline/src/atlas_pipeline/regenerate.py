@@ -2,7 +2,7 @@
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -121,19 +121,17 @@ def _append_crosswalk(path: Path, resolution, regeneration_id: str) -> None:
     tmp.replace(path)
 
 
-def regenerate(
-    *,
-    pack_dir: Path,
-    data_root: Path,
-    regeneration_id: str | None = None,
-    computed_at: str | None = None,
-    rubrics_dir: Path,
-    schema_path: Path,
-    empty_since: dict[str, str] | None = None,
-) -> Regeneration:
-    started = datetime.now(UTC)
-    regeneration_id = regeneration_id or started.strftime("%Y%m%dT%H%M%SZ")
-    computed_at = computed_at or started.isoformat().replace("+00:00", "Z")
+@dataclass
+class _PackInputs:
+    pack_dir: Path
+    pack: dict
+    statements: list[dict]
+    inputs: dict[str, str]
+    sources: list[dict]
+
+
+def _load_pack(pack_dir: Path, data_root: Path, empty_since: dict[str, str] | None) -> _PackInputs:
+    """Accepted runs of one pack: statements, run ids per source and source rows."""
     pack = yaml.safe_load((pack_dir / "pack.yml").read_text())
     iso2 = pack["country"].lower()
 
@@ -187,37 +185,106 @@ def regenerate(
 
     if not statements:
         raise RuntimeError(
-            "no accepted run for any loaded source; refusing to regenerate an empty snapshot"
+            f"no accepted run for any loaded source of {pack['country']}; "
+            "refusing to regenerate an empty snapshot"
         )
-    crosswalk_path = data_root / "canonical" / "crosswalk.parquet"
-    crosswalk = _load_crosswalk(crosswalk_path)
-    labels = _load_labels(data_root / "canonical" / "labels.jsonl")
-    resolution = resolve(
-        statements, pack=pack, checked_sources=list(inputs), crosswalk=crosswalk, labels=labels
-    )
-    by_business: dict[str, list[dict]] = {}
-    for s in resolution.statements:
-        by_business.setdefault(s["atlas_id"], []).append(s)
-    scores: list[dict] = []
-    for name in PHASE0_RUBRICS:
-        rubric = load_rubric(rubrics_dir / name / "v1.yml", pack_dir / "rubrics" / "bindings.yml")
-        for b in resolution.businesses:
-            result = score(
-                rubric, b, by_business.get(b["atlas_id"], []), evaluation_as_of=computed_at
-            )
-            scores.append({"atlas_id": b["atlas_id"], **result})
-            b.setdefault("scores", {})[name] = {
-                "value": result["value"],
-                "max": result["max"],
-                "checkable": result["checkable"],
-                "unknown": result["unknown"],
-                "version": result["version"],
-            }
+    return _PackInputs(pack_dir, pack, statements, inputs, sources)
 
+
+@dataclass
+class _Combined:
+    """One regeneration over several packs: resolved and scored per pack, served together."""
+
+    businesses: list[dict] = field(default_factory=list)
+    statements: list[dict] = field(default_factory=list)
+    aliases: list[dict] = field(default_factory=list)
+    scores: list[dict] = field(default_factory=list)
+    candidates: list[dict] = field(default_factory=list)
+    sources: list[dict] = field(default_factory=list)
+    inputs: dict[str, str] = field(default_factory=dict)
+    countries: list[str] = field(default_factory=list)
+    coverage_meta: dict[str, str] = field(default_factory=dict)
+    new_entities: list[str] = field(default_factory=list)
+
+
+def regenerate(
+    *,
+    pack_dir: Path | None = None,
+    pack_dirs: list[Path] | None = None,
+    data_root: Path,
+    regeneration_id: str | None = None,
+    computed_at: str | None = None,
+    rubrics_dir: Path,
+    schema_path: Path,
+    empty_since: dict[str, str] | None = None,
+) -> Regeneration:
+    started = datetime.now(UTC)
+    regeneration_id = regeneration_id or started.strftime("%Y%m%dT%H%M%SZ")
+    computed_at = computed_at or started.isoformat().replace("+00:00", "Z")
+    packs = list(pack_dirs or []) + ([pack_dir] if pack_dir else [])
+    if not packs:
+        raise ValueError("regenerate needs at least one pack")
+
+    crosswalk_path = data_root / "canonical" / "crosswalk.parquet"
+    labels = _load_labels(data_root / "canonical" / "labels.jsonl")
+    combined = _Combined()
+    for pack_path in packs:
+        loaded = _load_pack(pack_path, data_root, empty_since)
+        country = loaded.pack["country"]
+        resolution = resolve(
+            loaded.statements,
+            pack=loaded.pack,
+            checked_sources=list(loaded.inputs),
+            crosswalk=_load_crosswalk(crosswalk_path),
+            labels=labels,
+        )
+        by_business: dict[str, list[dict]] = {}
+        for s in resolution.statements:
+            by_business.setdefault(s["atlas_id"], []).append(s)
+        for name in PHASE0_RUBRICS:
+            rubric = load_rubric(
+                rubrics_dir / name / "v1.yml", pack_path / "rubrics" / "bindings.yml"
+            )
+            for b in resolution.businesses:
+                result = score(
+                    rubric, b, by_business.get(b["atlas_id"], []), evaluation_as_of=computed_at
+                )
+                combined.scores.append({"atlas_id": b["atlas_id"], **result})
+                b.setdefault("scores", {})[name] = {
+                    "value": result["value"],
+                    "max": result["max"],
+                    "checkable": result["checkable"],
+                    "unknown": result["unknown"],
+                    "version": result["version"],
+                }
+        _append_crosswalk(crosswalk_path, resolution, regeneration_id)
+        combined.candidates += name_candidates(resolution.businesses)
+        combined.businesses += resolution.businesses
+        combined.statements += resolution.statements
+        combined.aliases += resolution.aliases
+        combined.new_entities += list(resolution.new_entities)
+        combined.sources += loaded.sources
+        combined.inputs.update(loaded.inputs)
+        combined.countries.append(country)
+        coverage = resolution.businesses[0]["coverage"]
+        per_country = {
+            f"coverage_applicable:{country}": _json(coverage["applicable"]),
+            f"coverage_checked:{country}": _json(coverage["checked"]),
+        }
+        if not combined.coverage_meta:  # the first pack also fills the unsuffixed keys
+            per_country |= {
+                "coverage_applicable": _json(coverage["applicable"]),
+                "coverage_checked": _json(coverage["checked"]),
+            }
+        combined.coverage_meta.update(per_country)
+
+    resolution = combined
+    scores = combined.scores
+    inputs = combined.inputs
+    sources = combined.sources
     out = data_root / "regen" / regeneration_id
     out.mkdir(parents=True, exist_ok=True)
-    _append_crosswalk(crosswalk_path, resolution, regeneration_id)
-    candidates = name_candidates(resolution.businesses)
+    candidates = combined.candidates
     pq.write_table(
         pa.Table.from_pylist(
             [{**c, "comparison": _json(c["comparison"])} for c in candidates],
@@ -322,15 +389,13 @@ def regenerate(
         "started_at": started.isoformat().replace("+00:00", "Z"),
         "finished_at": finished.isoformat().replace("+00:00", "Z"),
         "inputs": inputs,
+        "packs": combined.countries,
     }
     # Free-plan size discipline: staged tables sit beside live ones during an import, so the
     # loader first drops the largest live table. The previous regeneration's stage.sql and
     # swap.sql stay on disk as the rollback path; trace reads fail closed during the load.
     load_order: dict[str, list[str]] = {}
-    pack_meta = {
-        "coverage_applicable": _json(resolution.businesses[0]["coverage"]["applicable"]),
-        "coverage_checked": _json(resolution.businesses[0]["coverage"]["checked"]),
-    }
+    pack_meta = combined.coverage_meta
     for database, prefix in (
         ("DB", ""),
         ("DB_STATEMENTS", "statements-"),

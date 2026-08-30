@@ -35,7 +35,13 @@ def main(argv: list[str] | None = None) -> int:
         "--replay-from", type=Path, help="manifest.json of a run whose raw objects to reuse"
     )
     regen = sub.add_parser("regenerate", help="resolve, score and write serving sql for a pack")
-    regen.add_argument("--pack", type=Path, required=True)
+    regen.add_argument(
+        "--pack",
+        type=Path,
+        action="append",
+        required=True,
+        help="pack directory; repeat to serve several countries from one regeneration",
+    )
     regen.add_argument("--data-root", type=Path, default=Path("data"))
     regen.add_argument("--id", dest="regeneration_id")
     regen.add_argument(
@@ -59,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "regenerate":
         result = regenerate(
-            pack_dir=args.pack,
+            pack_dirs=args.pack,
             data_root=args.data_root,
             regeneration_id=args.regeneration_id,
             rubrics_dir=REPO / "rubrics",
