@@ -3,6 +3,7 @@ import type {
 	ClaimResponse,
 	ConfirmedClaimResponse,
 	EvidenceResponse,
+	EvidenceStatement,
 	ScoreExplanationResponse,
 	ScoreSummary,
 	SearchResponse,
@@ -354,7 +355,15 @@ function fitArrays(payload: Record<string, unknown>, arrays: unknown[][]): ToolT
 
 export function shapeEvidenceResults(response: EvidenceResponse): ToolTextResult {
 	if (response.mode === 'field') {
-		const statements = response.statements.map((row) => ({
+		const grouped = new Map<string, { row: EvidenceStatement; count: number }>();
+		for (const row of response.statements) {
+			const key = [row.value, row.source, row.asserted_at, row.precedence].join(' ');
+			const existing = grouped.get(key);
+			if (existing) existing.count += 1;
+			else grouped.set(key, { row, count: 1 });
+		}
+		const statements = [...grouped.values()].map(({ row, count }) => ({
+			count,
 			source: bounded(row.source, 80),
 			source_ref: bounded(row.source_ref, 180),
 			asserted_at: bounded(row.asserted_at, 40),

@@ -655,3 +655,37 @@ describe('new tool result budgets', () => {
 		expect((parsed(segmentResult).top_candidates as unknown[]).length).toBe(10);
 	});
 });
+
+describe('shapeEvidenceResults grouping', () => {
+	it('folds identical field statements into one entry with a count', () => {
+		const statement = {
+			source: 'ura.customs_agents',
+			source_ref: 'https://example.invalid/customs',
+			asserted_at: '2026-05-12T00:00:00Z',
+			precedence: 2,
+			value: 'EXAMPLE LIMITED'
+		};
+		const result = shapeEvidenceResults({
+			atlas_id: 'atlas-1',
+			mode: 'field',
+			field: 'canonical_name',
+			returned: 3,
+			limit: 20,
+			next_cursor: null,
+			statements: [
+				statement,
+				statement,
+				{ ...statement, source: 'unbs.certified_products', precedence: 3 }
+			]
+		});
+		const value = parsed(result) as {
+			returned: number;
+			statements: { count: number; source: string }[];
+		};
+		expect(value.statements.map((s) => [s.source, s.count])).toEqual([
+			['ura.customs_agents', 2],
+			['unbs.certified_products', 1]
+		]);
+		expect(value.returned).toBe(2);
+	});
+});

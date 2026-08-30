@@ -54,7 +54,7 @@
 							class:bg-red-100={source.status === 'failed'}
 							class:text-red-800={source.status === 'failed'}
 						>
-							{source.status}
+							{source.status === 'not_loaded' ? 'not yet checked' : source.status}
 						</span>
 						{#if source.status_note}
 							<p class="mt-1 text-xs text-stone-600">{source.status_note}</p>

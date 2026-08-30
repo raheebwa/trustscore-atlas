@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { groupStatements } from '$lib/trace';
 	import { resolve } from '$app/paths';
 	import { formatFieldLabel } from '$lib/format';
 	import type { PageProps } from './$types';
@@ -20,7 +21,9 @@
 </p>
 <h1 class="mt-2 text-2xl font-semibold text-stone-900">{formatFieldLabel(trace.field)}</h1>
 <p class="mt-1 text-stone-600">
-	Statements on this page for the field. The winning value is highlighted when it appears here.
+	Statements on this page for the field, one row per distinct value, source and date; a register
+	that lists the business several times shows a count. The winning value is highlighted when it
+	appears here.
 </p>
 
 <div class="mt-4 overflow-x-auto rounded-lg border border-stone-200 bg-white">
@@ -35,18 +38,31 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each trace.statements as statement (statement.statement_id)}
-				<tr
-					class="border-b border-stone-100 last:border-0"
-					class:bg-emerald-50={statement.statement_id === trace.winnerStatementId}
-				>
+			{#each groupStatements(trace.statements, trace.winnerStatementId) as group (group.key)}
+				{@const statement = group.statement}
+				<tr class="border-b border-stone-100 last:border-0" class:bg-emerald-50={group.isWinner}>
 					<td class="px-4 py-2 text-stone-900">
 						{statement.value}
-						{#if statement.statement_id === trace.winnerStatementId}
+						{#if group.isWinner}
 							<span
 								class="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
 								>winner</span
 							>
+						{/if}
+						{#if group.count > 1}
+							<details class="mt-1 text-xs text-stone-500">
+								<summary class="cursor-pointer">
+									<span class="rounded-full bg-stone-100 px-2 py-0.5 font-medium text-stone-700"
+										>x{group.count} listings</span
+									>
+									in this register
+								</summary>
+								<ul class="mt-1 list-disc pl-5 font-mono">
+									{#each group.records as record (record.statement_id)}
+										<li>{record.source_record_id}</li>
+									{/each}
+								</ul>
+							</details>
 						{/if}
 					</td>
 					<td class="px-4 py-2">

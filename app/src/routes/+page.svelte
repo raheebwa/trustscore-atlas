@@ -41,8 +41,10 @@
 		<p class="mt-1 text-sm text-stone-500">businesses in the atlas</p>
 	</div>
 	<div class="rounded-lg border border-stone-200 bg-white p-6 text-center">
-		<p class="text-3xl font-semibold text-stone-900">{stats.sourceCount.toLocaleString()}</p>
-		<p class="mt-1 text-sm text-stone-500">public sources harmonised</p>
+		<p class="text-3xl font-semibold text-stone-900">
+			{stats.loadedSourceCount.toLocaleString()} of {stats.sourceCount.toLocaleString()}
+		</p>
+		<p class="mt-1 text-sm text-stone-500">registers loaded; the rest not yet checked</p>
 	</div>
 	<div class="rounded-lg border border-stone-200 bg-white p-6 text-center">
 		<p class="text-lg font-semibold break-all text-stone-900">
@@ -82,7 +84,7 @@
 								class:bg-red-100={source.status === 'failed'}
 								class:text-red-800={source.status === 'failed'}
 							>
-								{source.status}
+								{source.status === 'not_loaded' ? 'not yet checked' : source.status}
 							</span>
 						</td>
 					</tr>

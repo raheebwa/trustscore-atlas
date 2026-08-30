@@ -511,6 +511,7 @@ export async function getSources(db: D1Database): Promise<SourceSummary[]> {
 export interface HomeStats {
 	businessCount: number;
 	sourceCount: number;
+	loadedSourceCount: number;
 	liveRegenerationId: string | null;
 	liveRegenerationDate: string | null;
 	sources: SourceSummary[];
@@ -526,6 +527,7 @@ export async function getHomeStats(db: D1Database): Promise<HomeStats> {
 	return {
 		businessCount: businessCountRow?.n ?? 0,
 		sourceCount: sourceCountRow?.n ?? 0,
+		loadedSourceCount: sources.filter((source) => source.status !== 'not_loaded').length,
 		liveRegenerationId: regeneration?.id ?? null,
 		liveRegenerationDate: regeneration?.finished_at ?? null,
 		sources
