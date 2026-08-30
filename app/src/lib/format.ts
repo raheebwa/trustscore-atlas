@@ -51,3 +51,18 @@ export function identifierKey(identifier: {
 }): string {
 	return [identifier.scheme, identifier.value, identifier.source ?? ''].join(' ');
 }
+
+/** Display labels for an identifier list, one per scheme and value (a TIN on two lists shows once). */
+export function identifierLabels(
+	identifiers: { scheme: string; value: string; source?: string | null }[]
+): string[] {
+	const seen = new Set<string>();
+	const labels: string[] = [];
+	for (const identifier of identifiers) {
+		const label = `${identifier.scheme}: ${identifier.value}`;
+		if (seen.has(label)) continue;
+		seen.add(label);
+		labels.push(label);
+	}
+	return labels;
+}

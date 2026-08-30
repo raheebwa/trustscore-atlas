@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { identifierLabels } from '$lib/format';
 	import { resolve } from '$app/paths';
 	import type { PageProps } from './$types';
 
@@ -141,7 +142,7 @@
 					</p>
 					{#if item.identifiers.length > 0}
 						<p class="mt-1 text-sm text-stone-500">
-							{item.identifiers.map((id) => `${id.scheme}: ${id.value}`).join(', ')}
+							{identifierLabels(item.identifiers).join(', ')}
 						</p>
 					{/if}
 					<p class="mt-1 text-xs text-stone-500">
