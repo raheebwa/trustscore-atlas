@@ -167,30 +167,51 @@ export interface BoundaryMap {
 	asset: string;
 	object: string;
 	attribution?: string;
+	/** Whether the shapes are districts or the divisions inside one district. */
+	area?: 'district' | 'division';
 }
 
 /**
- * The map a pack declares for the explorer, read from the published methodology. A pack without
- * one gets no map: an explorer that draws Uganda's districts while the switch says Kenya is
- * worse than an explorer with no picture at all.
+ * The map the explorer draws, read from the published methodology.
+ *
+ * A pack without one gets no map: an explorer that draws Uganda's districts while the switch says
+ * Kenya is worse than an explorer with no picture at all. A pack may also declare a map for a
+ * district that holds areas of its own, and selecting that district draws those instead: the
+ * capital is one district holding five licensing divisions, and hatching the whole country to
+ * say so tells a reader nothing.
  */
 export async function packBoundaryMap(
 	{ db }: AtlasDatabases,
-	country: string
+	country: string,
+	district?: string | null
 ): Promise<BoundaryMap | null> {
 	const published = await getMetaValue(db, 'methodology');
 	if (!published) return null;
 	try {
 		const parsed = JSON.parse(published) as {
-			packs?: Record<string, { boundaries_map?: Partial<BoundaryMap> | null }>;
+			packs?: Record<
+				string,
+				{
+					boundaries_map?: Partial<BoundaryMap> | null;
+					boundaries_district_maps?: Record<string, Partial<BoundaryMap>> | null;
+				}
+			>;
 		};
-		const map = parsed.packs?.[country.toUpperCase()]?.boundaries_map;
+		const pack = parsed.packs?.[country.toUpperCase()];
+		const wanted = district?.trim().toLowerCase();
+		const districtMaps = pack?.boundaries_district_maps ?? {};
+		const districtMap = wanted
+			? Object.entries(districtMaps).find(([name]) => name.trim().toLowerCase() === wanted)?.[1]
+			: undefined;
+		const map = districtMap ?? pack?.boundaries_map;
 		if (!map?.asset || !map.object) return null;
 		return {
 			level: map.level ?? '',
 			asset: map.asset,
 			object: map.object,
-			attribution: map.attribution
+			attribution: map.attribution,
+			// What the shapes on this map are, so the page knows which counts to shade with.
+			area: districtMap ? 'division' : 'district'
 		};
 	} catch {
 		return null;

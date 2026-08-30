@@ -250,6 +250,8 @@ def _methodology_meta(rubrics_dir: Path, packs: list[Path]) -> str:
             # The explorer reads its map from here, so a pack that declares one gets a map at the
             # next regeneration rather than at the next deploy.
             "boundaries_map": (pack.get("boundaries") or {}).get("map"),
+            # A district the explorer can open further, keyed by the district's published name.
+            "boundaries_district_maps": (pack.get("boundaries") or {}).get("district_maps") or {},
             "precedence": pack["precedence"],
             "bindings": yaml.safe_load((pack_path / "rubrics" / "bindings.yml").read_text()),
         }

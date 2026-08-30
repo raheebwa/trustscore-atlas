@@ -351,12 +351,39 @@ def _load_feature_collection(path: Path) -> list[dict[str, Any]]:
             return _feature_geometry_to_geojson(Path(root) / sorted(shapefiles)[0])
 
 
-def build_topojson(input_path: Path, level: str, tolerance: float) -> dict[str, Any]:
+def _matching(features: list[dict[str, Any]], only: tuple[str, str]) -> list[dict[str, Any]]:
+    """The features under one parent area, matched on a property, case and space insensitively.
+
+    A district map is the national file with everything but one district dropped: the five
+    divisions of the capital live in the national admin4 file beside fifteen hundred others.
+    """
+    key, wanted = only[0].strip().lower(), only[1].strip().lower()
+    kept = []
+    for feature in features:
+        props = feature.get("properties")
+        if not isinstance(props, dict):
+            continue
+        lowered = {name.lower(): value for name, value in props.items()}
+        if str(lowered.get(key, "")).strip().lower() == wanted:
+            kept.append(feature)
+    if not kept:
+        raise ValueError(f"no features where {only[0]} is {only[1]}")
+    return kept
+
+
+def build_topojson(
+    input_path: Path,
+    level: str,
+    tolerance: float,
+    only: tuple[str, str] | None = None,
+) -> dict[str, Any]:
     if input_path.suffix.lower() == ".zip":
         features = _load_feature_collection(input_path)
     else:
         raw = json.loads(input_path.read_text())
         features = _load_geojson_features(raw)
+    if only:
+        features = _matching(features, only)
     return _build_topology(_extract_features(features, tolerance), level)
 
 
@@ -372,10 +399,21 @@ def main(argv: list[str] | None = None) -> int:
         help="Douglas-Peucker tolerance in degrees",
     )
     parser.add_argument("--max-bytes", type=int)
+    parser.add_argument(
+        "--only",
+        help="Keep only features under one parent, as property=value, e.g. adm2_name=Kampala",
+    )
     args = parser.parse_args(argv)
+    only = None
+    if args.only:
+        key, _, value = args.only.partition("=")
+        if not key or not value:
+            print("--only takes property=value", file=sys.stderr)
+            return 1
+        only = (key, value)
 
     try:
-        topology = build_topojson(Path(args.input), args.level, args.tolerance)
+        topology = build_topojson(Path(args.input), args.level, args.tolerance, only)
     except Exception as error:
         print(error, file=sys.stderr)
         return 1

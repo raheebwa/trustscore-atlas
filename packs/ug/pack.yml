@@ -81,6 +81,14 @@ boundaries:
     asset: ug-adm2.topojson
     object: adm2
     attribution: OCHA common operational datasets for Uganda (COD-AB), CC BY-IGO, simplified.
+  # A district the explorer can open further. Kampala is one district holding five licensing
+  # divisions, so selecting it draws those rather than leaving the national outline hatched.
+  district_maps:
+    Kampala:
+      level: adm4
+      asset: ug-kampala-adm4.topojson
+      object: adm4
+      attribution: OCHA common operational datasets for Uganda (COD-AB), CC BY-IGO, simplified.
   # The capital's licensing divisions; a business licensed in one of them is in Kampala district.
   kcca_divisions: [Central Division, Kawempe Division, Makindye Division, Nakawa Division, Rubaga Division]
 

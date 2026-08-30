@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { listPacks, listPacksCached, resolveScopeCountry } from './packs';
+import { listPacks, listPacksCached, packBoundaryMap, resolveScopeCountry } from './packs';
 import type { AtlasDatabases } from './platform';
 
 function fakeDatabases(published: unknown = undefined): AtlasDatabases {
@@ -156,4 +156,63 @@ describe('resolveScopeCountry', () => {
 			expect(scope).toEqual({ country: 'KE', fromRecord: false });
 		}
 	);
+});
+
+/**
+ * The explorer draws what a pack declares and nothing else. A country that declares no map is
+ * drawn as lists rather than borrowing another country's outline, and a district that holds areas
+ * of its own is drawn as those areas once it is selected: hatching a whole country to say
+ * something about its capital tells a reader nothing.
+ */
+describe('packBoundaryMap', () => {
+	const methodology = JSON.stringify({
+		packs: {
+			UG: {
+				boundaries_map: { level: 'adm2', asset: 'ug-adm2.topojson', object: 'adm2' },
+				boundaries_district_maps: {
+					Kampala: { level: 'adm4', asset: 'ug-kampala-adm4.topojson', object: 'adm4' }
+				}
+			},
+			KE: { boundaries_map: null, boundaries_district_maps: {} }
+		}
+	});
+
+	function fakeMethodology(published: string | null = methodology): AtlasDatabases {
+		const db = {
+			prepare: () => ({
+				bind: () => ({ first: async () => (published === null ? null : { value: published }) })
+			})
+		} as unknown as D1Database;
+		return { db, statementsDb: db, scoresDb: db };
+	}
+
+	it('draws the pack map when no district is chosen', async () => {
+		const map = await packBoundaryMap(fakeMethodology(), 'UG');
+
+		expect(map).toMatchObject({ asset: 'ug-adm2.topojson', area: 'district' });
+	});
+
+	it.each(['Kampala', 'kampala', ' KAMPALA '])(
+		'draws the divisions of %s once that district is chosen',
+		async (district) => {
+			const map = await packBoundaryMap(fakeMethodology(), 'UG', district);
+
+			expect(map).toMatchObject({ asset: 'ug-kampala-adm4.topojson', area: 'division' });
+		}
+	);
+
+	it('keeps the pack map for a district that declares none of its own', async () => {
+		const map = await packBoundaryMap(fakeMethodology(), 'UG', 'Wakiso');
+
+		expect(map).toMatchObject({ asset: 'ug-adm2.topojson', area: 'district' });
+	});
+
+	it('draws nothing for a pack that declares no map, whatever is selected', async () => {
+		expect(await packBoundaryMap(fakeMethodology(), 'KE')).toBeNull();
+		expect(await packBoundaryMap(fakeMethodology(), 'KE', 'Nairobi')).toBeNull();
+	});
+
+	it('draws nothing when no methodology is published yet', async () => {
+		expect(await packBoundaryMap(fakeMethodology(null), 'UG')).toBeNull();
+	});
 });

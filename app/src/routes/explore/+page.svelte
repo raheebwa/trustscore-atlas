@@ -57,6 +57,13 @@
 	const unknownDistrict = $derived(
 		explore.counts_by_district.find((row) => row.district === null)?.count ?? 0
 	);
+	// When the map is of one district's divisions, it is the divisions that are shaded and linked.
+	const mapIsDivisions = $derived(data.map?.area === 'division');
+	const divisionRows = $derived(
+		explore.counts_by_division
+			.filter((row) => row.division !== null)
+			.map((row) => ({ key: row.division as string, count: row.count }))
+	);
 </script>
 
 <svelte:head>
@@ -117,10 +124,12 @@
 						asset={data.map.asset}
 						object={data.map.object}
 						attribution={data.map.attribution}
-						counts={districtRows}
-						selected={filterValues.district}
-						hrefFor={(name) => withFilter('district', name)}
-						label={`Map of ${data.countryName}: each area is a link shaded by how many businesses it holds`}
+						counts={mapIsDivisions ? divisionRows : districtRows}
+						selected={mapIsDivisions ? filterValues.division : filterValues.district}
+						hrefFor={(name) => withFilter(mapIsDivisions ? 'division' : 'district', name)}
+						label={mapIsDivisions
+							? `Map of ${filterValues.district}: each division is a link shaded by how many businesses it holds`
+							: `Map of ${data.countryName}: each area is a link shaded by how many businesses it holds`}
 					/>
 				{:else}
 					<Callout tone="info" title="No boundary map for this pack yet">

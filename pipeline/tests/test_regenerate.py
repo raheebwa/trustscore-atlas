@@ -548,6 +548,12 @@ def test_regenerate_publishes_the_methodology_it_scored_with(tmp_path: Path):
     # The explorer draws the pack's own map, or says it has none: the declaration travels here.
     assert payload["packs"]["UG"]["boundaries_map"]["asset"] == "ug-adm2.topojson"
     assert payload["packs"].get("KE", {}).get("boundaries_map") is None
+    # A district the explorer can open further travels the same way, keyed by its published name.
+    assert (
+        payload["packs"]["UG"]["boundaries_district_maps"]["Kampala"]["asset"]
+        == "ug-kampala-adm4.topojson"
+    )
+    assert list(payload["packs"]["UG"]["boundaries_district_maps"]) == ["Kampala"]
 
     schemes = payload["packs"]["UG"]["identifier_schemes"]
     assert schemes["ug:tin"]["synthetic"] is False

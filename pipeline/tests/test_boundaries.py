@@ -367,3 +367,40 @@ def test_main_returns_one_and_reports_build_errors(tmp_path, capsys):
     assert result == 1
     assert "missing.geojson" in capsys.readouterr().err
     assert not output_path.exists()
+
+
+def test_build_topojson_can_keep_only_the_features_under_one_parent(tmp_path):
+    """A district map is the national file with everything but one district dropped.
+
+    Kampala's five divisions live in the national admin4 file beside fifteen hundred others.
+    Building a map of the capital means selecting them by the district they belong to, rather
+    than shipping the whole country to draw five shapes.
+    """
+    inside = _feature(
+        "Polygon",
+        [[[10, 20], [20, 20], [20, 30], [10, 30], [10, 20]]],
+        {"adm4_name": "Central Division", "adm2_name": "Kampala"},
+    )
+    outside = _feature(
+        "Polygon",
+        [[[40, 50], [50, 50], [50, 60], [40, 60], [40, 50]]],
+        {"adm4_name": "Katabi", "adm2_name": "Wakiso"},
+    )
+    path = _write_geojson(tmp_path, _collection(inside, outside))
+
+    topology = boundaries.build_topojson(path, "adm4", tolerance=0, only=("adm2_name", "Kampala"))
+
+    names = [g["properties"]["name"] for g in topology["objects"]["adm4"]["geometries"]]
+    assert names == ["Central Division"]
+
+
+def test_a_parent_that_matches_nothing_is_refused_rather_than_written_empty(tmp_path):
+    feature = _feature(
+        "Polygon",
+        [[[10, 20], [20, 20], [20, 30], [10, 30], [10, 20]]],
+        {"adm4_name": "Central Division", "adm2_name": "Kampala"},
+    )
+    path = _write_geojson(tmp_path, _collection(feature))
+
+    with pytest.raises(ValueError, match="no features"):
+        boundaries.build_topojson(path, "adm4", tolerance=0, only=("adm2_name", "Nowhere"))

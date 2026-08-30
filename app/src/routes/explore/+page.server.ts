@@ -42,7 +42,8 @@ export const load: PageServerLoad = async ({ cookies, platform, url }) => {
 			explore,
 			facets: (await facetsPromise).facets,
 			// The pack's own map, or nothing: the explorer never borrows another country's outline.
-			map: await packBoundaryMap(databases, country)
+			// A district that holds areas of its own is drawn as those areas once it is selected.
+			map: await packBoundaryMap(databases, country, url.searchParams.get('district'))
 		};
 	} catch (cause) {
 		if (cause instanceof RegenerationInProgressError) {

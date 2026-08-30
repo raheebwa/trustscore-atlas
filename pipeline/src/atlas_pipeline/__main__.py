@@ -119,6 +119,10 @@ def main(argv: list[str] | None = None) -> int:
         help="Douglas-Peucker tolerance in degrees",
     )
     boundaries_cmd.add_argument("--max-bytes", type=int)
+    boundaries_cmd.add_argument(
+        "--only",
+        help="Keep only features under one parent, as property=value, e.g. adm2_name=Kampala",
+    )
     args = parser.parse_args(argv)
 
     if args.command == "regenerate":
@@ -221,6 +225,7 @@ def main(argv: list[str] | None = None) -> int:
                 str(args.tolerance),
             ]
             + (["--max-bytes", str(args.max_bytes)] if args.max_bytes is not None else [])
+            + (["--only", args.only] if args.only else [])
         )
 
     params = {}
