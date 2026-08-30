@@ -21,6 +21,7 @@
 				<a href={resolve('/search')} class="hover:text-stone-900">Search</a>
 				<a href={resolve('/explore')} class="hover:text-stone-900">Explore</a>
 				<a href={resolve('/sources')} class="hover:text-stone-900">Sources</a>
+				<a href={resolve('/methodology')} class="hover:text-stone-900">Methodology</a>
 				<a href={resolve('/tools')} class="hover:text-stone-900">Actions</a>
 			</nav>
 		</div>
