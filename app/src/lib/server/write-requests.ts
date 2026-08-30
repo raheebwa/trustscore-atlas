@@ -48,14 +48,38 @@ async function pendingMetadata(prefix: string): Promise<PendingMetadata> {
 	};
 }
 
+function isPageForm(request: Request): boolean {
+	const type = request.headers.get('content-type') ?? '';
+	return type.includes('application/x-www-form-urlencoded') || type.includes('multipart/form-data');
+}
+
+/** JSON from tools and API clients; form fields from the page's own declarative forms. */
 async function readObject(request: Request): Promise<Record<string, unknown> | null> {
-	if (!request.headers.get('content-type')?.includes('application/json')) return null;
 	try {
+		if (isPageForm(request)) {
+			const form = await request.formData();
+			const value: Record<string, unknown> = {};
+			for (const [key, item] of form.entries()) {
+				if (typeof item === 'string' && item.trim()) value[key] = item;
+			}
+			return value;
+		}
+		if (!request.headers.get('content-type')?.includes('application/json')) return null;
 		const value: unknown = await request.json();
 		return value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
 	} catch {
 		return null;
 	}
+}
+
+/** A page form gets sent to its confirmation page; everything else gets the JSON receipt. */
+function pageRedirect(page: 'correct' | 'label' | 'report', metadata: PendingMetadata): Response {
+	return new Response(null, {
+		status: 303,
+		headers: {
+			Location: `/${page}/${encodeURIComponent(metadata.requestId)}?token=${encodeURIComponent(metadata.plainToken)}`
+		}
+	});
 }
 
 function validText(value: unknown, maxLength: number): value is string {
@@ -293,7 +317,9 @@ export async function createIssueEndpoint({ platform, request }: EndpointEvent):
 				),
 			eventInsert(db, metadata, 'issue', payload)
 		]);
-		return pendingResponse('issue_id', 'report', metadata);
+		return isPageForm(request)
+			? pageRedirect('report', metadata)
+			: pendingResponse('issue_id', 'report', metadata);
 	} catch (err) {
 		return apiServerError(err);
 	}

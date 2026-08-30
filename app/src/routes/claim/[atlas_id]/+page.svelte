@@ -69,13 +69,25 @@
 		</p>
 	{/if}
 
-	<form method="post" action={resolve('/api/v1/claims')} class="mt-6 max-w-xl space-y-4">
-		<input type="hidden" name="atlas_id" value={data.business.atlas_id} />
+	<form
+		method="post"
+		action={resolve('/api/v1/claims')}
+		class="mt-6 max-w-xl space-y-4"
+		toolname="claim_business_form"
+		tooldescription="Record a confirmed claim request for the business on this page. Submitting this form asserts the claimant's role; verification happens afterwards through the listed routes."
+	>
+		<input
+			type="hidden"
+			name="atlas_id"
+			value={data.business.atlas_id}
+			toolparamdescription="Opaque atlas_id of the business on this page."
+		/>
 		<label class="block">
 			<span class="block text-sm font-medium text-stone-700">Your role</span>
 			<select
 				name="claimant_role"
 				required
+				toolparamdescription="The claimant's relation to the business: owner or director, authorised employee, or authorised representative."
 				class="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-900"
 			>
 				<option value="">Choose a role</option>

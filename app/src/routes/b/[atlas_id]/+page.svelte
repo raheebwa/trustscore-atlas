@@ -29,6 +29,43 @@
 	>
 </div>
 
+<details class="mt-4 max-w-xl rounded-lg border border-stone-200 bg-white p-4">
+	<summary class="cursor-pointer text-sm font-medium text-stone-800"
+		>Report a problem with this record</summary
+	>
+	<form
+		method="post"
+		action={resolve('/api/v1/issues')}
+		class="mt-3 space-y-3"
+		toolname="report_issue_form"
+		tooldescription="Report a problem with the business record on this page. The report is recorded as unconfirmed and a confirmation page follows; maintainers review confirmed reports."
+	>
+		<input
+			type="hidden"
+			name="atlas_id"
+			value={record.atlas_id}
+			toolparamdescription="Opaque atlas_id of the business on this page."
+		/>
+		<label class="block">
+			<span class="block text-sm font-medium text-stone-700">What is wrong</span>
+			<textarea
+				name="description"
+				required
+				minlength="10"
+				maxlength="2000"
+				rows="3"
+				toolparamdescription="What is wrong with the record, in plain words, 10 to 2000 characters."
+				class="mt-1 w-full rounded-md border border-stone-300 px-3 py-2 text-stone-900"></textarea>
+		</label>
+		<button
+			type="submit"
+			class="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-700"
+		>
+			Send report
+		</button>
+	</form>
+</details>
+
 <section class="mt-6">
 	<h2 class="text-lg font-semibold text-stone-900">Identifiers</h2>
 	{#if record.identifiers.length > 0}

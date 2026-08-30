@@ -52,3 +52,28 @@ describe('issues API', () => {
 		expect(batches[0][1].bindings).toContain('issue');
 	});
 });
+
+describe('issues API from a page form', () => {
+	it('accepts a form post and sends the browser to the confirmation page', async () => {
+		const { db, batches } = database();
+		const body = new URLSearchParams({
+			atlas_id: 'atlas-example-1',
+			description: 'The website on this record points at the wrong company.'
+		});
+		const response = await POST({
+			platform: { env: { DB: db } },
+			request: new Request('https://atlas.example.invalid/api/v1/issues', {
+				method: 'POST',
+				headers: { 'content-type': 'application/x-www-form-urlencoded' },
+				body
+			})
+		} as never);
+
+		expect(response.status).toBe(303);
+		expect(response.headers.get('location')).toMatch(/^\/report\/issue_.+\?token=[a-f0-9]{64}$/);
+		expect(batches[0][0].bindings).toContain('atlas-example-1');
+		expect(batches[0][0].bindings).toContain(
+			'The website on this record points at the wrong company.'
+		);
+	});
+});
