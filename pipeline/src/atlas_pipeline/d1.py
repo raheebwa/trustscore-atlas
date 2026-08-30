@@ -208,15 +208,17 @@ def segment_rows(businesses: list[dict]) -> list[dict]:
         nature = sector.get("source_nature")
         district = location.get("district")
         division = location.get("division_or_subcounty")
-        for register in sorted(set(business.get("coverage", {}).get("found_in", []))):
-            for row_nature, row_register in (
-                (nature, register),
-                (None, register),
-                (nature, None),
-                (None, None),
-            ):
-                key = (category, row_nature, district, division, row_register)
-                counts[key] = counts.get(key, 0) + 1
+        registers = sorted(set(business.get("coverage", {}).get("found_in", [])))
+        # Per-register rows count the business under each register it appears in; the
+        # all-registers rollup (register None) counts it once.
+        keys = [(category, n, district, division, None) for n in (nature, None)]
+        keys += [
+            (category, n, district, division, register)
+            for register in registers
+            for n in (nature, None)
+        ]
+        for key in keys:
+            counts[key] = counts.get(key, 0) + 1
 
     out: list[dict] = []
     for category, nature, district, division, register in sorted(

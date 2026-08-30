@@ -218,3 +218,21 @@ def test_same_identifier_from_two_registers_loads_as_two_rows():
         ("ug:tin", "1000000001", "ura.customs_agents"),
         ("ug:tin", "1000000001", "ura.vat_withholding_agents"),
     ]
+
+
+def test_segment_rows_count_each_business_once_in_the_all_registers_rollup():
+    from atlas_pipeline.d1 import segment_rows
+
+    business = {
+        "sector": {"source_category": "GENERAL", "source_nature": "Hardware"},
+        "location": {"district": "Kampala", "division_or_subcounty": "Central Division"},
+        "coverage": {"found_in": ["kcca.businesses", "ura.vat_withholding_agents"]},
+    }
+    rows = {
+        (r["sector_nature"], r["register"]): r["business_count"] for r in segment_rows([business])
+    }
+    assert rows[("Hardware", "kcca.businesses")] == 1
+    assert rows[("Hardware", "ura.vat_withholding_agents")] == 1
+    assert rows[(None, "kcca.businesses")] == 1
+    assert rows[("Hardware", None)] == 1
+    assert rows[(None, None)] == 1
