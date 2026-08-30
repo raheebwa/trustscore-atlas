@@ -138,6 +138,69 @@ def _group_entities(
     return groups.members()
 
 
+@dataclass
+class _Decisions:
+    matched: set[tuple[str, str]] = field(default_factory=set)
+    blocked: set[tuple[str, str]] = field(default_factory=set)
+
+
+def _latest_verdicts(labels: list[dict]) -> _Decisions:
+    """Labels are append-only; the latest verdict per unordered pair of atlas ids wins."""
+    latest: dict[tuple[str, str], tuple[str, str]] = {}
+    for label in labels:
+        pair = tuple(sorted((label["atlas_id"], label["candidate_atlas_id"])))
+        stamp = str(label.get("labelled_at", ""))
+        if pair not in latest or stamp >= latest[pair][0]:
+            latest[pair] = (stamp, label["verdict"])
+    out = _Decisions()
+    for pair, (_, verdict) in latest.items():
+        (out.matched if verdict == "match" else out.blocked).add(pair)
+    return out
+
+
+def _apply_labels(
+    groups: dict[str, list[str]], crosswalk: dict, decisions: _Decisions
+) -> dict[str, list[str]]:
+    """Union groups joined by a match label; split groups whose members are blocked by a
+    non_match label (the blocked member keeps its own known id). Decisions refer to atlas ids,
+    so members are mapped through the crosswalk."""
+    if not decisions.matched and not decisions.blocked:
+        return groups
+    entity_atlas = {}
+    for members in groups.values():
+        for m in members:
+            known = _known(crosswalk, m)
+            if known:
+                entity_atlas[m] = known[0]
+    uf = _Groups()
+    for members in groups.values():
+        for m in members:
+            uf.add(m)
+        for m in members[1:]:
+            uf.union(members[0], m)
+    by_atlas: dict[str, list[str]] = defaultdict(list)
+    for m, a in entity_atlas.items():
+        by_atlas[a].append(m)
+    for a, b in decisions.matched:
+        if by_atlas.get(a) and by_atlas.get(b):
+            uf.union(by_atlas[a][0], by_atlas[b][0])
+    merged = uf.members()
+    if not decisions.blocked:
+        return merged
+    out: dict[str, list[str]] = {}
+    for root, members in merged.items():
+        keep = list(members)
+        for a, b in decisions.blocked:
+            side_a = [m for m in keep if entity_atlas.get(m) == a]
+            side_b = [m for m in keep if entity_atlas.get(m) == b]
+            if side_a and side_b:
+                for m in side_b:
+                    keep.remove(m)
+                    out[m] = [m]
+        out[root] = keep
+    return out
+
+
 def _known(crosswalk: dict, entity_id: str) -> tuple[str, str] | None:
     entry = crosswalk.get(entity_id)
     if entry is None:
@@ -166,6 +229,7 @@ def resolve(
     pack: dict,
     checked_sources: list[str],
     crosswalk: dict | None = None,
+    labels: list[dict] | None = None,
 ) -> Resolution:
     by_entity: dict[str, list[dict]] = defaultdict(list)
     for s in statements:
@@ -180,17 +244,24 @@ def resolve(
     unique_schemes = _issuer_unique_schemes(pack)
     result = Resolution(crosswalk={k: (_known(crosswalk, k) or ("", ""))[0] for k in crosswalk})
 
-    for members in _group_entities(by_entity, unique_schemes).values():
+    decisions = _latest_verdicts(labels or [])
+    groups = _group_entities(by_entity, unique_schemes)
+    groups = _apply_labels(groups, crosswalk, decisions)
+    for members in groups.values():
         rows = [s for m in members for s in by_entity[m]]
         by_field: dict[str, list[dict]] = defaultdict(list)
         for s in rows:
             by_field[s["field"]].append(s)
 
         atlas_id, aliased = _choose_atlas_id(members, crosswalk)
-        joined_by = sorted(unique_schemes) if len(members) > 1 else []
         for old in aliased:
+            reason = (
+                "label:match"
+                if (old, atlas_id) in decisions.matched or (atlas_id, old) in decisions.matched
+                else ",".join(sorted(unique_schemes))
+            )
             result.aliases.append(
-                {"atlas_id": old, "canonical_atlas_id": atlas_id, "reason": ",".join(joined_by)}
+                {"atlas_id": old, "canonical_atlas_id": atlas_id, "reason": reason}
             )
         for m in members:
             if _known(crosswalk, m) is None:

@@ -134,3 +134,96 @@ def test_join_of_previously_separate_ids_keeps_the_older_and_aliases_the_newer()
     ]
     assert result.new_entities == []
     assert {s["atlas_id"] for s in result.statements} == {"atl_older00000000000"}
+
+
+def test_labels_merge_and_block_candidates_on_regeneration():
+    """A match label unions two groups (older atlas id survives, the other becomes an alias);
+    a non_match label keeps a pair apart even when an identifier would have joined them.
+    Labels are append-only decisions; the latest verdict for a pair wins."""
+    kcca, ura = "kcca.businesses:aaaa", "ura.customs_agents:bbbb"
+    statements = [
+        stmt(
+            kcca,
+            "canonical_name",
+            "EXAMPLE HARDWARE SUPPLIES LTD",
+            source="kcca.businesses",
+            precedence=3,
+        ),
+        ident(kcca, "ug:kcca_licence", "0123456789abcdef", source="kcca.businesses"),
+        stmt(
+            ura, "canonical_name", "EXAMPLE HARDWARE SUPPLIES LIMITED", source="ura.customs_agents"
+        ),
+        ident(ura, "ug:tin", "1000000004", source="ura.customs_agents"),
+    ]
+    crosswalk = {
+        kcca: {"atlas_id": "atl_kcca000000000000", "first_regeneration_id": "20260801T000000Z"},
+        ura: {"atlas_id": "atl_ura0000000000000", "first_regeneration_id": "20260815T000000Z"},
+    }
+    labels = [
+        {
+            "atlas_id": "atl_kcca000000000000",
+            "candidate_atlas_id": "atl_ura0000000000000",
+            "verdict": "match",
+            "labelled_at": "2026-08-30T00:00:00Z",
+            "labelled_by": "maintainer",
+        },
+    ]
+    result = resolve(
+        statements, pack=PACK, checked_sources=CHECKED, crosswalk=crosswalk, labels=labels
+    )
+    assert len(result.businesses) == 1
+    b = result.businesses[0]
+    assert b["atlas_id"] == "atl_kcca000000000000"
+    assert b["coverage"]["found_in"] == ["kcca.businesses", "ura.customs_agents"]
+    assert result.aliases == [
+        {
+            "atlas_id": "atl_ura0000000000000",
+            "canonical_atlas_id": "atl_kcca000000000000",
+            "reason": "label:match",
+        }
+    ]
+
+    # a later non_match verdict on the same pair reverses the union
+    labels.append(
+        {
+            "atlas_id": "atl_kcca000000000000",
+            "candidate_atlas_id": "atl_ura0000000000000",
+            "verdict": "non_match",
+            "labelled_at": "2026-08-30T01:00:00Z",
+            "labelled_by": "maintainer",
+        }
+    )
+    result = resolve(
+        statements, pack=PACK, checked_sources=CHECKED, crosswalk=crosswalk, labels=labels
+    )
+    assert len(result.businesses) == 2 and result.aliases == []
+
+    # a non_match blocks even an identifier join
+    vat, customs = "ura.vat_withholding_agents:cccc", "ura.customs_agents:dddd"
+    joined = [
+        stmt(vat, "canonical_name", "SAMPLE ONE", source="ura.vat_withholding_agents"),
+        ident(vat, "ug:tin", "1000000005", source="ura.vat_withholding_agents"),
+        stmt(customs, "canonical_name", "SAMPLE TWO", source="ura.customs_agents"),
+        ident(customs, "ug:tin", "1000000005", source="ura.customs_agents"),
+    ]
+    cw = {
+        vat: {"atlas_id": "atl_vat0000000000000", "first_regeneration_id": "20260801T000000Z"},
+        customs: {"atlas_id": "atl_cus0000000000000", "first_regeneration_id": "20260801T000000Z"},
+    }
+    block = [
+        {
+            "atlas_id": "atl_vat0000000000000",
+            "candidate_atlas_id": "atl_cus0000000000000",
+            "verdict": "non_match",
+            "labelled_at": "2026-08-30T00:00:00Z",
+            "labelled_by": "maintainer",
+        }
+    ]
+    assert (
+        len(
+            resolve(
+                joined, pack=PACK, checked_sources=CHECKED, crosswalk=cw, labels=block
+            ).businesses
+        )
+        == 2
+    )
