@@ -63,7 +63,9 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          # The version comes from packageManager in the root package.json. Naming it here as
+          # well makes the action refuse to install at all, which is how the data workflows
+          # broke the moment that field arrived.
           run_install: false
 
       - name: Install Node
