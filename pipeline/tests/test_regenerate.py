@@ -544,3 +544,34 @@ def test_regenerate_publishes_the_methodology_it_scored_with(tmp_path: Path):
     }
     assert payload["linkage"]["review_band"] == [0.8, 0.95]
     assert payload["linkage"]["candidate_threshold"] == 0.5
+
+
+def test_regenerate_describes_registers_without_adapters_from_the_pack(tmp_path: Path):
+    spec = load_adapter(ADAPTER)
+    pages = {
+        spec.module.query_url(n): (ADAPTER / "fixtures" / "raw" / f"{_slug(n)}.html").read_bytes()
+        for n in EXPECTED["natures"]
+    }
+    run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=lambda url, **_: pages[url],
+        salt=SALT,
+        params={"natures": EXPECTED["natures"]},
+    )
+    out = regenerate(
+        pack_dir=PACKS / "ug",
+        data_root=tmp_path,
+        regeneration_id="20260830T060000Z",
+        computed_at="2026-08-30T06:00:00Z",
+        rubrics_dir=PACKS.parent / "rubrics",
+        schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
+    )
+    rows = {s["slug"]: s for s in out.summary["sources"]}
+    assert rows["cma.licensed_firms"]["title"] == "Licensed firms register"
+    assert rows["cma.licensed_firms"]["publisher"] == "Capital Markets Authority"
+    assert rows["cma.licensed_firms"]["cadence"] == "quarterly"
+    assert rows["cma.licensed_firms"]["status"] == "not_loaded"
+    assert "unknown" not in {s["title"] for s in out.summary["sources"]}

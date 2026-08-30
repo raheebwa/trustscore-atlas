@@ -142,10 +142,12 @@ def _load_pack(pack_dir: Path, data_root: Path, empty_since: dict[str, str] | No
     for entry in pack_sources(pack):
         slug, state = entry["slug"], entry["state"]
         source_yml = pack_dir / "sources" / _source_dir(slug) / "source.yml"
+        # A register without an adapter yet describes itself in pack.yml (title, publisher,
+        # cadence) so the sources table never shows placeholders for it.
         source = (
             yaml.safe_load(source_yml.read_text())
             if source_yml.exists()
-            else {"slug": slug, "country": pack["country"]}
+            else {"country": pack["country"]} | {k: v for k, v in entry.items() if k != "state"}
         )
         row = {
             k: source.get(k, _placeholder(k))

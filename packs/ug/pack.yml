@@ -77,6 +77,11 @@ sources:
     state: loaded
   - slug: kcca.property_rates
     state: not_loaded
+    publisher: Kampala Capital City Authority
+    title: Property rates compliance roster
+    url: https://www.kcca.go.ug/
+    cadence: annual
+    licence: public-record
   - slug: ura.vat_withholding_agents
     state: loaded
   - slug: ura.customs_agents
@@ -91,9 +96,24 @@ sources:
     state: loaded
   - slug: cma.licensed_firms
     state: not_loaded
+    publisher: Capital Markets Authority
+    title: Licensed firms register
+    url: https://cmauganda.co.ug/
+    cadence: quarterly
+    licence: public-record
   - slug: urbra.licensed_schemes
     state: not_loaded
+    publisher: Uganda Retirement Benefits Regulatory Authority
+    title: Licensed schemes and service providers
+    url: https://urbra.go.ug/
+    cadence: quarterly
+    licence: public-record
   - slug: ucc.broadcasters
     state: not_loaded
+    publisher: Uganda Communications Commission
+    title: Licensed broadcasters
+    url: https://www.ucc.co.ug/
+    cadence: quarterly
+    licence: public-record
   - slug: nlgrb.gaming_operators
     state: loaded
