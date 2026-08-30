@@ -129,3 +129,34 @@ describe('exploreCsv', () => {
 		expect(csv).toBe('district,business_count\r\nKampala,3\r\n(unknown),1\r\n"\'=1+1",1\r\n');
 	});
 });
+
+describe('exploreSegments on a segments table without a country column', () => {
+	it('answers unscoped, reports UG only, and binds no country', async () => {
+		const calls: string[] = [];
+		const db = {
+			prepare: (sql: string) => {
+				calls.push(sql);
+				return {
+					bind: (...bindings: unknown[]) => ({
+						first: async () => {
+							if (sql.includes('FROM meta')) return { value: 'regen-example-1' };
+							if (sql.includes('pragma_table_info')) return { n: 0 };
+							expect(bindings).not.toContain('UG');
+							return { n: 4 };
+						},
+						all: async () => {
+							expect(bindings).not.toContain('UG');
+							expect(sql).not.toContain('country');
+							return { results: [] };
+						}
+					})
+				};
+			}
+		} as unknown as D1Database;
+		const response = await exploreSegments({ db, statementsDb: db, scoresDb: db }, {});
+		expect(response.countries).toEqual(['UG']);
+		expect(response.filters.country).toBe('UG');
+		expect(response.total_count).toBe(4);
+		expect(calls.some((sql) => sql.includes("pragma_table_info('segments')"))).toBe(true);
+	});
+});
