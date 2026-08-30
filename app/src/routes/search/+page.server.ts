@@ -2,6 +2,7 @@ import { deploymentVersion } from '$lib/server/cache-scope';
 import { error } from '@sveltejs/kit';
 import { InvalidCursorError } from '$lib/pagination';
 import { RegenerationInProgressError } from '$lib/server/atlas';
+import { listFacetsCached } from '$lib/server/facets';
 import { searchBusinessesCached } from '$lib/server/search-cache';
 import { FTS_MIN_QUERY_LENGTH, normalizeQuery } from '$lib/server/search';
 import { requireDatabases } from '$lib/server/platform';
@@ -22,6 +23,10 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 		present_in: url.searchParams.get('present_in')?.trim() || null
 	};
 	const hasSegmentFilters = Object.values(segmentFilters).some(Boolean);
+	const country = url.searchParams.get('country');
+	const version = deploymentVersion(platform?.env as Record<string, unknown> | undefined);
+	// The filter controls offer published values only, so a chosen filter always has results.
+	const facetsPromise = listFacetsCached(databases, platform?.env?.CACHE, country, version);
 
 	try {
 		if (query.length === 0) {
@@ -31,6 +36,7 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 				results: null,
 				segment: hasSegmentFilters ? await findSegment(databases, segmentFilters) : null,
 				segmentFilters,
+				facets: (await facetsPromise).facets,
 				minLength: FTS_MIN_QUERY_LENGTH
 			};
 		}
@@ -44,7 +50,7 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 				cursor: url.searchParams.get('cursor')
 			},
 			undefined,
-			deploymentVersion(platform?.env as Record<string, unknown> | undefined)
+			version
 		);
 		return {
 			query,
@@ -52,6 +58,7 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 			results: response,
 			segment: null,
 			segmentFilters,
+			facets: (await facetsPromise).facets,
 			minLength: FTS_MIN_QUERY_LENGTH
 		};
 	} catch (cause) {

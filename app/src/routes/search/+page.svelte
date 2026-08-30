@@ -5,6 +5,30 @@
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+
+	// One control per published dimension; the options come from the data, never from free text.
+	const FILTERS = [
+		{ name: 'district', facet: 'district', label: 'District' },
+		{ name: 'division', facet: 'division', label: 'Division or subcounty' },
+		{ name: 'category', facet: 'sector_category', label: 'Sector category' },
+		{ name: 'nature', facet: 'sector_nature', label: 'Sector nature' },
+		{ name: 'present_in', facet: 'register', label: 'Present in register' }
+	] as const;
+
+	// A GET form submits every control, so an untouched filter would add an empty query parameter.
+	// Disabling the empty ones leaves the address bar showing only the filters actually chosen.
+	function dropEmptyControls(event: SubmitEvent) {
+		const form = event.currentTarget as HTMLFormElement;
+		for (const control of form.elements) {
+			const field = control as HTMLInputElement | HTMLSelectElement;
+			if (field.name && field.value === '') field.disabled = true;
+		}
+	}
+
+	function selected(name: (typeof FILTERS)[number]['name']): string {
+		if (name === 'district') return data.district || (data.segmentFilters.district ?? '');
+		return data.segmentFilters[name] ?? '';
+	}
 </script>
 
 <svelte:head>
@@ -13,7 +37,7 @@
 
 <h1 class="text-2xl font-semibold text-stone-900">Search businesses</h1>
 
-<form method="get" class="mt-4 flex flex-wrap gap-2">
+<form method="get" class="mt-4 flex flex-wrap gap-2" onsubmit={dropEmptyControls}>
 	<label class="sr-only" for="q">Search businesses</label>
 	<input
 		id="q"
@@ -23,46 +47,20 @@
 		placeholder="Search by business name..."
 		class="w-full rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
 	/>
-	<label class="sr-only" for="district">District or division</label>
-	<input
-		id="district"
-		name="district"
-		value={data.district}
-		placeholder="District or division"
-		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
-	/>
-	<label class="sr-only" for="category">Sector category</label>
-	<input
-		id="category"
-		name="category"
-		value={data.segmentFilters.category ?? ''}
-		placeholder="Sector category"
-		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
-	/>
-	<label class="sr-only" for="nature">Sector nature</label>
-	<input
-		id="nature"
-		name="nature"
-		value={data.segmentFilters.nature ?? ''}
-		placeholder="Sector nature"
-		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
-	/>
-	<label class="sr-only" for="division">Division or subcounty</label>
-	<input
-		id="division"
-		name="division"
-		value={data.segmentFilters.division ?? ''}
-		placeholder="Division or subcounty"
-		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
-	/>
-	<label class="sr-only" for="present_in">Register slug</label>
-	<input
-		id="present_in"
-		name="present_in"
-		value={data.segmentFilters.present_in ?? ''}
-		placeholder="Present in register"
-		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
-	/>
+	{#each FILTERS as filter (filter.name)}
+		<label class="sr-only" for={filter.name}>{filter.label}</label>
+		<select
+			id={filter.name}
+			name={filter.name}
+			value={selected(filter.name)}
+			class="rounded-md border border-stone-300 bg-white px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
+		>
+			<option value="">{filter.label}: any</option>
+			{#each data.facets[filter.facet] as option (option.value)}
+				<option value={option.value}>{option.value} ({option.count.toLocaleString()})</option>
+			{/each}
+		</select>
+	{/each}
 	<button
 		type="submit"
 		class="rounded-md bg-stone-900 px-5 py-2 text-base font-medium text-white hover:bg-stone-700"

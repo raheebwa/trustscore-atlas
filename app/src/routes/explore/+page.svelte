@@ -29,6 +29,24 @@
 	});
 
 	const filters = $derived(data.explore.filters);
+
+	// One control per published dimension; the options come from the data, never from free text.
+	const FILTERS = [
+		{ name: 'district', facet: 'district', label: 'District' },
+		{ name: 'division', facet: 'division', label: 'Division or subcounty' },
+		{ name: 'category', facet: 'sector_category', label: 'Sector category' },
+		{ name: 'nature', facet: 'sector_nature', label: 'Sector nature' },
+		{ name: 'present_in', facet: 'register', label: 'Present in register' }
+	] as const;
+
+	// A GET form submits every control, so an untouched filter would add an empty query parameter.
+	function dropEmptyControls(event: SubmitEvent) {
+		const form = event.currentTarget as HTMLFormElement;
+		for (const control of form.elements) {
+			const field = control as HTMLInputElement | HTMLSelectElement;
+			if (field.name && field.value === '') field.disabled = true;
+		}
+	}
 	const countsByDistrict = $derived.by(() => {
 		const map = new SvelteMap<string, number>();
 		for (const row of data.explore.counts_by_district) {
@@ -81,7 +99,7 @@
 	pages. Filter, then open the matching search or export the district breakdown.
 </p>
 
-<form method="get" class="mt-4 flex flex-wrap gap-2">
+<form method="get" class="mt-4 flex flex-wrap gap-2" onsubmit={dropEmptyControls}>
 	<label class="sr-only" for="country">Country</label>
 	<select
 		id="country"
@@ -92,46 +110,20 @@
 			<option value={code} selected={code === filters.country}>{code}</option>
 		{/each}
 	</select>
-	<label class="sr-only" for="category">Sector category</label>
-	<input
-		id="category"
-		name="category"
-		value={filters.category ?? ''}
-		placeholder="Sector category"
-		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
-	/>
-	<label class="sr-only" for="nature">Sector nature</label>
-	<input
-		id="nature"
-		name="nature"
-		value={filters.nature ?? ''}
-		placeholder="Sector nature"
-		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
-	/>
-	<label class="sr-only" for="district">District</label>
-	<input
-		id="district"
-		name="district"
-		value={filters.district ?? ''}
-		placeholder="District"
-		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
-	/>
-	<label class="sr-only" for="division">Division or subcounty</label>
-	<input
-		id="division"
-		name="division"
-		value={filters.division ?? ''}
-		placeholder="Division or subcounty"
-		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
-	/>
-	<label class="sr-only" for="present_in">Register slug</label>
-	<input
-		id="present_in"
-		name="present_in"
-		value={filters.present_in ?? ''}
-		placeholder="Present in register"
-		class="rounded-md border border-stone-300 px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
-	/>
+	{#each FILTERS as filter (filter.name)}
+		<label class="sr-only" for={filter.name}>{filter.label}</label>
+		<select
+			id={filter.name}
+			name={filter.name}
+			value={filters[filter.name] ?? ''}
+			class="rounded-md border border-stone-300 bg-white px-4 py-2 text-base shadow-sm focus:border-stone-500 focus:outline-none"
+		>
+			<option value="">{filter.label}: any</option>
+			{#each data.facets[filter.facet] as option (option.value)}
+				<option value={option.value}>{option.value} ({option.count.toLocaleString()})</option>
+			{/each}
+		</select>
+	{/each}
 	<button
 		type="submit"
 		class="rounded-md bg-stone-900 px-5 py-2 text-base font-medium text-white hover:bg-stone-700"

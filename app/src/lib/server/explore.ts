@@ -110,7 +110,8 @@ function buildLink(
 	return query ? `${path}?${query}` : path;
 }
 
-async function groupCounts(
+/** One breakdown over the segments table; exported for the facet lists behind the filters. */
+export async function segmentGroupCounts(
 	db: D1Database,
 	column: string,
 	filters: ExploreFilters,
@@ -142,12 +143,12 @@ export async function exploreSegments(
 				.prepare(`SELECT COALESCE(SUM(business_count), 0) AS n FROM segments${whereClause}`)
 				.bind(...bindings)
 				.first<{ n: number }>(),
-			groupCounts(db, 'district', filters),
-			filters.district ? groupCounts(db, 'division', filters) : Promise.resolve([]),
-			groupCounts(db, 'register', filters, { register: 'each' }),
+			segmentGroupCounts(db, 'district', filters),
+			filters.district ? segmentGroupCounts(db, 'division', filters) : Promise.resolve([]),
+			segmentGroupCounts(db, 'register', filters, { register: 'each' }),
 			filters.category
-				? groupCounts(db, 'sector_nature', filters, { nature: 'each' })
-				: groupCounts(db, 'sector_category', filters)
+				? segmentGroupCounts(db, 'sector_nature', filters, { nature: 'each' })
+				: segmentGroupCounts(db, 'sector_category', filters)
 		]);
 	// The table swap is atomic per database, but these reads are not one snapshot; a swap in
 	// between would mix two regenerations, so the caller retries instead (503).
