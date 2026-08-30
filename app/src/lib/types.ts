@@ -223,6 +223,54 @@ export interface SegmentResponse {
 	search_link: string;
 }
 
+export type ClaimVerificationState =
+	| 'unverified'
+	| 'website_pending'
+	| 'email_pending'
+	| 'verified'
+	| 'verification_failed'
+	| 'revoked';
+
+export type ClaimVerificationMethod = 'website_string' | 'domain_email';
+
+export interface ClaimChallenge {
+	challenge_id: string;
+	claim_id: string;
+	method: ClaimVerificationMethod;
+	target: string;
+	challenge_value: string | null;
+	token_hash: string | null;
+	created_at: string;
+	expires_at: string;
+	consumed_at: string | null;
+	attempts: number;
+	last_attempt_at: string | null;
+	outcome: string | null;
+}
+
+export interface ClaimEvidence {
+	evidence_id: string;
+	claim_id: string;
+	r2_key: string;
+	content_type: string;
+	byte_size: number;
+	sha256: string;
+	uploaded_at: string;
+	uploaded_note: string | null;
+}
+
+export interface OperatorStatement {
+	operator_statement_id: string;
+	claim_id: string;
+	atlas_id: string;
+	field: string;
+	value: string;
+	source_ref: string;
+	asserted_at: string;
+	decision_id: string | null;
+	created_at: string;
+}
+
 export interface UnconfirmedClaimResponse {
 	claim_id: string;
 	status: 'unconfirmed';
