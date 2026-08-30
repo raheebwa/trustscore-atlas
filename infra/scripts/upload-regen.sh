@@ -81,7 +81,7 @@ else
 fi
 
 described_file="$temp_dir/described.json"
-pipeline/.venv/bin/python -m atlas_pipeline regen describe --dir "$regeneration_dir" >"$described_file"
+"$repo_root/pipeline/.venv/bin/python" -m atlas_pipeline regen describe --dir "$regeneration_dir" >"$described_file"
 python3 - "$index_file" "$regeneration_id" "$next_index_file" "$retired_file" "$described_file" <<'PY'
 import datetime
 import json
