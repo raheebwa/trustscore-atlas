@@ -56,16 +56,57 @@ function downloadHref(regenerationId: string, path: string): ResolvedPathname {
 	return resolve('/downloads/[regeneration]/[...path]', { regeneration: regenerationId, path });
 }
 
-export async function getDownloads(data: R2Bucket): Promise<Downloads | null> {
-	const pointer = await data.get('bundles/latest.json');
-	if (!pointer) return null;
-	const latest = (await pointer.json()) as { regeneration_id?: unknown };
+const LATEST_CACHE_KEY = 'downloads:latest';
+const LATEST_TTL_SECONDS = 300;
+
+/** Reads a small JSON object from R2 through KV; bundle contents never change, only the pointer. */
+async function readJson(
+	data: R2Bucket,
+	cache: KVNamespace | undefined,
+	objectKey: string,
+	cacheKey: string,
+	ttl?: number
+): Promise<unknown> {
+	if (cache) {
+		try {
+			const hit = await cache.get(cacheKey);
+			if (hit) return JSON.parse(hit);
+		} catch {
+			// A cache failure only costs the R2 read below.
+		}
+	}
+	const object = await data.get(objectKey);
+	if (!object) return null;
+	const text = await object.text();
+	if (cache) {
+		try {
+			await cache.put(cacheKey, text, ttl ? { expirationTtl: ttl } : undefined);
+		} catch {
+			// Same: the page still answers from R2.
+		}
+	}
+	return JSON.parse(text);
+}
+
+export async function getDownloads(data: R2Bucket, cache?: KVNamespace): Promise<Downloads | null> {
+	const latest = (await readJson(
+		data,
+		cache,
+		'bundles/latest.json',
+		LATEST_CACHE_KEY,
+		LATEST_TTL_SECONDS
+	)) as { regeneration_id?: unknown } | null;
+	if (!latest) return null;
 	const regenerationId = typeof latest.regeneration_id === 'string' ? latest.regeneration_id : '';
 	const packageKey = resolveDownloadKey(regenerationId, 'datapackage.json');
 	if (!packageKey) return null;
-	const object = await data.get(packageKey);
-	if (!object) return null;
-	const pkg = (await object.json()) as DataPackage;
+	const pkg = (await readJson(
+		data,
+		cache,
+		packageKey,
+		`downloads:package:${regenerationId}`
+	)) as DataPackage | null;
+	if (!pkg) return null;
 	const items = (pkg.resources ?? [])
 		.filter((resource) => resolveDownloadKey(regenerationId, resource.path) !== null)
 		.map((resource) => ({

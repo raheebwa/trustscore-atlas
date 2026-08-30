@@ -86,3 +86,38 @@ describe('resolveDownloadKey', () => {
 		expect(resolveDownloadKey('20260830T030202Z', 'canonical//x')).toBeNull();
 	});
 });
+
+describe('getDownloads with a cache', () => {
+	it('serves the package from KV on a hit and stores it keyed by the bundle id on a miss', async () => {
+		const store = new Map<string, string>();
+		const cache = {
+			get: async (key: string) => store.get(key) ?? null,
+			put: async (key: string, value: string) => {
+				store.set(key, value);
+			}
+		} as unknown as KVNamespace;
+		let reads = 0;
+		const data = {
+			get: async (key: string) => {
+				reads += 1;
+				const objects: Record<string, string> = {
+					'bundles/latest.json': JSON.stringify({ regeneration_id: '20260830T030202Z' }),
+					'bundles/20260830T030202Z/datapackage.json': JSON.stringify(datapackage)
+				};
+				const body = objects[key];
+				return body === undefined
+					? null
+					: { key, size: body.length, text: async () => body, json: async () => JSON.parse(body) };
+			}
+		} as unknown as R2Bucket;
+
+		const first = await getDownloads(data, cache);
+		expect(first?.regeneration_id).toBe('20260830T030202Z');
+		expect(reads).toBe(2);
+		expect([...store.keys()]).toEqual(['downloads:latest', 'downloads:package:20260830T030202Z']);
+
+		const second = await getDownloads(data, cache);
+		expect(second?.canonical.length).toBe(1);
+		expect(reads).toBe(2);
+	});
+});
