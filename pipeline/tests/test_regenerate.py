@@ -539,6 +539,8 @@ def test_regenerate_publishes_the_methodology_it_scored_with(tmp_path: Path):
         "description": "The business appears in the jurisdiction's legal register of record.",
     }
     assert payload["packs"]["UG"]["precedence"]["regulator_or_authority"] == 3
+    assert "ug:tin" in payload["packs"]["UG"]["identifier_schemes"]
+    assert payload["packs"]["UG"]["identifier_schemes"]["ug:tin"]["issuer_unique"] is True
     assert payload["packs"]["UG"]["bindings"]["formality"]["local_trading_licence"] == {
         "sources": ["kcca.businesses"]
     }

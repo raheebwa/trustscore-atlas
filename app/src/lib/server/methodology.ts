@@ -25,6 +25,7 @@ export interface PublishedRubric {
 
 export interface PublishedPack {
 	name?: string;
+	identifier_schemes?: Record<string, { title?: string; issuer?: string; issuer_unique?: boolean }>;
 	precedence: Record<string, number>;
 	bindings: Record<string, Record<string, Record<string, unknown>>>;
 }

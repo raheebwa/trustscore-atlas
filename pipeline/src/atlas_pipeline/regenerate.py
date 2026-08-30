@@ -230,6 +230,14 @@ def _methodology_meta(rubrics_dir: Path, packs: list[Path]) -> str:
         pack = yaml.safe_load((pack_path / "pack.yml").read_text())
         pack_entries[pack["country"]] = {
             "name": pack.get("name"),
+            "identifier_schemes": {
+                scheme: {
+                    "title": spec.get("title"),
+                    "issuer": spec.get("issuer"),
+                    "issuer_unique": bool(spec.get("issuer_unique")),
+                }
+                for scheme, spec in (pack.get("identifier_schemes") or {}).items()
+            },
             "precedence": pack["precedence"],
             "bindings": yaml.safe_load((pack_path / "rubrics" / "bindings.yml").read_text()),
         }

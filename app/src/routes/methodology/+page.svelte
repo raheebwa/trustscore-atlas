@@ -96,6 +96,20 @@
 		</p>
 		{#each Object.entries(published.packs) as [code, pack] (code)}
 			<h3 class="mt-4 font-semibold text-stone-900">{pack.name ?? code} ({code})</h3>
+			{#if pack.identifier_schemes && Object.keys(pack.identifier_schemes).length > 0}
+				<p class="mt-1 text-sm text-stone-600">
+					Identifiers that link records:
+					{Object.entries(pack.identifier_schemes)
+						.filter(([, spec]) => spec.issuer_unique)
+						.map(([scheme, spec]) => `${scheme} (${spec.issuer ?? spec.title ?? 'issuer unknown'})`)
+						.join(', ') || 'none are issuer-unique'}.
+				</p>
+			{:else}
+				<p class="mt-1 text-sm text-stone-600">
+					The registers in this pack publish no identifier, so its records are keyed by name only
+					and are never merged with one another or with another country's records.
+				</p>
+			{/if}
 			<ul class="mt-2 flex flex-col gap-1 text-sm text-stone-700">
 				{#each Object.entries(pack.bindings) as [rubricName, predicates] (rubricName)}
 					{#each Object.entries(predicates) as [predicateId, binding] (predicateId)}
