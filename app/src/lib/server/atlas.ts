@@ -566,6 +566,7 @@ function toSearchResultItem(
 	return {
 		atlas_id: row.atlas_id,
 		canonical_name: row.canonical_name,
+		country: row.country,
 		division: row.division,
 		district: displayDistrict(row.district, row.division),
 		sector_category: row.sector_category,

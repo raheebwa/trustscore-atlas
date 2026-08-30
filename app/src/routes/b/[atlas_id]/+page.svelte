@@ -2,6 +2,7 @@
 	import { identifierKey, summariseIdentifiers } from '$lib/format';
 	import { resolve } from '$app/paths';
 	import { formatFieldLabel } from '$lib/format';
+	import { displayLocation } from '$lib/location';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -16,8 +17,11 @@
 <div class="flex flex-col gap-1">
 	<h1 class="text-2xl font-semibold text-stone-900">{record.canonical_name}</h1>
 	<p class="text-stone-600">
-		{record.entity_kind} &middot; {record.division ?? 'Unknown division'}, {record.district ??
-			'Unknown district'}
+		{record.entity_kind} &middot; {displayLocation(
+			record.district,
+			record.division,
+			record.country
+		)}
 		{#if record.sector_category}
 			&middot; {record.sector_category}{record.sector_nature ? `/${record.sector_nature}` : ''}
 		{/if}

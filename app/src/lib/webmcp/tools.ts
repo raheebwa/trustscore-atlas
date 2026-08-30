@@ -1,4 +1,5 @@
 import { summariseIdentifiers } from '$lib/format';
+import { displayLocation } from '$lib/location';
 import type {
 	BusinessRecordResponse,
 	ClaimResponse,
@@ -686,6 +687,7 @@ function shapeSearchHit(item: SearchResultItem, minimal = false) {
 		canonical_name: item.canonical_name,
 		district: item.district,
 		division: item.division,
+		location: displayLocation(item.district, item.division, item.country),
 		sector_category: item.sector_category,
 		sector_nature: item.sector_nature,
 		coverage: { found_in: item.coverage.found_in, summary: item.coverage_summary }
@@ -765,6 +767,7 @@ export function shapeBusinessRecord(record: BusinessRecordResponse): ToolTextRes
 		entity_kind: record.entity_kind,
 		district: record.district,
 		division: record.division,
+		location: displayLocation(record.district, record.division, record.country),
 		sector_category: record.sector_category,
 		sector_nature: record.sector_nature,
 		identifiers: summariseIdentifiers(record.identifiers),

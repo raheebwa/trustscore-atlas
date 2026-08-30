@@ -34,6 +34,7 @@ function makeResult(index: number): SearchResultItem {
 	return {
 		atlas_id: `atlas-${index}`,
 		canonical_name: `Example Hardware Supplies ${index} Ltd`,
+		country: 'UG',
 		division: 'Nakawa',
 		district: 'Kampala',
 		sector_category: 'Trade',
@@ -476,6 +477,34 @@ describe('shapeSearchResults', () => {
 		expect(first.coverage.found_in).toEqual(registers.slice(0, 3));
 	});
 
+	it('reads a record with no published location as its country', () => {
+		const kenyan: SearchResultItem = {
+			...makeResult(2),
+			canonical_name: 'Example Bank of Kenya Limited',
+			country: 'KE',
+			district: null,
+			division: null
+		};
+		const value = parsed(
+			shapeSearchResults({
+				query: 'example bank of kenya',
+				district: '',
+				total_count: 1,
+				returned: 1,
+				page_returned: 1,
+				limit: 20,
+				offset: 0,
+				regeneration_id: 'regen-example-1',
+				next_cursor: null,
+				results: [kenyan]
+			})
+		);
+		const [first] = value.results as { location: string }[];
+
+		expect(first.location).toBe('Kenya');
+		expect(JSON.stringify(value)).not.toContain('Unknown');
+	});
+
 	it('returns one compact JSON text item with paging fields', () => {
 		const response: SearchResponse = {
 			query: 'example hardware',
@@ -584,6 +613,19 @@ describe('shapeBusinessRecord', () => {
 		expect(result.content[0].text).toContain('2026-08-29T09:05:00Z');
 	});
 
+	it('reads a record with no published location as its country', () => {
+		const value = parsed(
+			shapeBusinessRecord({
+				...businessFixture,
+				country: 'KE',
+				district: null,
+				division: null
+			})
+		);
+
+		expect(value.location).toBe('Kenya');
+	});
+
 	it('returns structured errors', () => {
 		expect(parsed(shapeToolError('business_not_found'))).toEqual({
 			error: 'business_not_found'
@@ -632,6 +674,7 @@ describe('new tool result budgets', () => {
 			top_candidates: Array.from({ length: 10 }, (_, index) => ({
 				atlas_id: `atlas-example-${index}`,
 				canonical_name: longText,
+				country: 'UG',
 				district: 'Example District',
 				division: 'Example Division',
 				sector_category: 'Trade',

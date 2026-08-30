@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { summariseIdentifiers } from '$lib/format';
+	import { displayLocation } from '$lib/location';
 	import { resolve } from '$app/paths';
 	import type { PageProps } from './$types';
 
@@ -93,7 +94,7 @@
 						class="font-medium text-stone-900 hover:underline">{item.canonical_name}</a
 					>
 					<p class="mt-1 text-sm text-stone-600">
-						{item.division ?? 'Unknown division'}, {item.district ?? 'Unknown district'}
+						{displayLocation(item.district, item.division, item.country)}
 						&middot; Formality {item.formality.value}/{item.formality.max}
 					</p>
 				</li>
@@ -135,7 +136,7 @@
 						{/if}
 					</div>
 					<p class="mt-1 text-sm text-stone-600">
-						{item.division ?? 'Unknown division'}, {item.district ?? 'Unknown district'}
+						{displayLocation(item.district, item.division, item.country)}
 						{#if item.sector_category}
 							&middot; {item.sector_category}{item.sector_nature ? `/${item.sector_nature}` : ''}
 						{/if}

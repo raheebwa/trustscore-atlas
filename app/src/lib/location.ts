@@ -24,3 +24,28 @@ export function displayDistrict(
 	if (key && KCCA_DIVISIONS.some((name) => name.toLowerCase() === key)) return 'Kampala';
 	return district ?? null;
 }
+
+/** Register countries this pack set publishes; an unlisted code shows as itself. */
+const COUNTRY_NAMES: Record<string, string> = { UG: 'Uganda', KE: 'Kenya' };
+
+export function countryName(code: string | null | undefined): string | null {
+	const key = code?.trim().toUpperCase();
+	if (!key) return null;
+	return COUNTRY_NAMES[key] ?? key;
+}
+
+/**
+ * One display line for a record's location. Kenyan registers publish no district or division
+ * (the CBK lists carry neither), so showing "Unknown division, Unknown district" would read as
+ * missing Ugandan data rather than a register that never published it. Fall back to the country.
+ */
+export function displayLocation(
+	district: string | null | undefined,
+	division: string | null | undefined,
+	country: string | null | undefined
+): string {
+	const resolvedDistrict = displayDistrict(district, division)?.trim() || null;
+	const resolvedDivision = division?.trim() || null;
+	if (resolvedDivision && resolvedDistrict) return `${resolvedDivision}, ${resolvedDistrict}`;
+	return resolvedDivision ?? resolvedDistrict ?? countryName(country) ?? 'Location not published';
+}

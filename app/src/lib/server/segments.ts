@@ -43,6 +43,7 @@ interface DivisionCountRow {
 interface CandidateBusinessRow {
 	atlas_id: string;
 	canonical_name: string;
+	country: string | null;
 	district: string | null;
 	division: string | null;
 	sector_category: string | null;
@@ -129,6 +130,7 @@ async function topSegmentCandidates(
 		.map(({ business, score }) => ({
 			atlas_id: business.atlas_id,
 			canonical_name: business.canonical_name,
+			country: business.country,
 			district: business.district,
 			division: business.division,
 			sector_category: business.sector_category,
@@ -167,7 +169,7 @@ export async function findSegment(
 			.all<DivisionCountRow>(),
 		db
 			.prepare(
-				`SELECT b.atlas_id, b.canonical_name, b.district, b.division,
+				`SELECT b.atlas_id, b.canonical_name, b.country, b.district, b.division,
 				 b.sector_category, b.sector_nature, b.scores
 				 FROM businesses b${whereClause}
 				 ORDER BY CAST(json_extract(b.scores, '$.formality.value') AS INTEGER) DESC,

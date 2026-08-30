@@ -35,6 +35,7 @@ export interface BusinessScoreSummary {
 export interface SearchResultItem {
 	atlas_id: string;
 	canonical_name: string;
+	country: string | null;
 	division: string | null;
 	district: string | null;
 	sector_category: string | null;
@@ -199,6 +200,7 @@ export interface SegmentFilters {
 export interface SegmentCandidate {
 	atlas_id: string;
 	canonical_name: string;
+	country: string | null;
 	district: string | null;
 	division: string | null;
 	sector_category: string | null;
