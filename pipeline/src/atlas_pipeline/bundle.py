@@ -223,7 +223,7 @@ def _write_sources(path: Path, sources: list[dict]) -> None:
             lines += [f"## {current_country}", ""]
         pulled_at = source["manifest"].get("pulled_at", source["manifest"]["started_at"])
         lines += [
-            f"- **{source['publisher']} — {source['title']}**",
+            f"- **{source['publisher']}: {source['title']}**",
             f"  URL: {source['url']}",
             f"  Licence: {source['licence']}",
             f"  Attribution: {source['attribution']}",
