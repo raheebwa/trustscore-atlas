@@ -497,3 +497,50 @@ def test_regenerate_merges_two_packs_and_keeps_coverage_per_country(tmp_path: Pa
     assert "'coverage_applicable:UG'" in swap and "'coverage_applicable'" in swap
     stage = (out.directory / "stage.sql").read_text()
     assert "'KE'" in stage
+
+
+def test_regenerate_publishes_the_methodology_it_scored_with(tmp_path: Path):
+    """The methodology page reads rubric definitions, bindings and the precedence contract
+    from the serving database, so what is shown is exactly what scored the live data."""
+    spec = load_adapter(ADAPTER)
+    pages = {
+        spec.module.query_url(n): (ADAPTER / "fixtures" / "raw" / f"{_slug(n)}.html").read_bytes()
+        for n in EXPECTED["natures"]
+    }
+    run_adapter(
+        spec,
+        data_root=tmp_path,
+        run_id=RUN_ID,
+        started_at=STARTED_AT,
+        fetcher=lambda url, **_: pages[url],
+        salt=SALT,
+        params={"natures": EXPECTED["natures"]},
+    )
+    out = regenerate(
+        pack_dir=PACKS / "ug",
+        data_root=tmp_path,
+        regeneration_id="20260830T050000Z",
+        computed_at="2026-08-30T05:00:00Z",
+        rubrics_dir=PACKS.parent / "rubrics",
+        schema_path=PACKS.parent / "infra" / "d1" / "schema.sql",
+    )
+    swap = (out.directory / "swap.sql").read_text()
+    line = next(row for row in swap.splitlines() if "'methodology'" in row)
+    payload = json.loads(
+        line.split("VALUES ('methodology', '", 1)[1].rsplit("');", 1)[0].replace("''", "'")
+    )
+    rubrics = {r["name"]: r for r in payload["rubrics"]}
+    assert list(rubrics) == ["formality", "activity", "compliance_signals", "procurement_readiness"]
+    assert rubrics["formality"]["version"] == 1
+    assert rubrics["formality"]["question"] == "Does the state know this business exists?"
+    assert rubrics["formality"]["predicates"][0] == {
+        "id": "legal_register_presence",
+        "points": 30,
+        "description": "The business appears in the jurisdiction's legal register of record.",
+    }
+    assert payload["packs"]["UG"]["precedence"]["regulator_or_authority"] == 3
+    assert payload["packs"]["UG"]["bindings"]["formality"]["local_trading_licence"] == {
+        "sources": ["kcca.businesses"]
+    }
+    assert payload["linkage"]["review_band"] == [0.8, 0.95]
+    assert payload["linkage"]["candidate_threshold"] == 0.5

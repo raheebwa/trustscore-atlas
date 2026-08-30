@@ -12,6 +12,7 @@ import yaml
 
 from .adapters import STATEMENT_ARROW_SCHEMA, accepted_run
 from .d1 import regeneration_sql, segment_rows, swap_sql
+from .linkage import MODEL_VERSION as LINKAGE_MODEL_VERSION
 from .linkage import name_candidates
 from .resolve import pack_sources, resolve
 from .score import load_rubric, score
@@ -207,6 +208,46 @@ class _Combined:
     new_entities: list[str] = field(default_factory=list)
 
 
+LINKAGE_CANDIDATE_THRESHOLD = 0.5  # name_candidates default; candidates below are not kept
+
+
+def _methodology_meta(rubrics_dir: Path, packs: list[Path]) -> str:
+    """What the methodology page shows: the rubric definitions, each pack's bindings and
+    precedence contract, and the linkage model's thresholds, exactly as used in this run."""
+    rubrics = []
+    for name in PHASE0_RUBRICS:
+        rubric = yaml.safe_load((rubrics_dir / name / "v1.yml").read_text())
+        rubrics.append(
+            {
+                key: rubric[key]
+                for key in ("name", "version", "title", "question", "max", "licence", "predicates")
+            }
+        )
+    pack_entries = {}
+    for pack_path in packs:
+        pack = yaml.safe_load((pack_path / "pack.yml").read_text())
+        pack_entries[pack["country"]] = {
+            "name": pack.get("name"),
+            "precedence": pack["precedence"],
+            "bindings": yaml.safe_load((pack_path / "rubrics" / "bindings.yml").read_text()),
+        }
+    return _json(
+        {
+            "rubrics": rubrics,
+            "packs": pack_entries,
+            "linkage": {
+                "model_version": LINKAGE_MODEL_VERSION,
+                "candidate_threshold": LINKAGE_CANDIDATE_THRESHOLD,
+                "review_band": [0.8, 0.95],
+                "rule": "Names are compared with expert-set weights inside blocks that share a "
+                "first token; the same register never pairs with itself. Candidates are shown, "
+                "never merged: only an issuer-unique identifier or a maintainer label links "
+                "two records.",
+            },
+        }
+    )
+
+
 def regenerate(
     *,
     pack_dir: Path | None = None,
@@ -396,7 +437,7 @@ def regenerate(
     # loader first drops the largest live table. The previous regeneration's stage.sql and
     # swap.sql stay on disk as the rollback path; trace reads fail closed during the load.
     load_order: dict[str, list[str]] = {}
-    pack_meta = combined.coverage_meta
+    pack_meta = combined.coverage_meta | {"methodology": _methodology_meta(rubrics_dir, packs)}
     for database, prefix in (
         ("DB", ""),
         ("DB_STATEMENTS", "statements-"),
