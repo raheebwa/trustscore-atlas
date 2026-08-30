@@ -56,6 +56,10 @@ A source adapter is a directory `packs/<iso2>/sources/<slug>/` with `source.yml`
 
 ## Licence
 
-TODO: licence files are still to be added. The intended split is Apache-2.0 for code and
-CC-BY-4.0 for published data and rubrics; per-source rows carry their source's rights
-declaration (`rights` in each `source.yml`).
+Code is licensed under Apache-2.0 (LICENSE).
+
+Published data, data packages, and rubrics are licensed under CC-BY-4.0 (LICENSE-DATA).
+
+Per-source rights are carried in each source's source.yml file and in NOTICE.
+
+Attribution line to use: "TrustScore Atlas, atlas.trustscorehq.com"
