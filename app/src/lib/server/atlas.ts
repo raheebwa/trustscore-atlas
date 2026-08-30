@@ -901,6 +901,26 @@ async function fetchStatementsFor(
 	return filterPublishableStatements((results ?? []).map(toStatementRow));
 }
 
+/**
+ * When a maintainer approved a verified claim on this record, if one was.
+ *
+ * It is read from the statement the approval produced rather than from a column, because that
+ * statement is the thing that outranks the registers, and a record page that said it some other
+ * way could disagree with what it publishes.
+ */
+export function operatorVerifiedAt(statements: StatementRow[]): string | null {
+	const verified = statements
+		.filter(
+			(statement) =>
+				statement.field === 'status.operator_verified' &&
+				statement.value === 'verified' &&
+				statement.source === 'atlas.operator'
+		)
+		.map((statement) => statement.asserted_at)
+		.sort();
+	return verified.at(-1) ?? null;
+}
+
 export function buildProvenanceTable(
 	statements: StatementRow[],
 	atlasId: string,
@@ -1042,6 +1062,8 @@ export async function getBusiness(
 export interface BusinessDetail {
 	record: BusinessRecordResponse;
 	provenance: ProvenanceRow[];
+	/** When a maintainer approved a verified claim on this record, if one was. */
+	operatorVerifiedAt?: string | null;
 	fields: string[];
 }
 
@@ -1054,6 +1076,7 @@ export async function getBusinessDetail(
 	if (!result) return null;
 	const { record, statements } = result;
 	// The table says where the published values came from, so it starts from the record itself.
+	// The operator line is read from the same statements the table is built from.
 	const provenance = buildProvenanceTable(statements, atlasId, {
 		canonical_name: record.canonical_name,
 		district: record.district,
@@ -1062,7 +1085,7 @@ export async function getBusinessDetail(
 		sector_nature: record.sector_nature
 	});
 	const fields = provenance.map((row) => row.field);
-	return { record, provenance, fields };
+	return { record, provenance, fields, operatorVerifiedAt: operatorVerifiedAt(statements) };
 }
 
 export interface TraceResult {

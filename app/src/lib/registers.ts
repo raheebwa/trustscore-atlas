@@ -14,7 +14,7 @@
  */
 
 export type RegisterKind =
-	'regulator' | 'tax' | 'permit' | 'standards' | 'procurement' | 'municipal';
+	'regulator' | 'tax' | 'permit' | 'standards' | 'procurement' | 'municipal' | 'operator';
 
 export interface RegisterDescription {
 	slug: string;
@@ -23,6 +23,8 @@ export interface RegisterDescription {
 }
 
 const REGISTERS: Record<string, { short: string; kind: RegisterKind }> = {
+	// Not a register: what a maintainer approved after a claimant proved they run the business.
+	'atlas.operator': { short: 'Verified operator', kind: 'operator' },
 	'bou.supervised_institutions': { short: 'Bank of Uganda', kind: 'regulator' },
 	'cbk.licensed_banks': { short: 'Central Bank of Kenya', kind: 'regulator' },
 	'cma.licensed_firms': { short: 'Capital Markets Authority', kind: 'regulator' },

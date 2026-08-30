@@ -3,6 +3,7 @@
 	import { Tabs } from 'bits-ui';
 	import Copy from '@lucide/svelte/icons/copy';
 	import Flag from '@lucide/svelte/icons/flag';
+	import BadgeCheck from '@lucide/svelte/icons/badge-check';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { organizationJsonLd } from '$lib/structured-data';
@@ -73,6 +74,14 @@
 		formatWhen(record.scores[0]?.evaluation_as_of ?? null, { showTime: false })?.text
 	);
 
+	/**
+	 * A maintainer approved a verified claim on this record, so an operator's own statements
+	 * outrank the registers on the fields they cover. The date is the approval's.
+	 */
+	const operatorVerified = $derived(
+		formatWhen(data.operatorVerifiedAt ?? null, { showTime: false })?.absolute
+	);
+
 	// The closing tag is split so this string cannot end the block that renders it.
 	const organizationTag = $derived(
 		`<script type="application/ld+json">${organizationJsonLd(record, page.url.origin)}</` +
@@ -111,6 +120,12 @@
 			<div class="flex flex-wrap items-start justify-between gap-3">
 				<div class="flex min-w-0 flex-col gap-1">
 					<h1 class="font-display text-2xl text-ink">{record.canonical_name}</h1>
+					{#if operatorVerified}
+						<p class="flex items-center gap-1.5 text-xs text-success-ink">
+							<BadgeCheck size={16} strokeWidth={1.5} aria-hidden="true" />
+							Verified by operator on {operatorVerified}
+						</p>
+					{/if}
 					<p class="text-base text-ink-muted">
 						{record.entity_kind} &middot; {record.location}
 						{#if record.sector_category}

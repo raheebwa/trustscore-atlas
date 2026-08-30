@@ -137,6 +137,13 @@
 			<p class="text-base text-ink-muted">
 				Registers are added as code, in the repository, not through this site.
 			</p>
+			<p class="text-base text-ink-muted" id="operator-statements">
+				One source is not a register. When a claimant proves they control the business's website, or
+				opens a link Atlas mails to a domain a register published for the record, and a maintainer
+				then approves the claim, what they assert is published as an operator statement at the top
+				of the precedence order. It wins the field it is about, carries the claim it came from, and
+				appears on the record like any other value, with its own source beside it.
+			</p>
 			{#if pack}
 				{#each Object.entries(pack.bindings) as [rubricName, predicates] (rubricName)}
 					<div class="flex flex-col gap-2">

@@ -7,6 +7,7 @@ import {
 	getConsistentLiveRegenerationId,
 	getFieldTrace,
 	getStatementsPage,
+	operatorVerifiedAt,
 	searchBusinesses
 } from './atlas';
 import type { StatementRow } from '$lib/types';
@@ -424,5 +425,42 @@ describe('coverage per country', () => {
 				not_yet_checked: ['example.ke.pending']
 			}
 		]);
+	});
+});
+
+/**
+ * The line a reader sees when a maintainer approved a verified claim. It is read from the
+ * statement the approval produced, which is the same statement that outranks the registers, so
+ * the sentence and the published value can never disagree.
+ */
+describe('operatorVerifiedAt', () => {
+	const approved = (assertedAt: string) =>
+		statement({
+			field: 'status.operator_verified',
+			value: 'verified',
+			source: 'atlas.operator',
+			precedence: 1,
+			asserted_at: assertedAt
+		});
+
+	it('says nothing for a record no operator was verified on', () => {
+		expect(operatorVerifiedAt([statement({})])).toBeNull();
+	});
+
+	it('takes the latest approval when a record has more than one', () => {
+		expect(
+			operatorVerifiedAt([approved('2026-08-01T00:00:00Z'), approved('2026-08-30T00:00:00Z')])
+		).toBe('2026-08-30T00:00:00Z');
+	});
+
+	// A register asserting the same field is not an operator statement, whatever it says.
+	it('ignores a claim of that field from anywhere else', () => {
+		const fromRegister = statement({
+			field: 'status.operator_verified',
+			value: 'verified',
+			source: 'kcca.businesses'
+		});
+
+		expect(operatorVerifiedAt([fromRegister])).toBeNull();
 	});
 });

@@ -6,6 +6,7 @@
 	import Scale from '@lucide/svelte/icons/scale';
 	import Gavel from '@lucide/svelte/icons/gavel';
 	import Building from '@lucide/svelte/icons/building-2';
+	import BadgeCheck from '@lucide/svelte/icons/badge-check';
 	import { describeRegister, type RegisterKind } from '$lib/registers';
 
 	let { slug, muted = false }: { slug: string; muted?: boolean } = $props();
@@ -16,7 +17,8 @@
 		permit: Package,
 		standards: Scale,
 		procurement: Gavel,
-		municipal: Building
+		municipal: Building,
+		operator: BadgeCheck
 	};
 	const register = $derived(describeRegister(slug));
 	const Icon = $derived(icons[register.kind]);
