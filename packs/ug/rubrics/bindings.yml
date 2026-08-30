@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Binds the abstract predicates in rubrics/<name>/v<N>.yml to this pack's registers.
 # A predicate with an empty binding is reported as "not checked", never as 0 points.
 formality:

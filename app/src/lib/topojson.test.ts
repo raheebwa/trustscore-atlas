@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
 import { decodeTopology, districtKey, projectRing, type Topology } from './topojson';
 

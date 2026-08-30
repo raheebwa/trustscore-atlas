@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """D1 writer: regeneration SQL under the per-statement byte limit, staged names, swap batch."""
 
 import sqlite3

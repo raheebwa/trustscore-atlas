@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Adapter conformance suite, run against the KCCA licensed businesses adapter on fixtures.
 
 The six checks are the contract in docs/ARCHITECTURE.md section 6. Every adapter gets a copy

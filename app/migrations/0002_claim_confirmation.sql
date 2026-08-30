@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: Apache-2.0
 ALTER TABLE claims ADD COLUMN expires_at TEXT;
 ALTER TABLE claims ADD COLUMN confirmed_at TEXT;
 -- Stores only the SHA-256 hash. The plain token is returned once in the confirmation URL.

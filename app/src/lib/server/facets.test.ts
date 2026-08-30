@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Facets feed the search filters, so every value they offer must exist in the data: a filter
  * control built from a free-text guess sends people to empty result pages.

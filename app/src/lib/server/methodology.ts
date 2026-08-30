@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * The methodology page reads what the serving database was scored with: the pipeline
  * writes the rubric definitions, each pack's bindings and precedence contract, and the

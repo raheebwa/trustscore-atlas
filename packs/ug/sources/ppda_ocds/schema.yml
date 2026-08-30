@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Table Schema for records.parquet after party aggregation and personal-data exclusion.
 fields:
   - name: record_id

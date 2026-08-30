@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Regeneration: union every loaded source, resolve, score, and write the serving SQL."""
 
 import hashlib

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The six adapter conformance checks from the adapter contract."""
 
 import json

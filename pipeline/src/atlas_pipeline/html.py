@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Minimal HTML table extraction using the standard library only."""
 
 from html.parser import HTMLParser

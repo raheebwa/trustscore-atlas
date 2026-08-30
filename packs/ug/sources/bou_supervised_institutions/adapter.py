@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Bank of Uganda supervised financial institutions register."""
 
 import json

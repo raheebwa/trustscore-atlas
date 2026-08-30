@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Linkage review for maintainers: name candidates in the review band, both businesses side
  * by side, and an append-only verdict per pair. The pipeline compiles verdicts into the

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Identity-churn guard: refuse to load a regeneration that silently rewrites identities.
 
 A regeneration built from the wrong state (no crosswalk, no labels) passes every step and

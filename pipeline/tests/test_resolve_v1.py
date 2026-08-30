@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Resolution v1: issuer-unique identifiers group entities across sources; everything else is a
 candidate, never a merge; merged groups keep the older atlas id and alias the rest."""
 

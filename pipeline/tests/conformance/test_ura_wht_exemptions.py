@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Conformance checks for the URA withholding tax exemptions register."""
 
 import json

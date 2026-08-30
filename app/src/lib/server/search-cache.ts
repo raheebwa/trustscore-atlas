@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Search answers are immutable for a regeneration, so a query is cached in KV under the
  * live regeneration id and its normalised options; a new regeneration changes the key.

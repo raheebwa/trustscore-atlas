@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 function hex(bytes: Uint8Array): string {
 	return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
 }

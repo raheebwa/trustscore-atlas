@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
 import { GET_EVIDENCE_TOOL, SEARCH_BUSINESSES_TOOL } from './tools';
 import { scopeToBusiness, toolsForRoute } from './routes';

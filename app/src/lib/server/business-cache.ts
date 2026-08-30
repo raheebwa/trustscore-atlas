@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * The business page composes one record from five round trips across the three serving
  * databases. The composed result is immutable for a regeneration, so it is cached in KV under

@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: Apache-2.0
 -- Maintainer requests for the pipeline: regenerate now, or roll back to an earlier regeneration.
 -- The refresh workflow consumes pending rows; rows are append-only and status moves through a
 -- separate events table so a request keeps its history.

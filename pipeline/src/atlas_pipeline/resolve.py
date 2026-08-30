@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Resolution: statements -> canonical business records.
 
 Version 0 groups statements by source entity id (no cross-source merging yet) and chooses

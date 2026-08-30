@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """PPDA OCDS parties with aggregated procurement history."""
 
 import json

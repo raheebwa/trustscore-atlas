@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: Apache-2.0
 -- Serving schema for the regenerated tables (docs/ARCHITECTURE.md section 7).
 -- The regeneration writer creates each table under a staged name (<table>__<regeneration_id>),
 -- loads it, then swaps it into place. Append-only ops tables live in the application migrations.

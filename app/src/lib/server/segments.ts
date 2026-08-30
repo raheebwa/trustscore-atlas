@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { getConsistentLiveRegenerationId, getLocationPublishingCountries } from './atlas';
 import { displayLocation } from '$lib/location';
 import type { AtlasDatabases } from './platform';

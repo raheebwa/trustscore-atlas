@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """KCCA licensed businesses.
 
 The directory page queries one endpoint per business nature; an empty division returns all

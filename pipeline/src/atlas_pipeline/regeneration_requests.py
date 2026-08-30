@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Read and append events for maintainer regeneration requests."""
 
 import subprocess

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Regeneration: every loaded source -> canonical parquet, scores, and serving SQL."""
 
 import json

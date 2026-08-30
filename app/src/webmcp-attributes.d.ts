@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Declarative WebMCP form attributes: a form with toolname becomes a tool in Chrome with
 // WebMCP, and toolparamdescription documents each field for the model.
 declare namespace svelteHTML {

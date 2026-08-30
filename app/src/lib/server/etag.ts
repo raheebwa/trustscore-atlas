@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Derives a stable ETag from the live regeneration id, the deployment version and a request path
  * (docs/ARCHITECTURE.md section 9: "All reads carry ETag derived from the live regeneration id").

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The identity-churn guard: a green run must never rewrite every identity unnoticed."""
 
 import json

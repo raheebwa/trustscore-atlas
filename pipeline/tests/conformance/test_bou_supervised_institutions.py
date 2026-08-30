@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Conformance checks for the Bank of Uganda supervised institutions register."""
 
 import json

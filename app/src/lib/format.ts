@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /** Turns a dotted statement field path into a readable label, e.g. "sector.source_category" -> "Sector › Source Category". */
 export function formatFieldLabel(field: string): string {
 	return field

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Cloudflare Access guard for the maintainer surface. Access sits in front of /ops and
  * forwards a signed JWT in Cf-Access-Jwt-Assertion; the Worker verifies it against the

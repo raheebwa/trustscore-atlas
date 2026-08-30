@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { getDatabase } from '$lib/server/platform';
 import { loadWriteConfirmation } from '$lib/server/write-confirmation';
 import type { PageServerLoad } from './$types';

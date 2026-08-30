@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Characterization tests for the polite fetcher: retries with backoff, pause after success."""
 
 import httpx

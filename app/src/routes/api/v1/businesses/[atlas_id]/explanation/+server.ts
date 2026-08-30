@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { deploymentVersion } from '$lib/server/cache-scope';
 import { RegenerationInProgressError, businessExists, getJoinedScore } from '$lib/server/atlas';
 import { explainScore } from '$lib/score-explanation';

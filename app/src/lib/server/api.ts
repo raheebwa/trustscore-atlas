@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * JSON response helper for /api/v1/*: derives the ETag from the live
  * regeneration id and the request path, sets an open CORS policy for reads,

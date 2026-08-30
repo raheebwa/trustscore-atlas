@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Ops MCP server: the maintainer actions over the same ops library as the /ops screens, behind
  * the same Cloudflare Access check (the server hook verifies the JWT for every /ops path and

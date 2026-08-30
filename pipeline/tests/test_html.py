@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 from atlas_pipeline.html import table_rows
 
 HTML = """

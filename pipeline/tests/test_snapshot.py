@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Snapshot runs: when a register stops serving, a dated typed table received earlier is loaded
 through the same adapter contract with honest time semantics."""
 

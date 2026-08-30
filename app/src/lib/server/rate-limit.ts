@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { json } from '@sveltejs/kit';
 
 const WRITE_PAGE_PREFIXES = ['/claim/', '/correct/', '/label/', '/report/'] as const;

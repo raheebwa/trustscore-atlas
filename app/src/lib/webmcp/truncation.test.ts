@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
 import { MAX_TOOL_RESULT_CHARS, shapeBusinessRecord } from './tools';
 import type { BusinessRecordResponse } from '$lib/types';

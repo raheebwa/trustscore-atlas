@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Downloads read the published bundle in R2: `bundles/latest.json` names the regeneration,
  * `bundles/<id>/datapackage.json` describes every file (docs/PRD.md section 10.5).

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { getMethodology } from '$lib/server/methodology';
 import { getDatabase } from '$lib/server/platform';
 import type { PageServerLoad } from './$types';

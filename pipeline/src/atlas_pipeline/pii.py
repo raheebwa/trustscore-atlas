@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Personal-data posture applied to every native row before it is written anywhere."""
 
 import hashlib

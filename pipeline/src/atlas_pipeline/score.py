@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Rubric evaluation: a pure function of a business, its statements and a rubric version."""
 
 import json

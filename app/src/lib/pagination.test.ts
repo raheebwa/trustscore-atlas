@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
 import { buildStatementsPage } from '$lib/server/atlas';
 import type { StatementRow } from '$lib/types';

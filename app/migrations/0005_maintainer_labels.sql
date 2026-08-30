@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: Apache-2.0
 -- Linkage verdicts recorded by maintainers on the review screen. Append-only: the pipeline
 -- compiles rows into the canonical labels file at the next regeneration and records which
 -- regeneration compiled each row in a second append-only table.

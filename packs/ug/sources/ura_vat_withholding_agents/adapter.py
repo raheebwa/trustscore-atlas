@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """URA VAT withholding agents report."""
 
 import re

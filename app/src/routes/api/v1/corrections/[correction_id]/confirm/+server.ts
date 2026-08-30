@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { confirmWriteRequestEndpoint } from '$lib/server/write-requests';
 import type { RequestHandler } from './$types';
 

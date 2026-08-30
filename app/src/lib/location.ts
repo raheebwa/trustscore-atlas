@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Display rule for the capital: KCCA licenses businesses per division, and the five divisions
  * belong to Kampala district. District and division are resolved independently by precedence,

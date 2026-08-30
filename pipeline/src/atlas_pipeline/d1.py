@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Regeneration SQL for the serving database.
 
 Two constraints from the platform shape everything here: one SQL statement may not exceed

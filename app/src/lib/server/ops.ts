@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Maintainer operations shared by the /ops screens and any ops transport: list confirmed
  * requests awaiting a decision and record decisions. Safety rules live here, never in a

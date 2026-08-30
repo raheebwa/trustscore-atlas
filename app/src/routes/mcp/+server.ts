@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Remote MCP server, read-only, over stateless Streamable HTTP: one JSON-RPC request per
  * POST, one JSON response, no server-initiated stream (GET answers 405). The six read tools

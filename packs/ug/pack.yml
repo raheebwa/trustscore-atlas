@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Uganda country pack. The canonical layer, score engine and surfaces are pack-agnostic;
 # everything Uganda-specific is declared here or under this directory.
 country: UG

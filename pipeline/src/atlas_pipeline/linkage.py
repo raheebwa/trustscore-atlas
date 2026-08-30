@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Name candidates: probabilistic pairs between businesses from different registers.
 
 Expert-set match weights on name similarity and division agreement (no training on name-only

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Segment explorer over the precomputed `segments` table (one row per
  * country, category, nature-or-any, district, division, register-or-any).

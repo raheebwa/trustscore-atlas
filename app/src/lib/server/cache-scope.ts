@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Every KV cache key carries the live regeneration id and the deployment version, so a new
  * regeneration or a new build never serves an answer shaped by the previous code.

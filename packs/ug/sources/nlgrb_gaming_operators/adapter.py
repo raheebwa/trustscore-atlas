@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """NLGRB licensed gaming operators register."""
 
 import io

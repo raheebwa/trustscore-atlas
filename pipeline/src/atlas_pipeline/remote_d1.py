@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Execute SQL against the remote serving D1 database."""
 
 import json

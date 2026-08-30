@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The only surface an adapter sees: fetch, raw storage, record emission."""
 
 import hashlib

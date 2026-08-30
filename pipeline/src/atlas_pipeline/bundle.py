@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Publish one regeneration as a self-describing download bundle."""
 
 import hashlib

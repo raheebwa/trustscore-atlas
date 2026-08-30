@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Route-aware tool sets: each page registers only the tools that make sense there, and the
  * business page scopes record tools to the record on screen. Registrations are torn down and

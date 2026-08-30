@@ -1,4 +1,5 @@
 <script lang="ts">
+	// SPDX-License-Identifier: Apache-2.0
 	import './layout.css';
 	import { resolve } from '$app/paths';
 	import WebMcpRegistration from '$lib/webmcp/WebMcpRegistration.svelte';

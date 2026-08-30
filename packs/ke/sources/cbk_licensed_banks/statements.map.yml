@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Native column -> canonical field.
 country: KE
 precedence_class: regulator_or_authority

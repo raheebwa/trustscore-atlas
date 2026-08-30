@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Apply statements.map.yml to typed records to produce statements."""
 
 import hashlib

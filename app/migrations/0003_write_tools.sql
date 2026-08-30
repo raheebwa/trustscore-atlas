@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: Apache-2.0
 CREATE TABLE IF NOT EXISTS corrections (
   correction_id          TEXT PRIMARY KEY,
   atlas_id               TEXT NOT NULL,

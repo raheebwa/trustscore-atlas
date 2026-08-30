@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: Apache-2.0
 -- Fictional development seed for the local scores D1 database.
 -- It matches the live regeneration in dev.sql and dev-statements.sql.
 

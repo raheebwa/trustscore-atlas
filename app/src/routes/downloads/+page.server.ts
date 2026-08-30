@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { getDownloads } from '$lib/server/downloads';
 import { requireBucket } from '$lib/server/platform';
 import type { PageServerLoad } from './$types';

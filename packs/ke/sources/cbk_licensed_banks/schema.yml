@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Table schema for records.parquet after applying the adapter posture.
 fields:
   - name: record_id

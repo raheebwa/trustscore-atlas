@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { error } from '@sveltejs/kit';
 import { resolveDownloadKey } from '$lib/server/downloads';
 import { requireBucket } from '$lib/server/platform';

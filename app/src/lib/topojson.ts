@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Minimal TopoJSON reader for the boundaries pack: decodes quantized,
  * delta-encoded arcs into longitude/latitude rings and projects them into an

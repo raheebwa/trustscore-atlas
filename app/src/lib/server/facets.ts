@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * The value sets behind the search filters: district, division, sector category, sector nature
  * and register, each with the number of businesses it holds, for one country and one

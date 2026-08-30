@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Typed rubric evaluators for Activity, Compliance Signals and Procurement Readiness, with
 adverse golden cases: an expired licence, a suspended status, a cancelled award."""
 

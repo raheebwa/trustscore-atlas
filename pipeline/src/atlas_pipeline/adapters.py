@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Load an adapter directory and run it through the framework."""
 
 import importlib.util

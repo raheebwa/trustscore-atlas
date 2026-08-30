@@ -1,4 +1,5 @@
 <script lang="ts">
+	// SPDX-License-Identifier: Apache-2.0
 	/** Registers the page surface and tears every registration down on navigation. */
 	import { onDestroy, onMount } from 'svelte';
 	import { afterNavigate } from '$app/navigation';

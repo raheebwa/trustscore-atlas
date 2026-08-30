@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Compile append-only maintainer linkage verdicts into canonical labels."""
 
 import json

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Boundary conversion to TopoJSON."""
 
 from __future__ import annotations

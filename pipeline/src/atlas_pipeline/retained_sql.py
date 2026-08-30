@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Retained load SQL: describe a regeneration's nine SQL files for the R2 index and verify a
 downloaded set against that index before a rollback touches any database.
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { json } from '@sveltejs/kit';
 import { CLAIM_VERIFICATION_STEPS, hashClaimConfirmationToken } from '$lib/claims';
 import { apiBadRequest, apiServerError } from '$lib/server/api';

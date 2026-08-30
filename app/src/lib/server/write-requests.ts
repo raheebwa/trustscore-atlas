@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { json } from '@sveltejs/kit';
 import { createConfirmationToken, hashConfirmationToken } from '$lib/confirmation';
 import {

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The shared precedence-ordering goldens (schemas/golden/precedence-ordering.json) must hold
 for the pipeline's rank_values exactly as they hold for the site's ordering module."""
 

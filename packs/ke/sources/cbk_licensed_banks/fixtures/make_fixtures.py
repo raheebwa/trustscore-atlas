@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Generate the synthetic CBK PDF fixtures without third-party PDF libraries."""
 
 from pathlib import Path

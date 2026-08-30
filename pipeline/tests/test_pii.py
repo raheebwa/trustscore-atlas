@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 from atlas_pipeline.pii import apply_posture, salted_hash
 
 

@@ -3,6 +3,8 @@ name = "atlas-pipeline"
 version = "0.1.0"
 description = "Ingestion, resolution, scoring and loading framework for TrustScore Atlas"
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [
     { name = "Aheebwa Ramadhan", email = "raaheebwa@gmail.com" }
 ]
@@ -31,7 +33,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --cov=atlas_pipeline --cov-report=term-missing"
+addopts = "-q --cov=atlas_pipeline --cov-report=term-missing --cov-fail-under=90"
 
 [tool.ruff]
 line-length = 100

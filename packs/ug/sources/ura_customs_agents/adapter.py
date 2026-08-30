@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """URA licensed customs agents report."""
 
 import re

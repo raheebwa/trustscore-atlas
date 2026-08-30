@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Manages server-side request forgery and unbounded reads against a stranger's URL: a claimant
  * hands us a website and we fetch it, so every check here exists to keep that fetch from reaching

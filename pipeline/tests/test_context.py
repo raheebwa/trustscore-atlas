@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 from atlas_pipeline.context import Context, RawStore
 
 

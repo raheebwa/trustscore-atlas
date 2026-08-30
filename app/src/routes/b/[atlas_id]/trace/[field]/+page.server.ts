@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { error } from '@sveltejs/kit';
 import { InvalidCursorError } from '$lib/pagination';
 import {

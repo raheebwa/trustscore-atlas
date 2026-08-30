@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import type { Handle } from '@sveltejs/kit';
 import { accessConfigFrom, verifyAccessRequest } from '$lib/server/access';
 import { applyRequestRateLimit } from '$lib/server/rate-limit';

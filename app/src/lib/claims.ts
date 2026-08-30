@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 export const CLAIM_VERIFICATION_STEPS = [
 	'Place a verification string on the registered website or official social profile.',
 	'Reply from an email address on the domain named in a register.',

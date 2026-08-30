@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 name: Bug report
 description: Report incorrect Atlas data or a problem with the site, API, downloads, or tools.
 title: "[Bug]: "

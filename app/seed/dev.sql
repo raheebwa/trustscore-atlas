@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: Apache-2.0
 -- Fictional development seed for the local main D1 database (infra/d1/schema.sql).
 -- Five fictional businesses across three Kampala divisions, sourced entirely
 -- from one fictional pull of the KCCA business licence register. Names,

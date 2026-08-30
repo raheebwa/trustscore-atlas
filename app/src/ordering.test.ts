@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { rankValues, type RankableStatement } from '$lib/ordering';

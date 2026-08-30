@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Discover scheduled adapters and restore working state from a bundle."""
 
 import json

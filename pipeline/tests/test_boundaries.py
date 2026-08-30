@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Boundary conversion from small GeoJSON and zipped inputs."""
 
 import json

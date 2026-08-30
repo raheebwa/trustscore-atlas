@@ -1,4 +1,5 @@
 <script lang="ts">
+	// SPDX-License-Identifier: Apache-2.0
 	import { summariseIdentifiers } from '$lib/format';
 	import { resolve } from '$app/paths';
 	import type { PageProps } from './$types';

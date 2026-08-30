@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Download bundles contain canonical tables, accepted source runs, and metadata."""
 
 import hashlib

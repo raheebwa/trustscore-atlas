@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: Apache-2.0
 -- Maintainer decisions on confirmed requests. Confirmation (the requester proved the
 -- request is theirs) and moderation (a maintainer accepted or declined it) are separate
 -- states; a decision never rewrites the request row.

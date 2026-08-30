@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 export const STATEMENTS_MAX_ROWS = 200;
 export const STATEMENTS_BYTE_BUDGET = 60_000;
 export const CURSOR_MAX_OFFSET = 10_000;

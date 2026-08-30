@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Characterization tests for the JSON Schemas under schemas/.
 
 They pin the contract every adapter and the canonical layer must satisfy.

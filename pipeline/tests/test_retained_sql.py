@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Retained SQL description and verification: a stale file set is refused before any load."""
 
 import json

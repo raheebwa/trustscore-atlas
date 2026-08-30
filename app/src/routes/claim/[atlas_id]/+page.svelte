@@ -1,4 +1,5 @@
 <script lang="ts">
+	// SPDX-License-Identifier: Apache-2.0
 	import { resolve } from '$app/paths';
 	import { CLAIM_VERIFICATION_STEPS } from '$lib/claims';
 	import type { PageProps } from './$types';

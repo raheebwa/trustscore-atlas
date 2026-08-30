@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Name candidates: probabilistic pairs across records with expert-set weights, written for
 review and never merged."""
 

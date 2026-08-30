@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { hashConfirmationToken } from '$lib/confirmation';
 
 export type WriteRequestKind = 'correction' | 'linkage_label' | 'issue';

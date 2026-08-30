@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Resolution v0: statements from one or more sources -> canonical businesses."""
 
 from datetime import UTC, datetime

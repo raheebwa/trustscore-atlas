@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """UNBS Product Certification Scheme register."""
 
 import certifi

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Maintainer requests for the pipeline: regenerate now, or roll back to an earlier
  * regeneration. Requests are append-only rows with an event trail; the refresh workflow

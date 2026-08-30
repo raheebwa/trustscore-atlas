@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: Apache-2.0
 -- D1's migration runner applies each file once, so these ALTER statements need not be idempotent.
 ALTER TABLE claims ADD COLUMN verified_at TEXT;
 ALTER TABLE claims ADD COLUMN verified_domain TEXT;

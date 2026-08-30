@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Kenya country pack. Kenya demonstrates portability with one regulator directory adapter.
 country: KE
 name: Kenya

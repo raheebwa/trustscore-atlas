@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * A register that lists one business many times (a customs agent with one row per licence,
  * a manufacturer with one row per certified product) asserts the same value many times on

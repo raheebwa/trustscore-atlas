@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { error, fail } from '@sveltejs/kit';
 import { accessConfigFrom, verifyAccessRequest } from '$lib/server/access';
 import { decideRequest, listQueue, OpsError, REQUEST_TYPES } from '$lib/server/ops';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Pure helpers for the search query builder: FTS phrase escaping, the length
  * threshold that chooses FTS5 over the LIKE fallback, LIKE pattern escaping,

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Scoring v0: the Formality rubric as a pure function with evidence rows and coverage."""
 
 import json

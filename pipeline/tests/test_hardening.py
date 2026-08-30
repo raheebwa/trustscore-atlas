@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests written from the adversarial review of the 2a pipeline diff."""
 
 import json

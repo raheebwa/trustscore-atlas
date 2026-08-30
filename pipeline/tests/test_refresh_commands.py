@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Scheduled refresh commands discover adapters and restore durable pipeline state."""
 
 import json

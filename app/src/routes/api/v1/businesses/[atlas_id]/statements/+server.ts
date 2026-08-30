@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { deploymentVersion } from '$lib/server/cache-scope';
 import { RegenerationInProgressError, businessExists, getStatementsPage } from '$lib/server/atlas';
 import { InvalidCursorError } from '$lib/pagination';

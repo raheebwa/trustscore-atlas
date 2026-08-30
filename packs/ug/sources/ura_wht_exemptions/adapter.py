@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """URA withholding tax exemptions report."""
 
 import re
