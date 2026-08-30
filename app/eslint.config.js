@@ -34,8 +34,10 @@ export default defineConfig(
 		}
 	},
 	{
-		// Override or add rule settings here, such as:
-		// 'svelte/button-has-type': 'error'
-		rules: {}
+		// Presentational components receive an href their caller already resolved, so route
+		// resolution stays at the call site where the route is known. Every page and layout is
+		// still held to the rule.
+		files: ['src/lib/components/**/*.svelte'],
+		rules: { 'svelte/no-navigation-without-resolve': ['error', { ignoreLinks: true }] }
 	}
 );

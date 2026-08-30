@@ -1,10 +1,27 @@
 <script lang="ts">
 	// SPDX-License-Identifier: Apache-2.0
 	import './layout.css';
-	import { resolve } from '$app/paths';
+	import AppShell from '$lib/components/AppShell.svelte';
+	import Toast from '$lib/components/Toast.svelte';
 	import WebMcpRegistration from '$lib/webmcp/WebMcpRegistration.svelte';
+	import { formatWhen } from '$lib/format';
+	import type { LayoutProps } from './$types';
 
-	let { children } = $props();
+	let { data, children }: LayoutProps = $props();
+
+	// The footer says when the data was last refreshed, not which regeneration produced it: the
+	// id belongs on the downloads page, in the API and in tool results.
+	const refreshed = $derived(
+		formatWhen(data.regeneration ? regenerationInstant(data.regeneration) : null)
+	);
+
+	/** Regeneration ids are stamped as 20260830T045242Z, which is an ISO instant without separators. */
+	function regenerationInstant(id: string): string | null {
+		const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(id);
+		return match
+			? `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}Z`
+			: null;
+	}
 </script>
 
 <svelte:head>
@@ -17,7 +34,7 @@
 	<meta property="og:title" content="TrustScore Atlas" />
 	<meta
 		property="og:description"
-		content="Public business registers of Uganda and Kenya, harmonised into one record per business with field-level provenance, deterministic scores and tools any agent can call."
+		content="Public business registers, harmonised, with every value cited: one record per business, field-level provenance, deterministic scores, and tools any agent can call."
 	/>
 	<meta property="og:image" content="https://atlas.trustscorehq.com/og.png" />
 	<meta property="og:image:width" content="1200" />
@@ -29,42 +46,12 @@
 
 <WebMcpRegistration />
 
-<div class="flex min-h-screen flex-col bg-stone-50 text-stone-900">
-	<header class="border-b border-stone-200 bg-white">
-		<div
-			class="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-4"
-		>
-			<a
-				href={resolve('/')}
-				class="flex items-center gap-2 text-lg font-semibold tracking-tight text-stone-900"
-			>
-				<img src="/brand/trustscore-mark.svg" alt="TrustScore" class="h-6 w-auto" />
-				<span>Atlas</span>
-			</a>
-			<nav class="flex flex-wrap gap-x-5 gap-y-1 text-sm font-medium text-stone-600">
-				<a href={resolve('/search')} class="hover:text-stone-900">Search</a>
-				<a href={resolve('/explore')} class="hover:text-stone-900">Explore</a>
-				<a href={resolve('/sources')} class="hover:text-stone-900">Sources</a>
-				<a href={resolve('/methodology')} class="hover:text-stone-900">Methodology</a>
-				<a href={resolve('/downloads')} class="hover:text-stone-900">Downloads</a>
-				<a href={resolve('/tools')} class="hover:text-stone-900">Actions</a>
-			</nav>
-		</div>
-	</header>
+<AppShell
+	packs={data.packs}
+	country={data.country}
+	regeneration={refreshed ? `Data refreshed ${refreshed.text}` : undefined}
+>
+	{@render children()}
+</AppShell>
 
-	<main class="mx-auto w-full max-w-4xl flex-1 px-4 py-8">
-		{@render children()}
-	</main>
-
-	<footer class="border-t border-stone-200 bg-white">
-		<div
-			class="mx-auto flex max-w-4xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-6 text-sm text-stone-500"
-		>
-			<img src="/brand/trustscore-wordmark.svg" alt="TrustScore" class="h-5 w-auto" />
-			<p class="max-w-2xl">
-				Atlas harmonises public business records published by government registers. It is not a
-				credit or fraud verdict. Every value links to the register that published it.
-			</p>
-		</div>
-	</footer>
-</div>
+<Toast />

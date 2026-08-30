@@ -3,7 +3,7 @@
 	import { describeReference } from '$lib/references';
 	import { groupStatements } from '$lib/trace';
 	import { resolve } from '$app/paths';
-	import { formatFieldLabel } from '$lib/format';
+	import { formatFieldLabel, formatWhen } from '$lib/format';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -93,7 +93,9 @@
 							>{referenceFor(statement).source_ref_label}</span
 						>
 					</td>
-					<td class="px-4 py-2 text-stone-600">{statement.asserted_at}</td>
+					<td class="px-4 py-2 text-stone-600" title={statement.asserted_at}
+						>{formatWhen(statement.asserted_at, { showTime: false })?.absolute}</td
+					>
 					<td class="px-4 py-2 text-stone-600">{statement.precedence}</td>
 					<td class="px-4 py-2 text-stone-600">{statement.confidence}</td>
 				</tr>

@@ -27,7 +27,7 @@ const routes = [
 	'/downloads',
 	'/tools',
 	'/b/atl_11bf115c93cd7870',
-	'/b/atl_11bf115c93cd7870/trace?field=canonical_name',
+	'/b/atl_11bf115c93cd7870/trace/canonical_name',
 	'/claim/atl_11bf115c93cd7870'
 ];
 const viewports = [
@@ -97,9 +97,10 @@ try {
 			try {
 				await page.goto(target.href, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 				await page.screenshot({ path: `${directory}/${slugFor(route)}.png`, fullPage: true });
-				// A machine timestamp is not a sentence: rendered copy carries a human date and keeps
-				// the ISO value in a title attribute, which has no sub-second part to match here.
-				const rendered = await page.content();
+				// A machine timestamp is not a sentence. This reads the text a person actually sees,
+				// not the serialised page data or a title attribute, both of which carry ISO values
+				// on purpose.
+				const rendered = await page.evaluate(() => document.body.innerText);
 				for (const stamp of rendered.match(/T\d\d:\d\d:\d\d\.\d+Z/g) ?? []) {
 					result.rawTimestamps.push(`${label}: ${stamp}`);
 				}

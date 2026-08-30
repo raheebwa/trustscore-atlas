@@ -1,6 +1,6 @@
 <script lang="ts">
 	// SPDX-License-Identifier: Apache-2.0
-	import { nextScheduledRun } from '$lib/format';
+	import { nextScheduledRun, formatWhen } from '$lib/format';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -45,7 +45,9 @@
 					</td>
 					<td class="px-4 py-2 text-stone-600">{source.licence}</td>
 					<td class="px-4 py-2 text-stone-600">{source.cadence}</td>
-					<td class="px-4 py-2 text-stone-600">{source.last_run_at ?? 'never'}</td>
+					<td class="px-4 py-2 text-stone-600"
+						>{formatWhen(source.last_run_at, { showTime: false })?.text ?? 'never run'}</td
+					>
 					<td class="px-4 py-2 text-stone-600"
 						>{nextScheduledRun(source.cadence, source.last_run_at)}</td
 					>

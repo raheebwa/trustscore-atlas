@@ -1,6 +1,6 @@
 <script lang="ts">
 	// SPDX-License-Identifier: Apache-2.0
-	import { summariseIdentifiers } from '$lib/format';
+	import { summariseIdentifiers, formatWhen } from '$lib/format';
 	import { resolve } from '$app/paths';
 	import type { PageProps } from './$types';
 
@@ -128,7 +128,8 @@
 								<span class="font-medium">{item.formality.summary}</span>
 								<span class="block text-xs text-stone-500">{item.formality.coverage_summary}</span>
 								<span class="block text-xs text-stone-500"
-									>Evaluated {item.formality.evaluation_as_of}</span
+									>Evaluated {formatWhen(item.formality.evaluation_as_of, { showTime: false })
+										?.absolute}</span
 								>
 							</span>
 						{/if}

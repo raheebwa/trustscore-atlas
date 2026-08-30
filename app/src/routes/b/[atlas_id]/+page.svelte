@@ -1,6 +1,6 @@
 <script lang="ts">
 	// SPDX-License-Identifier: Apache-2.0
-	import { identifierKey, summariseIdentifiers } from '$lib/format';
+	import { identifierKey, summariseIdentifiers, formatWhen } from '$lib/format';
 	import { resolve } from '$app/paths';
 	import { formatFieldLabel } from '$lib/format';
 	import type { PageProps } from './$types';
@@ -170,7 +170,9 @@
 							</tbody>
 						</table>
 					</div>
-					<p class="mt-2 text-xs text-stone-400">Evaluated {score.evaluation_as_of}</p>
+					<p class="mt-2 text-xs text-stone-400">
+						Evaluated {formatWhen(score.evaluation_as_of, { showTime: false })?.text}
+					</p>
 				</div>
 			{/each}
 		</div>
@@ -216,7 +218,9 @@
 								<span class="block text-xs text-stone-500">{row.reference.source_ref_label}</span>
 							{/if}
 						</td>
-						<td class="px-4 py-2 text-stone-600">{row.asserted_at}</td>
+						<td class="px-4 py-2 text-stone-600" title={row.asserted_at}
+							>{formatWhen(row.asserted_at, { showTime: false })?.absolute}</td
+						>
 						<td class="px-4 py-2 text-stone-600">{row.precedence}</td>
 						<td class="px-4 py-2">
 							<a
@@ -246,8 +250,10 @@
 					rel="external noreferrer">{source.title}</a
 				>
 				<span class="text-stone-500">
-					&middot; {source.publisher} &middot; {source.licence} &middot; last run {source.last_run_at ??
-						'never'}</span
+					&middot; {source.publisher} &middot; {source.licence} &middot; last run {formatWhen(
+						source.last_run_at,
+						{ showTime: false }
+					)?.text ?? 'never'}</span
 				>
 			</li>
 		{/each}
