@@ -58,6 +58,43 @@
 						? formatWhen(item.confirmed_at)?.text
 						: 'not yet'}
 				</p>
+				{#if item.verification}
+					{@const verification = item.verification}
+					<div class="mt-3 rounded-md border border-border bg-panel-2 p-3 text-xs text-ink">
+						<p>
+							<span class="font-medium">
+								{verification.state === 'verified' ? 'Verified' : 'Not verified'}
+							</span>
+							{#if verification.state === 'verified'}
+								by {verification.method === 'domain_email' ? 'a mailed link' : 'a website string'} at
+								<span class="font-mono">{verification.verified_domain}</span>.
+								{#if verification.domain_matches_register}
+									A register published that website for this record.
+								{/if}
+							{/if}
+							{#if item.gate.reason}
+								{item.gate.reason}
+							{/if}
+						</p>
+						{#if verification.evidence.length > 0}
+							<p class="mt-2">
+								Documents:
+								{#each verification.evidence as document, index (document.evidence_id)}
+									{#if index > 0}&middot;{/if}
+									<a
+										href={resolve('/ops/claims/[claim_id]/evidence/[evidence_id]', {
+											claim_id: document.claim_id,
+											evidence_id: document.evidence_id
+										})}
+										class="underline">{document.uploaded_note || document.content_type}</a
+									>
+								{/each}
+							</p>
+						{:else}
+							<p class="mt-2 text-ink-muted">No documents attached.</p>
+						{/if}
+					</div>
+				{/if}
 				<form
 					method="post"
 					action="?/decide"
@@ -75,9 +112,21 @@
 							class="mt-1 w-80 rounded-md border border-border-strong px-2 py-1 text-sm"
 						/>
 					</label>
+					{#if item.gate.needs_relationship_review}
+						<label class="flex max-w-md items-start gap-2 text-xs text-ink">
+							<input type="checkbox" name="domain_relationship_reviewed" class="mt-0.5" />
+							<span>
+								Domain relationship reviewed: I checked what connects
+								<span class="font-mono">{item.verification?.verified_domain}</span> to this business,
+								and the reason above names it.
+							</span>
+						</label>
+					{/if}
 					<button
 						name="decision"
 						value="approved"
+						disabled={!item.gate.approvable}
+						title={item.gate.approvable ? undefined : (item.gate.reason ?? undefined)}
 						class="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-ink hover:bg-accent-ink"
 					>
 						Approve

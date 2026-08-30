@@ -7,16 +7,52 @@ function database() {
 	const db = {
 		prepare: (sql: string) => ({
 			bind: (...bindings: unknown[]) => ({
+				// A prepared statement carries what it was bound with, so a statement that goes into
+				// a batch can still be read back by the test.
+				sql,
+				bindings,
 				first: async () => {
 					calls.push({ sql, bindings });
 					if (sql.includes('FROM meta')) return { value: '20260830T035950Z' };
 					if (sql.includes('FROM moderation_decisions')) return null;
-					if (sql.includes('status FROM')) return { status: 'confirmed' };
+					if (sql.includes('FROM claim_evidence')) return { documents: 0 };
+					// The claim an approval stands on: verified, at a domain a register published.
+					if (sql.includes('verified_at, verified_domain')) {
+						return {
+							claim_id: 'claim_1',
+							atlas_id: 'atlas-1',
+							verified_at: '2026-08-30T00:00:00Z',
+							verified_domain: 'example.invalid',
+							verification_method: 'website_string'
+						};
+					}
+					if (sql.startsWith('SELECT * FROM')) {
+						return { status: 'confirmed', atlas_id: 'atlas-1', claim_id: 'claim_1' };
+					}
 					if (sql.includes('pragma')) return { n: 1 };
 					return { n: 0 };
 				},
 				all: async () => {
 					calls.push({ sql, bindings });
+					// The website a register published for the record, which is what makes the proven
+					// domain approvable without a maintainer vouching for the relationship.
+					if (sql.includes('claim_id IN (')) {
+						return {
+							results: [
+								{
+									claim_id: 'claim_1',
+									atlas_id: 'atlas-1',
+									verified_at: '2026-08-30T00:00:00Z',
+									verified_domain: 'example.invalid',
+									verification_method: 'website_string'
+								}
+							]
+						};
+					}
+					if (sql.includes('FROM statements')) {
+						return { results: [{ atlas_id: 'atlas-1', value: 'https://example.invalid' }] };
+					}
+					if (sql.includes('FROM claim_evidence')) return { results: [] };
 					if (sql.includes('FROM claims')) {
 						return {
 							results: [
@@ -45,8 +81,8 @@ function database() {
 				}
 			})
 		}),
-		batch: async (statements: unknown[]) => {
-			calls.push({ sql: 'BATCH', bindings: statements });
+		batch: async (statements: { sql: string; bindings: unknown[] }[]) => {
+			calls.push(...statements);
 			return [];
 		}
 	} as unknown as D1Database;

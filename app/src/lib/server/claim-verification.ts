@@ -231,7 +231,7 @@ export async function publishedMailDomains(
  * The host a published website value names, without the www a register may or may not have
  * written, so one spelling of a domain is one domain.
  */
-function bareHost(value: string): string | null {
+export function bareHost(value: string): string | null {
 	const trimmed = value?.trim().toLowerCase();
 	if (!trimmed) return null;
 	try {

@@ -8,7 +8,7 @@
 
 import { json } from '@sveltejs/kit';
 import { listReviewCandidates, recordMaintainerLabel } from '$lib/server/linkage-review';
-import { decideRequest, listQueue, OpsError, REQUEST_TYPES } from '$lib/server/ops';
+import { approvalGate, decideRequest, listQueue, OpsError, REQUEST_TYPES } from '$lib/server/ops';
 import type { ModerationRequestType } from '$lib/server/ops';
 import { getDatabase, requireBucket } from '$lib/server/platform';
 import {
@@ -49,14 +49,19 @@ const TOOLS = [
 	{
 		name: 'decide_request',
 		description:
-			'Approve or reject one confirmed request with a reason. One decision per request, append-only, never edits the request.',
+			'Approve or reject one confirmed request with a reason. One decision per request, append-only, never edits the request. Approving a claim, or a correction filed from one, needs the claim verified; when no register published the proven domain, it also needs a person to have checked what connects that domain to the business.',
 		inputSchema: {
 			type: 'object',
 			properties: {
 				request_type: { type: 'string', enum: [...REQUEST_TYPES] },
 				request_id: { type: 'string', maxLength: 200 },
 				decision: { type: 'string', enum: ['approved', 'rejected'] },
-				reason: { type: 'string', maxLength: 500 }
+				reason: { type: 'string', maxLength: 500 },
+				domain_relationship_reviewed: {
+					type: 'boolean',
+					description:
+						'Set only when a person has checked what connects the proven domain to this business, and the reason names that evidence. It is recorded with the decision as the basis for approving.'
+				}
 			},
 			required: ['request_type', 'request_id', 'decision', 'reason']
 		},
@@ -108,9 +113,14 @@ async function runTool(
 	args: Args
 ): Promise<unknown> {
 	const db = getDatabase(platform, 'ops');
+	const statementsDb = getDatabase(platform, 'statements');
 	switch (name) {
-		case 'list_queue':
-			return { items: await listQueue(db) };
+		case 'list_queue': {
+			// The queue carries the same gate the decision applies, so an agent is not left to
+			// re-derive it and press a button that is always refused.
+			const items = await listQueue(db, statementsDb);
+			return { items: items.map((item) => ({ ...item, gate: approvalGate(item) })) };
+		}
 		case 'list_linkage_candidates':
 			return {
 				candidates: await listReviewCandidates(
@@ -134,12 +144,13 @@ async function runTool(
 			if (decision !== 'approved' && decision !== 'rejected') {
 				throw new OpsError('Decision must be approved or rejected.');
 			}
-			return decideRequest(db, {
+			return decideRequest(db, statementsDb, {
 				request_type: requestType as ModerationRequestType,
 				request_id: text(args.request_id),
 				decision,
 				reason: text(args.reason, 500),
-				decided_by: maintainer
+				decided_by: maintainer,
+				domain_relationship_reviewed: args.domain_relationship_reviewed === true
 			});
 		}
 		case 'label_linkage_pair': {

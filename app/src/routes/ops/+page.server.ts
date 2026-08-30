@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { error, fail } from '@sveltejs/kit';
 import { accessConfigFrom, verifyAccessRequest } from '$lib/server/access';
-import { decideRequest, listQueue, OpsError, REQUEST_TYPES } from '$lib/server/ops';
+import { approvalGate, decideRequest, listQueue, OpsError, REQUEST_TYPES } from '$lib/server/ops';
 import type { ModerationRequestType } from '$lib/server/ops';
 import { getDatabase } from '$lib/server/platform';
 import type { Actions, PageServerLoad } from './$types';
@@ -9,7 +9,11 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ platform, parent }) => {
 	await parent(); // the layout guard decides access before any queue query runs
 	const db = getDatabase(platform, 'moderation_decisions');
-	return { queue: await listQueue(db) };
+	// The queue says whether a claim is verified and whether its proven domain is one a register
+	// published, which is read from the statements database.
+	const queue = await listQueue(db, getDatabase(platform, 'statements'));
+	// The screen offers what the decision would accept, in the decision's own words.
+	return { queue: queue.map((item) => ({ ...item, gate: approvalGate(item) })) };
 };
 
 export const actions: Actions = {
@@ -29,13 +33,18 @@ export const actions: Actions = {
 			return fail(400, { message: 'Decision must be approved or rejected.' });
 		}
 		try {
-			const record = await decideRequest(getDatabase(platform, 'moderation_decisions'), {
-				request_type: requestType as ModerationRequestType,
-				request_id: String(form.get('request_id') ?? ''),
-				decision,
-				reason: String(form.get('reason') ?? ''),
-				decided_by: identity.email
-			});
+			const record = await decideRequest(
+				getDatabase(platform, 'moderation_decisions'),
+				getDatabase(platform, 'statements'),
+				{
+					request_type: requestType as ModerationRequestType,
+					request_id: String(form.get('request_id') ?? ''),
+					decision,
+					reason: String(form.get('reason') ?? ''),
+					decided_by: identity.email,
+					domain_relationship_reviewed: form.get('domain_relationship_reviewed') === 'on'
+				}
+			);
 			return { decided: record.request_id, decision: record.decision };
 		} catch (cause) {
 			if (cause instanceof OpsError) return fail(400, { message: cause.message });
