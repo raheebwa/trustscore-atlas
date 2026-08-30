@@ -4,6 +4,7 @@ const WRITE_PAGE_PREFIXES = ['/claim/', '/correct/', '/label/', '/report/'] as c
 
 export function isRateLimitedPath(pathname: string): boolean {
 	return (
+		pathname === '/mcp' ||
 		pathname === '/api/v1' ||
 		pathname.startsWith('/api/v1/') ||
 		WRITE_PAGE_PREFIXES.some((prefix) => pathname.startsWith(prefix))

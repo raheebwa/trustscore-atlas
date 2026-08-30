@@ -105,3 +105,11 @@ describe('request rate limiting', () => {
 		expect(next).not.toHaveBeenCalled();
 	});
 });
+
+describe('isRateLimitedPath for the remote MCP endpoint', () => {
+	it('limits /mcp like the API', async () => {
+		const { isRateLimitedPath } = await import('./rate-limit');
+		expect(isRateLimitedPath('/mcp')).toBe(true);
+		expect(isRateLimitedPath('/methodology')).toBe(false);
+	});
+});
