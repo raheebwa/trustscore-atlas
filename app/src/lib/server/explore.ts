@@ -200,7 +200,7 @@ export async function exploreSegmentsCached(
 	const filters = cleanFilters(inputFilters);
 	const liveId = cache ? await getLiveRegenerationId(databases.db) : null;
 	const key = liveId
-		? `explore:${liveId}:${[filters.country, filters.category, filters.nature, filters.district, filters.division, filters.present_in].map((v) => v ?? '').join('|')}`
+		? `explore:${liveId}:${JSON.stringify([filters.country, filters.category, filters.nature, filters.district, filters.division, filters.present_in].map((v) => v ?? ''))}`
 		: null;
 	if (key) {
 		try {

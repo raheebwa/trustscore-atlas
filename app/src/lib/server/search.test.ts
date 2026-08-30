@@ -134,7 +134,7 @@ describe('searchBusinessesCached', () => {
 		const second = await searchBusinessesCached(databases, cache, options, search);
 		expect(second).toEqual(first);
 		expect(searches).toBe(1);
-		expect([...store.keys()]).toEqual(['search:regen-1:example|kampala|5|']);
+		expect([...store.keys()]).toEqual(['search:regen-1:["example","kampala","5",""]']);
 		await searchBusinessesCached(databases, cache, { ...options, cursor: 'c1' }, search);
 		expect(searches).toBe(2);
 	});

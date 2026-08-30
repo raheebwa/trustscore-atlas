@@ -5,7 +5,8 @@ import type { ModerationRequestType } from '$lib/server/ops';
 import { getDatabase } from '$lib/server/platform';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ platform }) => {
+export const load: PageServerLoad = async ({ platform, parent }) => {
+	await parent(); // the layout guard decides access before any queue query runs
 	const db = getDatabase(platform, 'moderation_decisions');
 	return { queue: await listQueue(db) };
 };

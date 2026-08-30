@@ -16,7 +16,7 @@ function cacheKey(liveId: string, options: SearchOptions): string {
 		options.limit == null ? '' : String(options.limit),
 		options.cursor ?? ''
 	];
-	return `search:${liveId}:${parts.join('|')}`;
+	return `search:${liveId}:${JSON.stringify(parts)}`;
 }
 
 export async function searchBusinessesCached(
