@@ -142,3 +142,20 @@ def test_bundle_comparison_guards_a_rollback_target_against_the_live_bundle(tmp_
     assert any("businesses" in r for r in churned.reasons)
     assert any("labels" in r for r in churned.reasons)
     assert any("aliases 0" in r for r in churned.reasons)
+
+
+def test_comparison_refuses_a_target_or_live_bundle_it_could_not_read(tmp_path: Path):
+    """A missing download must never read as a clean comparison: with no rows on either side
+    every difference is zero, which is exactly what a passing guard looks like."""
+    live = _bundle(tmp_path / "live2", businesses=1000, aliases=70, labels=53)
+
+    missing_target = compare_bundles(target=tmp_path / "absent", live=live)
+    assert not missing_target.ok
+    assert any("target bundle" in reason for reason in missing_target.reasons)
+
+    missing_live = compare_bundles(
+        target=_bundle(tmp_path / "ok2", businesses=1000, aliases=70, labels=53),
+        live=tmp_path / "absent-live",
+    )
+    assert not missing_live.ok
+    assert any("live bundle" in reason for reason in missing_live.reasons)

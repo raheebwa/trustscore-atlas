@@ -94,6 +94,12 @@ def compare_bundles(*, target: Path, live: Path) -> ChurnReport:
     share = delta / previous_businesses if previous_businesses else 0.0
 
     reasons: list[str] = []
+    # A bundle that could not be read gives zero rows on both sides, and zero differences read
+    # exactly like a healthy comparison. Refuse instead of vouching for what was never downloaded.
+    if not previous_businesses:
+        reasons.append(f"live bundle at {live} has no businesses to compare against")
+    if not target_businesses:
+        reasons.append(f"target bundle at {target} has no businesses")
     if previous_businesses and share > NEW_ENTITY_SHARE_LIMIT:
         reasons.append(
             f"target has {target_businesses} businesses against {previous_businesses} live "
