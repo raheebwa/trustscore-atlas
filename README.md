@@ -95,7 +95,7 @@ The site also exposes ordinary HTML forms as declarative tools. Each form uses `
 
 ## Chrome WebMCP evals
 
-The captured production run used Chrome 152 with `--enable-features=WebMCP`, driven over the Chrome DevTools Protocol. Discovery called `document.modelContext.getTools()` and execution called `document.modelContext.executeTool()`. The table reports the saved capture in scratchpad form on the maintainer's machine; it is not rerun at build time.
+The captured production run used Chrome 152 with `--enable-features=WebMCP`, driven over the Chrome DevTools Protocol. Discovery called `document.modelContext.getTools()` and execution called `document.modelContext.executeTool()`. The table reports a saved capture from a local Chrome session against the live site; it is not rerun at build time. Reproduce with the runner in [app/scripts/webmcp-evals.mjs](app/scripts/webmcp-evals.mjs): start Chrome with `--enable-features=WebMCP --remote-debugging-port=9333`, open the site in a tab, then run `node app/scripts/webmcp-evals.mjs https://atlas.trustscorehq.com evals.md`.
 
 | Check | Captured production result | Time | Result bytes |
 |---|---|---:|---:|
